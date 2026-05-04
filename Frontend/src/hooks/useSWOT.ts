@@ -5,7 +5,7 @@ import { runAgentAndWait, type AgentName } from "@/services/agentApi";
 import { useAgentResults } from "@/contexts/AgentResultsContext";
 import type { InsightCard, SwotCategory, NaqaaePillar } from "@/types";
 
-export type SwotAgentName = Extract<AgentName, "tech" | "workforce" | "sentiment">;
+export type SwotAgentName = Extract<AgentName, "tech" | "workforce" | "sentiment" | "social">;
 
 export function useSWOT() {
   const [categoryFilter, setCategoryFilter] = useState<SwotCategory | "all">("all");
@@ -13,8 +13,7 @@ export function useSWOT() {
   const [agentRunning, setAgentRunning] = useState<SwotAgentName | null>(null);
   const [agentError, setAgentError] = useState<string | null>(null);
 
-  // Only live agent results — no mock fallback
-  const { results, addInsights } = useAgentResults();
+  const { results, addInsights, setSocialMeta } = useAgentResults();
 
   const runAgent = useCallback(async (agentName: SwotAgentName) => {
     setAgentRunning(agentName);
@@ -22,9 +21,20 @@ export function useSWOT() {
     try {
       const result = await runAgentAndWait(agentName, { intervalMs: 3_000 }) as {
         insights?: InsightCard[];
+        total_posts_analyzed?: number;
+        opportunities?: number;
+        threats?: number;
       };
       if (result?.insights && result.insights.length > 0) {
         addInsights(result.insights);
+      }
+      if (agentName === "social" && result?.total_posts_analyzed != null) {
+        setSocialMeta({
+          postsAnalyzed: result.total_posts_analyzed,
+          opportunities: result.opportunities ?? 0,
+          threats: result.threats ?? 0,
+          lastRun: new Date().toISOString(),
+        });
       }
     } catch (err) {
       setAgentError(
@@ -33,7 +43,7 @@ export function useSWOT() {
     } finally {
       setAgentRunning(null);
     }
-  }, [addInsights]);
+  }, [addInsights, setSocialMeta]);
 
   const filtered = results.insights.filter((i) => {
     const matchCat = categoryFilter === "all" || i.category === categoryFilter;

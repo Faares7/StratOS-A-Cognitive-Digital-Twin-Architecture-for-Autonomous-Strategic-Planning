@@ -1,11 +1,5 @@
 "use client";
 
-/**
- * AgentResultsContext
- * Global store for all agent results — persisted to localStorage so data
- * survives page navigation and browser refreshes.
- */
-
 import React, {
   createContext,
   useContext,
@@ -17,15 +11,24 @@ import type { InsightCard, ResearchIntelligence } from "@/types";
 
 // ── Shape ─────────────────────────────────────────────────────────────────────
 
+interface SocialMeta {
+  postsAnalyzed: number;
+  opportunities: number;
+  threats: number;
+  lastRun: string;
+}
+
 interface AgentResults {
-  insights: InsightCard[];           // combined from tech + workforce + sentiment
-  research: ResearchIntelligence | null;  // from benchmark agent
+  insights: InsightCard[];
+  research: ResearchIntelligence | null;
+  socialMeta: SocialMeta | null;
 }
 
 interface ContextValue {
   results: AgentResults;
   addInsights: (newInsights: InsightCard[]) => void;
   setResearch: (data: ResearchIntelligence) => void;
+  setSocialMeta: (meta: SocialMeta) => void;
   clearAll: () => void;
 }
 
@@ -34,11 +37,12 @@ interface ContextValue {
 type Action =
   | { type: "ADD_INSIGHTS"; insights: InsightCard[] }
   | { type: "SET_RESEARCH"; data: ResearchIntelligence }
+  | { type: "SET_SOCIAL_META"; meta: SocialMeta }
   | { type: "LOAD"; results: AgentResults }
   | { type: "CLEAR" };
 
-const DEFAULT: AgentResults = { insights: [], research: null };
-const STORAGE_KEY = "stratos_agent_results_v1";
+const DEFAULT: AgentResults = { insights: [], research: null, socialMeta: null };
+const STORAGE_KEY = "stratos_agent_results_v2";
 
 function reducer(state: AgentResults, action: Action): AgentResults {
   switch (action.type) {
@@ -49,8 +53,10 @@ function reducer(state: AgentResults, action: Action): AgentResults {
     }
     case "SET_RESEARCH":
       return { ...state, research: action.data };
+    case "SET_SOCIAL_META":
+      return { ...state, socialMeta: action.meta };
     case "LOAD":
-      return action.results;
+      return { ...DEFAULT, ...action.results };
     case "CLEAR":
       return DEFAULT;
     default:
@@ -64,6 +70,7 @@ const AgentResultsContext = createContext<ContextValue>({
   results: DEFAULT,
   addInsights: () => {},
   setResearch: () => {},
+  setSocialMeta: () => {},
   clearAll: () => {},
 });
 
@@ -72,13 +79,12 @@ const AgentResultsContext = createContext<ContextValue>({
 export function AgentResultsProvider({ children }: { children: React.ReactNode }) {
   const [results, dispatch] = useReducer(reducer, DEFAULT);
 
-  // Hydrate from localStorage on first client render
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const parsed: AgentResults = JSON.parse(raw);
-        if (parsed.insights || parsed.research) {
+        if (parsed.insights || parsed.research || parsed.socialMeta) {
           dispatch({ type: "LOAD", results: parsed });
         }
       }
@@ -87,7 +93,6 @@ export function AgentResultsProvider({ children }: { children: React.ReactNode }
     }
   }, []);
 
-  // Persist every state change to localStorage
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(results));
@@ -104,13 +109,17 @@ export function AgentResultsProvider({ children }: { children: React.ReactNode }
     dispatch({ type: "SET_RESEARCH", data });
   }, []);
 
+  const setSocialMeta = useCallback((meta: SocialMeta) => {
+    dispatch({ type: "SET_SOCIAL_META", meta });
+  }, []);
+
   const clearAll = useCallback(() => {
     dispatch({ type: "CLEAR" });
     try { localStorage.removeItem(STORAGE_KEY); } catch {}
   }, []);
 
   return (
-    <AgentResultsContext.Provider value={{ results, addInsights, setResearch, clearAll }}>
+    <AgentResultsContext.Provider value={{ results, addInsights, setResearch, setSocialMeta, clearAll }}>
       {children}
     </AgentResultsContext.Provider>
   );

@@ -8,7 +8,7 @@ const BASE_URL = (
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
 ).replace(/\/$/, "");
 
-export type AgentName = "tech" | "benchmark" | "workforce" | "sentiment";
+export type AgentName = "tech" | "benchmark" | "workforce" | "sentiment" | "social";
 
 export type JobStatus = {
   status: "running" | "complete" | "failed";

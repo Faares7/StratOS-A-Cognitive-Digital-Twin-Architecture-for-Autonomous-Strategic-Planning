@@ -2,6 +2,9 @@ import os
 import json
 import time
 import glob
+from collections import defaultdict
+from datetime import datetime, timezone
+from pathlib import Path
 from groq import Groq
 from dotenv import load_dotenv
 
@@ -213,3 +216,104 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+# ── API entry point ───────────────────────────────────────────────────────────
+
+def compile_and_run(raw_data_path: str | None = None) -> dict:
+    """
+    Entry point for the FastAPI bridge.
+
+    Fast path: if output/ot_signals.json already exists (from a previous pipeline
+    run), reads it directly — no Groq calls needed, responds instantly.
+
+    Slow path: if no output exists, runs the full NLP pipeline on the latest
+    scraped JSON file (requires GROQ_API_KEY and takes several minutes).
+
+    Returns InsightCard-compatible dicts grouped by theme, plus counts.
+    """
+    _AGENT_DIR = Path(__file__).parent
+    _OUTPUT_FILE = _AGENT_DIR / "output" / "ot_signals.json"
+    _RAW_DIR = _AGENT_DIR / "raw_data"
+
+    if _OUTPUT_FILE.exists():
+        print(f"[social] Reading cached output from {_OUTPUT_FILE}")
+        with open(_OUTPUT_FILE, "r", encoding="utf-8") as f:
+            signals: list[dict] = json.load(f)
+    else:
+        # Find latest raw scrape and run the pipeline
+        raw_files = sorted(_RAW_DIR.glob("scraped_*.json"))
+        if not raw_files:
+            return {
+                "insights": [], "opportunities": 0, "threats": 0,
+                "total_posts_analyzed": 0,
+                "error": "No scraped data found — run scraper.py first.",
+            }
+        target = raw_data_path or str(raw_files[-1])
+        print(f"[social] Running NLP pipeline on {target}...")
+        process_file(target)
+        with open(_OUTPUT_FILE, "r", encoding="utf-8") as f:
+            signals = json.load(f)
+
+    # Group by (swot_type, theme) → one InsightCard per group
+    by_theme: dict[str, list[dict]] = defaultdict(list)
+    for s in signals:
+        theme = (s.get("theme") or "").strip()
+        if theme:
+            by_theme[theme].append(s)
+
+    now = datetime.now(timezone.utc).isoformat()
+    insights: list[dict] = []
+
+    for idx, (theme, posts) in enumerate(by_theme.items()):
+        best = max(posts, key=lambda p: p.get("confidence", 0))
+        swot_type = best.get("swot_type", "THREAT")
+        category = "opportunity" if swot_type == "OPPORTUNITY" else "threat"
+        confidence = int(best.get("confidence", 0.8) * 100)
+        count = len(posts)
+
+        pillar = (
+            "Pillar 8: Community Engagement"
+            if category == "opportunity"
+            else "Pillar 2: Strategic Planning"
+        )
+        impact = "high" if count >= 3 else "medium" if count >= 2 else "low"
+
+        insights.append({
+            "id": f"sm-{idx + 1:02d}-{theme[:14].lower().replace(' ', '-')}",
+            "category": category,
+            "title": theme,
+            "description": best.get("signal", ""),
+            "pillar_tag": pillar,
+            "impact_level": impact,
+            "confidence_score": confidence,
+            "reference_count": count,
+            "created_at": now,
+            "data_source": "live",
+            "is_validated": False,
+            "ai_suggestion": True,
+            "evidence": {
+                "type": "raw_text",
+                "explanation": "; ".join(
+                    p.get("signal", "") for p in posts[:3] if p.get("signal")
+                ),
+                "data_points": {
+                    "posts_analyzed": count,
+                    "source_group": best.get("source_group", ""),
+                    "avg_confidence": round(
+                        sum(p.get("confidence", 0) for p in posts) / count, 2
+                    ),
+                },
+            },
+        })
+
+    opps = sum(1 for s in signals if s.get("swot_type") == "OPPORTUNITY")
+    threats = sum(1 for s in signals if s.get("swot_type") == "THREAT")
+
+    print(f"[social] Done. {opps} opportunities, {threats} threats across {len(insights)} themes.")
+    return {
+        "insights": insights,
+        "opportunities": opps,
+        "threats": threats,
+        "total_posts_analyzed": len(signals),
+    }

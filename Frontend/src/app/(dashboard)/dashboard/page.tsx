@@ -10,6 +10,7 @@ import { SWOTSummaryCard } from "@/components/dashboard/SWOTSummaryCard";
 import { MeetingSummaries } from "@/components/dashboard/MeetingSummaries";
 import { ScenarioWidget } from "@/components/dashboard/ScenarioWidget";
 import { CompetitiveIntelWidget } from "@/components/dashboard/CompetitiveIntelWidget";
+import { SocialMediaWidget } from "@/components/dashboard/SocialMediaWidget";
 
 function Skeleton({ className }: { className?: string }) {
   return <div className={`skeleton rounded-xl ${className ?? ""}`} />;
@@ -87,10 +88,7 @@ export default function CommandCenterPage() {
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
             <CompetitiveIntelWidget data={researchData} />
             <ScenarioWidget simulation={data.last_simulation} />
-            <div className="flex flex-col rounded-xl border border-dashed border-white/10 items-center justify-center p-6 text-center">
-              <p className="text-xs text-slate-600">Upcoming widget</p>
-              <p className="mt-1 text-[10px] text-slate-700">Workforce Analytics</p>
-            </div>
+            <SocialMediaWidget />
           </div>
         </div>
       )}

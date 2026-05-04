@@ -222,6 +222,7 @@ export default function SWOTPage() {
               { name: "tech" as const, label: "Tech Intelligence", hint: "GitHub · CISA · Jobs" },
               { name: "workforce" as const, label: "Workforce Analysis", hint: "HR metrics · Gemini" },
               { name: "sentiment" as const, label: "Sentiment Analysis", hint: "Student feedback · Ollama" },
+              { name: "social" as const, label: "Social Media Analysis", hint: "Facebook groups · Groq" },
             ] as const
           ).map(({ name, label, hint }) => {
             const running = agentRunning === name;

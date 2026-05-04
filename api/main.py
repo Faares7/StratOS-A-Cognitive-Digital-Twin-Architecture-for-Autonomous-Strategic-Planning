@@ -1,10 +1,9 @@
 """
 StratOS Cognitive Digital Twin — Backend API
 ============================================================
-FastAPI bridge between the Next.js frontend and the four
-LangGraph multi-agent workflows.
+FastAPI bridge between the Next.js frontend and the LangGraph multi-agent workflows.
 
-Run from the GRAD/ root directory:
+Run from the project root:
     uvicorn api.main:app --reload --port 8000
 
 Architecture
@@ -20,6 +19,7 @@ import asyncio
 import importlib.util
 import os
 import sys
+import threading
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -35,6 +35,7 @@ load_dotenv(ROOT_DIR / ".env")
 
 AGENTS_DIR: Path = ROOT_DIR / "Agents"
 DATA_DIR: Path = ROOT_DIR / "Data"
+SOCIAL_AGENT_DIR: Path = ROOT_DIR / "Social Media Scraping Agent"
 
 # ── Wire Workforce Agent's relative-import package onto sys.path ─────────────
 _MONITORING_DIR = str(AGENTS_DIR / "monitoring")
@@ -42,7 +43,6 @@ if _MONITORING_DIR not in sys.path:
     sys.path.insert(0, _MONITORING_DIR)
 
 # ── In-memory job store ───────────────────────────────────────────────────────
-# Keyed by job_id → {status, result, error, started_at, finished_at}
 _jobs: dict[str, dict[str, Any]] = {}
 
 _PRIORITY_MAP = {"CRITICAL": "critical", "HIGH": "high", "MEDIUM": "medium", "LOW": "low"}
@@ -52,6 +52,8 @@ NAQAAE_TECH_OPP   = "Pillar 12: Digital Transformation"
 NAQAAE_TECH_THR   = "Pillar 3: Quality Assurance Systems"
 NAQAAE_WORKFORCE  = "Pillar 4: Faculty Development"
 NAQAAE_SENTIMENT  = "Pillar 5: Student Learning Outcomes"
+NAQAAE_SOCIAL_OPP = "Pillar 8: Community Engagement"
+NAQAAE_SOCIAL_THR = "Pillar 2: Strategic Planning"
 
 
 # ── Module loader (cached) ────────────────────────────────────────────────────
@@ -126,7 +128,6 @@ def get_job(job_id: str):
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  TECH AGENT
-#  Returns: opportunities + threats as InsightCard-compatible JSON
 # ══════════════════════════════════════════════════════════════════════════════
 
 def _task_tech(job_id: str) -> None:
@@ -210,7 +211,8 @@ def run_tech(background_tasks: BackgroundTasks):
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  BENCHMARK AGENT
-#  Returns: ResearchIntelligence-compatible JSON (Nile U + Egyptian competitors)
+#  Fast path: bulk OpenAlex fetch → frontend result immediately.
+#  DB save runs in a daemon thread after the job is marked complete.
 # ══════════════════════════════════════════════════════════════════════════════
 
 def _task_benchmark(job_id: str) -> None:
@@ -219,15 +221,25 @@ def _task_benchmark(job_id: str) -> None:
             "benchmark_agent",
             AGENTS_DIR / "benchmark_agent.py",
         )
-        result: dict = mod.compile_and_run()
+        # Step 1: fetch + parse (fast — 1-2 HTTP calls)
+        all_data: list = mod._fetch_all_parsed()
+        # Step 2: format for frontend and finish job immediately
+        result: dict = mod._format_result(all_data)
         _finish(job_id, result)
+        # Step 3: write to Supabase in a daemon thread — does not block the response
+        threading.Thread(
+            target=mod.write_all_to_db,
+            args=(all_data,),
+            daemon=True,
+            name="benchmark-db-save",
+        ).start()
     except Exception as exc:
         _fail(job_id, str(exc))
 
 
 @app.post("/api/agents/benchmark/run", status_code=202)
 def run_benchmark(background_tasks: BackgroundTasks):
-    """Trigger the Benchmark Agent (OpenAlex → Supabase). May take several minutes."""
+    """Trigger the Benchmark Agent (OpenAlex bulk fetch + background Supabase save)."""
     job_id = _new_job()
     background_tasks.add_task(_task_benchmark, job_id)
     return {"job_id": job_id}
@@ -235,7 +247,6 @@ def run_benchmark(background_tasks: BackgroundTasks):
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  WORKFORCE AGENT
-#  Returns: HR insights (strengths/weaknesses) + calculated metrics
 # ══════════════════════════════════════════════════════════════════════════════
 
 def _task_workforce(job_id: str) -> None:
@@ -288,8 +299,6 @@ def run_workforce(background_tasks: BackgroundTasks):
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  SENTIMENT AGENT
-#  Returns: student feedback themes mapped to strength/weakness InsightCards
-#  Note: requires a running Ollama instance with llama3.1:8b + nomic-embed-text
 # ══════════════════════════════════════════════════════════════════════════════
 
 async def _task_sentiment_async(job_id: str, csv_path: str) -> None:
@@ -374,9 +383,44 @@ async def _task_sentiment_async(job_id: str, csv_path: str) -> None:
 
 @app.post("/api/agents/sentiment/run", status_code=202)
 async def run_sentiment(background_tasks: BackgroundTasks):
-    """Trigger the Sentiment Agent (CSV → Ollama llama3.1 → semantic clustering).
-    Requires a locally running Ollama instance."""
+    """Trigger the Sentiment Agent (CSV → Ollama llama3.1 → semantic clustering)."""
     csv_path = os.getenv("SENTIMENT_CSV_PATH") or str(DATA_DIR / "cleaned_students.csv")
     job_id = _new_job()
     background_tasks.add_task(_task_sentiment_async, job_id, csv_path)
+    return {"job_id": job_id}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  SOCIAL MEDIA AGENT
+#  Reads cached ot_signals.json (instant) or re-runs Groq NLP pipeline.
+#  Returns opportunity + threat InsightCards grouped by theme.
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _task_social_media(job_id: str) -> None:
+    try:
+        mod = _load_module(
+            "nlp_pipeline",
+            SOCIAL_AGENT_DIR / "nlp_pipeline.py",
+        )
+        result: dict = mod.compile_and_run()
+
+        if result.get("error"):
+            _fail(job_id, result["error"])
+            return
+
+        _finish(job_id, {
+            "insights": result.get("insights", []),
+            "opportunities": result.get("opportunities", 0),
+            "threats": result.get("threats", 0),
+            "total_posts_analyzed": result.get("total_posts_analyzed", 0),
+        })
+    except Exception as exc:
+        _fail(job_id, str(exc))
+
+
+@app.post("/api/agents/social/run", status_code=202)
+def run_social(background_tasks: BackgroundTasks):
+    """Trigger the Social Media Agent (Facebook groups → Groq NLP → SWOT signals)."""
+    job_id = _new_job()
+    background_tasks.add_task(_task_social_media, job_id)
     return {"job_id": job_id}
