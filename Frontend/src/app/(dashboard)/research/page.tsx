@@ -20,6 +20,62 @@ const COLORS = [
   "#e879f9", "#facc15", "#4ade80", "#f87171",
 ];
 
+function exportReportCsv(
+  data: ResearchIntelligence,
+  chartData: Record<string, number | string>[],
+  allUniversities: string[],
+  isLive: boolean,
+) {
+  const nu = data.nile_university;
+  const rows: string[] = [];
+
+  const esc = (v: string | number) => {
+    const s = String(v);
+    return s.includes(",") || s.includes('"') || s.includes("\n")
+      ? `"${s.replace(/"/g, '""')}"`
+      : s;
+  };
+  const row = (...cols: (string | number)[]) => rows.push(cols.map(esc).join(","));
+
+  row("RESEARCH INTELLIGENCE REPORT — Nile University");
+  row("Generated", new Date().toLocaleString());
+  row("Data Source", isLive ? "Live (OpenAlex)" : "Mock / Demo");
+  rows.push("");
+
+  row("--- NILE UNIVERSITY SUMMARY ---");
+  row("Metric", "Value");
+  row("Rank", nu.rank != null ? `#${nu.rank}` : "Not Ranked");
+  row("Publications", nu.publications);
+  row("H-Index", nu.h_index);
+  row("Total Citations", nu.total_citations);
+  rows.push("");
+
+  row("--- COMPETITOR RANKINGS ---");
+  row("Rank", "University", "Publications", "H-Index", "Total Citations");
+
+  const all = [data.nile_university, ...data.competitors].sort(
+    (a, b) => (a.rank ?? 9999) - (b.rank ?? 9999)
+  );
+  all.forEach((u) => {
+    row(u.rank != null ? `#${u.rank}` : "—", u.university_name, u.publications, u.h_index, u.total_citations);
+  });
+  rows.push("");
+
+  row("--- HISTORICAL TREND ---");
+  row("Year", ...allUniversities);
+  chartData.forEach((entry) => {
+    row(entry.year, ...allUniversities.map((name) => entry[name] ?? 0));
+  });
+
+  const blob = new Blob([rows.join("\n")], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `research-intelligence-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export default function ResearchPage() {
   const { results, setResearch } = useAgentResults();
   const [mockData, setMockData]   = useState<ResearchIntelligence | null>(null);
@@ -184,7 +240,13 @@ export default function ResearchPage() {
                     : "Comparing Nile University's H-Index improvement against top Egyptian universities"}
                 </p>
               </div>
-              <Button variant="outline" size="sm" className="gap-1.5 text-xs">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 text-xs"
+                disabled={!data}
+                onClick={() => data && exportReportCsv(data, chartData, allUniversities, isLive)}
+              >
                 <Download className="h-3.5 w-3.5" />
                 Export Report
               </Button>
