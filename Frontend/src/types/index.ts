@@ -90,6 +90,13 @@ export interface Meeting {
   has_recording: boolean;
   has_transcript: boolean;
   data_source: DataSource;
+  // Enriched fields populated by Google Calendar / Fathom
+  transcript?: string;
+  recording_url?: string;
+  meet_link?: string;
+  calendar_event_id?: string;
+  html_link?: string;
+  fathom_call_id?: string;
 }
 
 // ─── Research Intelligence ─────────────────────────────────────────────────────
