@@ -15,6 +15,7 @@ import {
   Building2,
   ChevronRight,
   ChevronLeft,
+  ClipboardList,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -53,6 +54,7 @@ const mainNav: NavItem[] = [
   { href: "/gap-analysis", icon: BarChart3, label: "Gap Analysis" },
   { href: "/research", icon: GraduationCap, label: "Research Intelligence" },
   { href: "/meetings", icon: FileText, label: "Meetings" },
+  { href: "/surveys", icon: ClipboardList, label: "Survey Generation" },
 ];
 
 const bottomNav: NavItem[] = [

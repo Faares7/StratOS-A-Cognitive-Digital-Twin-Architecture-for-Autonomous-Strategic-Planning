@@ -5,9 +5,9 @@ import pandas as pd
 from typing import List, Dict, Any
 from typing_extensions import TypedDict
 from pydantic import BaseModel, Field
-from langchain_ollama import ChatOllama, OllamaEmbeddings
-from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_ollama import OllamaEmbeddings
 from langgraph.graph import StateGraph, END
+from core.llm import JSON_GUARDRAIL, local_brain
 
 # ==========================================
 # 1. DEFINE SCHEMAS (Strict Pydantic Guards)
@@ -38,32 +38,40 @@ def ingest_node(state: SentimentState):
     print(f"📥 [Ingest] Ingested {total} stakeholder records locally.")
     return {"total_students": total}
 
+_SENTIMENT_SYSTEM = (
+    "You are a qualitative analyst. Extract key strategic themes (strengths and "
+    "weaknesses) from the stakeholder feedback provided. For each theme return a "
+    "concise 2-4 word label and a direct quote that justifies it."
+    + JSON_GUARDRAIL
+)
+
 async def llm_processing_node(state: SentimentState):
-    print("🧠 [LLM Node] Processing batches locally on RTX 3060 via Ollama...")
-    
-    # LOCAL OLLAMA CONFIGURATION
-    llm = ChatOllama(model="llama3.1:8b", temperature=0.1)
-    structured_llm = llm.with_structured_output(ExtractedThemes)
-    
-    # RTX 3060 VRAM PROTECTION: Max 2 students per prompt to avoid Out-Of-Memory errors
+    print("🧠 [LLM Node] Processing batches via local Ollama...")
+
+    structured_llm = local_brain.with_structured_output(ExtractedThemes)
+
+    # Max 2 students per prompt to protect VRAM
     batch_size = 2
     raw_data = state['raw_data']
     batches = [raw_data[i:i + batch_size] for i in range(0, len(raw_data), batch_size)]
-    
-    # Lock GPU to processing exactly 1 prompt at a time
+
+    # Process one batch at a time to avoid overloading the local model
     gpu_limit = asyncio.Semaphore(1)
-    
+
     async def process_batch(batch):
         async with gpu_limit:
-            prompt = "Analyze the following stakeholder feedback and extract key strategic themes based on the provided data:\n\n"
+            from langchain_core.messages import SystemMessage, HumanMessage
+            human_text = "Analyze the following stakeholder feedback and extract key strategic themes:\n\n"
             for student in batch:
-                prompt += "- Stakeholder Record:\n"
+                human_text += "- Stakeholder Record:\n"
                 for column_name, value in student.items():
                     if pd.notna(value) and str(value).strip() != "":
-                        prompt += f"  • {column_name}: {value}\n"
-                prompt += "\n"
-            
-            return await structured_llm.ainvoke(prompt)
+                        human_text += f"  * {column_name}: {value}\n"
+                human_text += "\n"
+            return await structured_llm.ainvoke([
+                SystemMessage(content=_SENTIMENT_SYSTEM),
+                HumanMessage(content=human_text),
+            ])
             
     tasks = [process_batch(b) for b in batches]
     results = await asyncio.gather(*tasks)

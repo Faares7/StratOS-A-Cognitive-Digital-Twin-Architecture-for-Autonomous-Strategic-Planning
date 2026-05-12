@@ -1009,3 +1009,46 @@ def run_social(background_tasks: BackgroundTasks):
     job_id = _new_job()
     background_tasks.add_task(_task_social_media, job_id)
     return {"job_id": job_id}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  SURVEY AGENT
+#  Single-node LangGraph: GraphState.current_weaknesses + user_request
+#  → local LLM structured output → SurveyDraft (list of SurveyQuestion)
+# ══════════════════════════════════════════════════════════════════════════════
+
+class SurveyRequest(BaseModel):
+    audience: str = "All students"
+    min_questions: int = 5
+    max_questions: int = 10
+    instructions: str = ""
+    # Optional: pass current weaknesses from the live graph state so the agent
+    # can tailor questions to known institutional gaps.
+    current_weaknesses: list[str] = []
+
+
+def _task_survey(job_id: str, req: SurveyRequest) -> None:
+    try:
+        mod = _load_module(
+            "survey_agent",
+            AGENTS_DIR / "Survey generation" / "survey_agent.py",
+        )
+        state_snapshot = {"current_weaknesses": req.current_weaknesses}
+        user_request = {
+            "audience": req.audience,
+            "min_questions": req.min_questions,
+            "max_questions": req.max_questions,
+            "instructions": req.instructions,
+        }
+        result: dict = mod.compile_and_run(state_snapshot, user_request)
+        _finish(job_id, result)
+    except Exception as exc:
+        _fail(job_id, str(exc))
+
+
+@app.post("/api/agents/survey/run", status_code=202)
+def run_survey(req: SurveyRequest, background_tasks: BackgroundTasks):
+    """Trigger the Survey Agent (LangGraph → local LLM → structured SurveyDraft)."""
+    job_id = _new_job()
+    background_tasks.add_task(_task_survey, job_id, req)
+    return {"job_id": job_id}
