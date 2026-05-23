@@ -9,10 +9,50 @@ langchain-core>=0.3.0
 langchain-google-genai>=1.0.0
 
 # HTTP client for Scout API calls
+requests>=2.31.0 # ============================================================
+#  StratOS CDT — Complete Python Dependencies
+#  Install with: pip install -r requirements_api.txt
+# ============================================================
+
+# ── FastAPI Backend ──────────────────────────────────────────
+fastapi>=0.111.0
+uvicorn[standard]>=0.29.0
+
+# ── LangGraph + LangChain Core ───────────────────────────────
+langgraph>=0.2.0
+langchain-core>=0.3.0
+langchain-google-genai>=1.0.0      # Tech Agent + Workforce Agent (Gemini)
+langchain-ollama>=0.1.0            # Sentiment Agent (local Ollama)
+langchain-huggingface>=0.0.3       # Sentiment Agent (HuggingFace embeddings)
+
+# ── Data & ML ────────────────────────────────────────────────
+numpy>=1.26.0
+pandas>=2.0.0
+scikit-learn>=1.4.0                # Optional: for advanced similarity in sentiment
+
+# ── HTTP & APIs ──────────────────────────────────────────────
 requests>=2.31.0
+httpx>=0.27.0                      # Async HTTP (used by FastAPI internals)
+
+# ── Database ─────────────────────────────────────────────────
+psycopg2-binary>=2.9.9             # Benchmark Agent → Supabase PostgreSQL
+
+# ── Environment ──────────────────────────────────────────────
+python-dotenv>=1.0.0
+
+# ── Typing ───────────────────────────────────────────────────
+typing_extensions>=4.11.0
+pydantic>=2.0.0
+
 
 # Environment variable management
 python-dotenv>=1.0.0
 
 # Optional: for richer console output during development
 rich>=13.0.0
+
+# ── GraphRAG / NAQAAE Ingestion Pipeline ─────────────────────────────────────
+langchain-community>=0.3.0         # OllamaEmbeddings used by ingest_graph.py
+langchain-neo4j>=0.3.0             # Neo4jGraph + Neo4jVector integrations
+langchain-text-splitters>=0.3.0    # MarkdownHeaderTextSplitter
+neo4j>=5.19.0                      # Official Neo4j Python driver (AuraDB TLS)
