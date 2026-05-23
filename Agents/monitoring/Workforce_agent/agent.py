@@ -29,12 +29,8 @@ from pathlib import Path
 from typing import Any, TypedDict
 
 from dotenv import load_dotenv
-from langchain_google_genai import ChatGoogleGenerativeAI
-
-# -- Uncomment this block and comment the Google block above if you prefer OpenAI
-# from langchain_openai import ChatOpenAI
-
 from langgraph.graph import END, START, StateGraph
+from core.llm import local_brain
 
 from .prompts import WORKFORCE_ANALYSIS_PROMPT
 from .schema import WorkforceInsights
@@ -156,22 +152,8 @@ def extract_insights_node(state: WorkforceState) -> dict[str, Any]:
     The chain is:
         WORKFORCE_ANALYSIS_PROMPT | llm.with_structured_output(WorkforceInsights)
     """
-    # --- LLM configuration -------------------------------------------------
-    llm = ChatGoogleGenerativeAI(
-        model="gemini-2.5-flash",          # Fast, cost-efficient for structured tasks
-        temperature=0.1,                    # Low temperature → deterministic phrasing
-        google_api_key=os.getenv("GOOGLE_API_KEY"),
-    )
-
-    # Uncomment to use OpenAI instead:
-    # llm = ChatOpenAI(
-    #     model="gpt-4o-mini",
-    #     temperature=0.1,
-    #     api_key=os.getenv("OPENAI_API_KEY"),
-    # )
-
     # --- Build chain -------------------------------------------------------
-    structured_llm = llm.with_structured_output(WorkforceInsights)
+    structured_llm = local_brain.with_structured_output(WorkforceInsights)
     chain = WORKFORCE_ANALYSIS_PROMPT | structured_llm
 
     # --- Prepare prompt payload --------------------------------------------

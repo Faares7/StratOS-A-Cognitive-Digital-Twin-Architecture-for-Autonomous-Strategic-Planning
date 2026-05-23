@@ -1,7 +1,12 @@
 "use client";
 
+import { SessionProvider } from "next-auth/react";
 import { AgentResultsProvider } from "@/contexts/AgentResultsContext";
 
 export function Providers({ children }: { children: React.ReactNode }) {
-  return <AgentResultsProvider>{children}</AgentResultsProvider>;
+  return (
+    <SessionProvider>
+      <AgentResultsProvider>{children}</AgentResultsProvider>
+    </SessionProvider>
+  );
 }

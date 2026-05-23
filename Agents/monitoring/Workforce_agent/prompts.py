@@ -15,6 +15,7 @@ Usage
 """
 
 from langchain_core.prompts import ChatPromptTemplate
+from core.llm import JSON_GUARDRAIL
 
 # ---------------------------------------------------------------------------
 # System message – persona + hard constraints
@@ -81,7 +82,7 @@ OUTPUT FORMAT
 You MUST respond with a JSON object matching the `WorkforceInsights` schema, \
 containing the fields: metric_category, insight_type, finding, impact_level.  \
 Do not include any prose outside the JSON block.
-""".strip()
+""".strip() + JSON_GUARDRAIL
 
 # ---------------------------------------------------------------------------
 # Human message – delivers the numerical payload

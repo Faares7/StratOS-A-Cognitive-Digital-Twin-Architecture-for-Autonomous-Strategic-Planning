@@ -7,13 +7,11 @@ from dotenv import load_dotenv
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import (
     NoSuchElementException, TimeoutException, StaleElementReferenceException
 )
-from webdriver_manager.chrome import ChromeDriverManager
 from keywords import is_relevant, get_matched_categories, get_matched_keywords
 
 load_dotenv()
@@ -112,12 +110,14 @@ def is_within_cutoff(date_str: str) -> bool:
 
 
 # ── Driver setup ──────────────────────────────────────────────────────────────
-def build_driver() -> webdriver.Chrome:
+def build_driver(headless: bool = False) -> webdriver.Chrome:
     options = webdriver.ChromeOptions()
+    options.add_argument("--no-first-run")
+    options.add_argument("--no-default-browser-check")
     options.add_argument("--disable-notifications")
     options.add_argument("--disable-popup-blocking")
-    options.add_argument("--start-maximized")
     options.add_argument("--disable-blink-features=AutomationControlled")
+    options.add_argument("--remote-debugging-port=0")
     options.add_experimental_option("excludeSwitches", ["enable-automation"])
     options.add_experimental_option("useAutomationExtension", False)
     options.add_argument(
@@ -125,10 +125,16 @@ def build_driver() -> webdriver.Chrome:
         "AppleWebKit/537.36 (KHTML, like Gecko) "
         "Chrome/124.0.0.0 Safari/537.36"
     )
-    driver = webdriver.Chrome(
-        service=Service(ChromeDriverManager().install()),
-        options=options,
-    )
+    if headless:
+        options.add_argument("--headless=new")
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-gpu")
+        options.add_argument("--disable-dev-shm-usage")
+        options.add_argument("--window-size=1920,1080")
+    else:
+        options.add_argument("--start-maximized")
+    # Selenium 4.x Selenium Manager handles chromedriver automatically
+    driver = webdriver.Chrome(options=options)
     driver.execute_script(
         "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
     )
@@ -136,7 +142,7 @@ def build_driver() -> webdriver.Chrome:
 
 
 # ── Login ─────────────────────────────────────────────────────────────────────
-def login(driver: webdriver.Chrome):
+def login(driver: webdriver.Chrome, verification_wait: int = 0):
     print("[*] Navigating to Facebook...")
     driver.get("https://www.facebook.com")
     human_delay(3, 5)
@@ -155,9 +161,10 @@ def login(driver: webdriver.Chrome):
     except TimeoutException:
         print("[!] Login form not found — may already be logged in.")
 
-    print("\n[!] If Facebook is asking for verification, complete it now.")
-    print("[!] You have 60 seconds before scraping begins...\n")
-    time.sleep(60)
+    if verification_wait > 0:
+        print(f"\n[!] If Facebook is asking for verification, complete it now.")
+        print(f"[!] You have {verification_wait} seconds before scraping begins...\n")
+        time.sleep(verification_wait)
     print("[*] Continuing to group...")
 
 
@@ -440,7 +447,7 @@ def scrape_group(driver: webdriver.Chrome) -> list[dict]:
 
 
 # ── Save ──────────────────────────────────────────────────────────────────────
-def save(posts: list[dict]):
+def save(posts: list[dict]) -> str:
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     path = os.path.join(RAW_DATA_DIR, f"scraped_{timestamp}.json")
     with open(path, "w", encoding="utf-8") as f:
@@ -450,22 +457,32 @@ def save(posts: list[dict]):
     print(f"\n[+] Saved {len(posts)} posts → {path}")
     print(f"    Relevant : {relevant_count}")
     print(f"    Filtered : {len(posts) - relevant_count}")
+    return path
+
+
+# ── Callable entry point ───────────────────────────────────────────────────────
+def run_scrape(headless: bool = False, verification_wait: int = 0) -> str | None:
+    """Run the full scrape pipeline. Returns the path to the saved JSON file."""
+    driver = build_driver(headless=headless)
+    posts  = []
+    path   = None
+    try:
+        login(driver, verification_wait=verification_wait)
+        posts = scrape_group(driver)
+        path  = save(posts)
+    except KeyboardInterrupt:
+        print("\n[!] Interrupted — saving what was collected...")
+        if posts:
+            path = save(posts)
+    finally:
+        driver.quit()
+        print("[*] Browser closed.")
+    return path
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 def main():
-    driver = build_driver()
-    posts  = []
-    try:
-        login(driver)
-        posts = scrape_group(driver)
-        save(posts)
-    except KeyboardInterrupt:
-        print("\n[!] Interrupted — saving what was collected...")
-        save(posts)
-    finally:
-        driver.quit()
-        print("[*] Browser closed.")
+    run_scrape(headless=False, verification_wait=60)
 
 
 if __name__ == "__main__":

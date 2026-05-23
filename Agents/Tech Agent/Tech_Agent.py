@@ -39,11 +39,9 @@ from dotenv import load_dotenv
 from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
 from langchain_core.messages import HumanMessage, AIMessage
-from langchain_google_genai import ChatGoogleGenerativeAI
-
-from langchain_ollama import ChatOllama
 from typing import TypedDict, Annotated, Optional, List, Literal
 from pydantic import BaseModel, Field
+from core.llm import JSON_GUARDRAIL, local_brain
 
 # ─── Logging Setup ──────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -352,14 +350,7 @@ def market_scout_node(state: TechClusterState) -> TechClusterState:
 #  3. TECH INTELLIGENCE LEAD — Synthesis Node (Fan-In)
 # ══════════════════════════════════════════════════════════════════════════════
 
-# ── Gemini LLM Setup ──────────────────────────────────────────────────────────
-def _get_local_llm() -> ChatOllama:
-    """Instantiate the Local LLM running on Ollama."""
-    return ChatOllama(
-        model="llama3.1:8b", # Or whichever model you downloaded via Ollama
-        temperature=0.3,
-        format="json",    # Helps enforce JSON output for your Pydantic schema
-    )
+# ── LLM Setup — uses shared local_brain from core.llm ─────────────────────────
 
 
 LEAD_SYSTEM_PROMPT = """
@@ -411,7 +402,7 @@ Output STRICTLY as a JSON object with this exact schema:
 }
 
 Return ONLY valid JSON. No markdown fences. No commentary outside the JSON object.
-"""
+""" + JSON_GUARDRAIL
 
 
 def tech_intelligence_lead_node(state: TechClusterState) -> TechClusterState:
@@ -426,9 +417,7 @@ def tech_intelligence_lead_node(state: TechClusterState) -> TechClusterState:
     market_data = state.get("market_scout_output", {})
 
     try:
-        llm = _get_local_llm()
-        # Bind the Pydantic handcuffs to the LLM
-        structured_llm = llm.with_structured_output(StrategicOutput)
+        structured_llm = local_brain.with_structured_output(StrategicOutput)
 
         user_message = f"""
         Here are the three intelligence packages from your scout agents. 
