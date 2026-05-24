@@ -43,6 +43,7 @@ ROOT_DIR: Path = Path(__file__).parent.parent.resolve()
 load_dotenv(ROOT_DIR / ".env")
 
 AGENTS_DIR: Path = ROOT_DIR / "Agents"
+GAP_ANALYSIS_AGENT_PATH: Path = AGENTS_DIR / "Gap analysis" / "gap_analysis_agent.py"
 DATA_DIR: Path = ROOT_DIR / "Data"
 SOCIAL_AGENT_DIR: Path = ROOT_DIR / "Social Media Scraping Agent"
 MEETINGS_AGENT_PATH: Path = AGENTS_DIR / "meetings" / "agent.py"
@@ -1051,4 +1052,292 @@ def run_survey(req: SurveyRequest, background_tasks: BackgroundTasks):
     """Trigger the Survey Agent (LangGraph → local LLM → structured SurveyDraft)."""
     job_id = _new_job()
     background_tasks.add_task(_task_survey, job_id, req)
+    return {"job_id": job_id}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  HITL GAP ANALYSIS
+#  Phase 1 — GET  /api/gap-analysis/draft     → fetch editable draft data
+#  Phase 2 — POST /api/gap-analysis/calculate → LangGraph QA agent → job_id
+# ══════════════════════════════════════════════════════════════════════════════
+
+# ── 7 Strategic Pillars for gap analysis ─────────────────────────────────────
+
+_GAP_PILLARS = [
+    "Leadership & Governance",
+    "Strategic Planning",
+    "Quality Assurance Systems",
+    "Faculty Development",
+    "Student Learning Outcomes",
+    "Curriculum Design",
+    "Research & Innovation",
+]
+
+# ── Mock target states (used when Neo4j returns no matching Standard node) ────
+
+_MOCK_TARGET_STATES: dict[str, str] = {
+    "Leadership & Governance": (
+        "The institution shall have a clear, documented governance structure with "
+        "defined roles and responsibilities at all levels. Leadership must demonstrate "
+        "a visible commitment to quality culture, transparent decision-making, and "
+        "continuous improvement aligned with NAQAAE accreditation standards. A formal "
+        "succession planning process and annual leadership effectiveness review are required."
+    ),
+    "Strategic Planning": (
+        "The institution shall develop, formally approve, implement, and regularly "
+        "review a comprehensive strategic plan with SMART objectives and measurable "
+        "KPIs. The plan must demonstrate documented alignment to national higher "
+        "education priorities, resource allocation decisions, and NAQAAE accreditation "
+        "requirements. All stakeholders shall have access to progress reports."
+    ),
+    "Quality Assurance Systems": (
+        "The institution shall operate a fully documented internal quality assurance "
+        "system covering all academic and administrative processes. The system must "
+        "include systematic review cycles, evidence-based improvement actions, "
+        "structured student feedback loops, and cross-departmental QA collaboration "
+        "with documented outcomes and closure of corrective actions."
+    ),
+    "Faculty Development": (
+        "The institution shall have structured, funded programs for faculty recruitment, "
+        "induction, professional development, performance appraisal, and career "
+        "progression. These programs must ensure academic staff maintain current "
+        "disciplinary expertise, adopt research-informed teaching methodologies, and "
+        "have access to mentoring. Teaching load policies must allow meaningful "
+        "engagement with development activities."
+    ),
+    "Student Learning Outcomes": (
+        "The institution shall define measurable student learning outcomes for all "
+        "academic programs, aligned to the national qualifications framework. Outcomes "
+        "must be systematically assessed using both direct and indirect methods, with "
+        "calibrated rubrics, results analysed at program level, and documented "
+        "curriculum improvements driven by assessment findings each academic cycle."
+    ),
+    "Curriculum Design": (
+        "The institution shall follow a systematic, stakeholder-inclusive curriculum "
+        "design process. Program and course learning outcomes must be current, "
+        "industry-validated through active advisory boards, regularly reviewed on a "
+        "maximum 3-year cycle, explicitly mapped to course-level assessments, and "
+        "aligned to national qualifications framework level descriptors."
+    ),
+    "Research & Innovation": (
+        "The institution shall demonstrate a growing, sustainable research culture "
+        "evidenced by increasing externally funded projects, peer-reviewed publications "
+        "meeting national benchmarks per faculty member, documented innovation "
+        "initiatives, formal mechanisms connecting research to teaching practice, and "
+        "measurable community and industry benefit from research outputs."
+    ),
+}
+
+# ── Mock strengths / weaknesses (Supabase placeholder until fully wired) ──────
+
+_MOCK_STRENGTHS: dict[str, str] = {
+    "Leadership & Governance": (
+        "Board of Trustees charter is formally documented and published. Annual "
+        "leadership performance reviews are conducted with documented outcomes. "
+        "University council meets quarterly with published minutes and action logs."
+    ),
+    "Strategic Planning": (
+        "A five-year institutional strategic plan (2022–2027) is published and "
+        "publicly accessible. KPIs are tracked in an internal performance dashboard "
+        "reviewed quarterly. Department heads submit annual strategic alignment reports."
+    ),
+    "Quality Assurance Systems": (
+        "A dedicated Quality Assurance Unit with a full-time director is operational. "
+        "Internal audit cycles are completed bi-annually across all faculties. "
+        "ISO 9001 certification process has been initiated for administrative processes."
+    ),
+    "Faculty Development": (
+        "An annual professional development budget is allocated per faculty member. "
+        "Participation in international conferences is financially supported. "
+        "A classroom observation and peer-review protocol is formally in place."
+    ),
+    "Student Learning Outcomes": (
+        "Program learning outcomes are documented and published for all undergraduate "
+        "programs. Graduate exit surveys are administered every semester. "
+        "An alumni tracking and engagement study was launched in the current academic year."
+    ),
+    "Curriculum Design": (
+        "Program advisory boards include active industry representatives. "
+        "Curriculum review meetings are scheduled and held annually per program. "
+        "Course syllabi are standardised in format and centrally stored."
+    ),
+    "Research & Innovation": (
+        "A research ethics review board is fully operational. Internal seed-funding "
+        "grants are awarded competitively on an annual basis. An open-access "
+        "institutional repository for faculty publications is available and maintained."
+    ),
+}
+
+_MOCK_WEAKNESSES: dict[str, str] = {
+    "Leadership & Governance": (
+        "Governance policies are not consistently communicated or applied across "
+        "departments. Decision-making authority boundaries at the middle-management "
+        "level remain unclear. No formal succession planning process exists for "
+        "key leadership positions."
+    ),
+    "Strategic Planning": (
+        "Faculty awareness of the strategic plan's specific annual objectives is "
+        "limited. Progress monitoring reports are not published to all internal "
+        "stakeholders. Resource allocation decisions are not visibly or transparently "
+        "linked to stated strategic priorities."
+    ),
+    "Quality Assurance Systems": (
+        "QA unit findings rarely result in documented, time-bound corrective action "
+        "plans with assigned owners. Student feedback collection loops are incomplete "
+        "and results are not communicated back to students. Cross-departmental QA "
+        "collaboration remains minimal and informal."
+    ),
+    "Faculty Development": (
+        "No structured mentoring or coaching program exists for junior faculty. "
+        "Professional development is largely self-directed with inconsistent uptake. "
+        "Teaching load volumes prevent meaningful engagement with available training "
+        "and development opportunities."
+    ),
+    "Student Learning Outcomes": (
+        "Indirect assessment methods dominate; direct evidence of student learning "
+        "is sparse and inconsistently collected. Graduate attribute mapping across "
+        "the curriculum is incomplete. Assessment rubrics lack formal calibration "
+        "across evaluators, raising consistency concerns."
+    ),
+    "Curriculum Design": (
+        "Curriculum revision cycles exceed three years for several programs, creating "
+        "currency risks. Industry advisory board engagement is inconsistent and "
+        "poorly documented. Learning outcomes are not regularly validated against "
+        "current labour market data or employer feedback."
+    ),
+    "Research & Innovation": (
+        "Publication output per faculty member is below the national benchmark for "
+        "comparable institutions. A formal research-teaching nexus policy has not "
+        "been articulated or implemented. Grant application success rate requires "
+        "targeted improvement through pre-submission mentoring."
+    ),
+}
+
+# ── Neo4j lazy connection (reuses credentials from .env) ─────────────────────
+
+_neo4j_driver: Any = None
+
+
+def _get_neo4j_driver() -> Any:
+    global _neo4j_driver
+    uri  = os.getenv("NEO4J_URI", "")
+    user = os.getenv("NEO4J_USERNAME", "")
+    pw   = os.getenv("NEO4J_PASSWORD", "")
+    if not all([uri, user, pw]):
+        return None
+    try:
+        if _neo4j_driver is None:
+            from neo4j import GraphDatabase as _GD
+            _neo4j_driver = _GD.driver(uri, auth=(user, pw))
+        return _neo4j_driver
+    except Exception as exc:
+        print(f"[neo4j] Connection failed: {exc}")
+        return None
+
+
+def _query_target_state(pillar: str) -> str | None:
+    """
+    Query the NAQAAE knowledge graph for a Standard node matching the pillar.
+    Returns the first chunk's content, or None if not found / no DB connection.
+    """
+    driver = _get_neo4j_driver()
+    if driver is None:
+        return None
+    # Use the first meaningful word as the search keyword
+    keyword = pillar.split("&")[0].strip().split()[0]
+    try:
+        with driver.session() as session:
+            result = session.run(
+                """
+                MATCH (s:Standard)
+                WHERE toLower(s.title) CONTAINS toLower($keyword)
+                OPTIONAL MATCH (s)-[:HAS_CHUNK]->(ch:Chunk)
+                RETURN ch.content AS content
+                ORDER BY ch.position ASC
+                LIMIT 1
+                """,
+                keyword=keyword,
+            )
+            record = result.single()
+            if record and record["content"]:
+                return str(record["content"])
+    except Exception as exc:
+        print(f"[neo4j] Query failed for pillar '{pillar}': {exc}")
+    return None
+
+
+# ── Phase 1: Fetch draft ──────────────────────────────────────────────────────
+
+@app.get("/api/gap-analysis/draft")
+def get_gap_analysis_draft():
+    """
+    Fetch editable draft data for the 7 Strategic Pillars.
+
+    Target States are sourced from the Neo4j NAQAAE knowledge graph when
+    available, falling back to curated mock text. Strengths and Weaknesses
+    are mock placeholders until Supabase is fully wired.
+    """
+    pillars_data = []
+    for pillar in _GAP_PILLARS:
+        neo4j_content = _query_target_state(pillar)
+        pillars_data.append({
+            "pillar":       pillar,
+            "target_state": neo4j_content or _MOCK_TARGET_STATES[pillar],
+            "strengths":    _MOCK_STRENGTHS[pillar],
+            "weaknesses":   _MOCK_WEAKNESSES[pillar],
+            "target_source": "neo4j" if neo4j_content else "mock",
+        })
+    return {"pillars": pillars_data, "data_source": "neo4j+mock"}
+
+
+# ── Phase 2: Calculate gap ────────────────────────────────────────────────────
+
+class GapCalculateRequest(BaseModel):
+    pillars: list[dict]  # list of PillarDraft objects from the frontend
+
+
+def _task_gap_calculate(job_id: str, pillars: list[dict]) -> None:
+    try:
+        # Ensure project root is on sys.path so `from core.llm import ...` resolves
+        if str(ROOT_DIR) not in sys.path:
+            sys.path.insert(0, str(ROOT_DIR))
+
+        # Always evict the cached entry before loading.
+        # _load_module registers the module in sys.modules BEFORE exec_module runs,
+        # so a failed first load leaves a broken empty shell in the cache.
+        # Every subsequent call would return that shell (missing compile_and_run).
+        sys.modules.pop("gap_analysis_agent", None)
+
+        
+        if not GAP_ANALYSIS_AGENT_PATH.exists():
+            raise FileNotFoundError(f"Agent file not found: {GAP_ANALYSIS_AGENT_PATH}")
+
+        mod = _load_module("gap_analysis_agent", GAP_ANALYSIS_AGENT_PATH)
+
+        if not hasattr(mod, "compile_and_run"):
+            raise AttributeError(
+                "gap_analysis_agent loaded but compile_and_run is missing. "
+                "Check the agent file for top-level import errors."
+            )
+
+        result: list[dict] = mod.compile_and_run(pillars)
+        _finish(job_id, result)
+    except Exception as exc:
+        _fail(job_id, str(exc))
+
+
+@app.post("/api/gap-analysis/calculate", status_code=202)
+async def calculate_gap_analysis(
+    req: GapCalculateRequest,
+    background_tasks: BackgroundTasks,
+):
+    """
+    Run the LangGraph QA agent on user-edited pillar data.
+
+    Accepts the 7-pillar payload edited by the user in the frontend, queues a
+    background LangGraph job, and returns a job_id for polling via
+    GET /api/jobs/{job_id}.
+    """
+    job_id = _new_job()
+    background_tasks.add_task(_task_gap_calculate, job_id, req.pillars)
     return {"job_id": job_id}

@@ -198,3 +198,24 @@ export interface ChatMessage {
   content: string;
   timestamp: string;
 }
+
+// ─── HITL Gap Analysis ─────────────────────────────────────────────────────────
+export interface PillarDraft {
+  pillar: string;
+  target_state: string;
+  strengths: string;
+  weaknesses: string;
+  target_source?: "neo4j" | "mock";
+}
+
+export interface GapDraft {
+  pillars: PillarDraft[];
+  data_source: string;
+}
+
+export interface PillarSuggestion {
+  pillar: string;
+  suggestions: string[];
+}
+
+export type GapCalculationResult = PillarSuggestion[];
