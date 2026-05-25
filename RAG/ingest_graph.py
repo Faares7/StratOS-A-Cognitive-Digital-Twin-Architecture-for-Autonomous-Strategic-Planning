@@ -3,23 +3,32 @@
 ingest_graph.py — NAQAAE GraphRAG Ingestion Pipeline
 
 Walks ./RAG/Pre-built/Naqaae_Immutable/, splits every English Markdown standards file
-along its header hierarchy, embeds each chunk with a local Ollama model, and
-writes a hierarchical knowledge graph + vector index into Neo4j AuraDB.
+along its full 3-level header hierarchy, embeds each chunk with a local Ollama model,
+and writes a hierarchical knowledge graph + vector index into Neo4j AuraDB.
 
 Graph schema
 ────────────
   (Document)-[:HAS_STANDARD]->(Standard)
   (Standard)-[:HAS_CRITERION]->(Criterion)
-  (Document|Standard|Criterion)-[:HAS_CHUNK]->(Chunk)
+  (Criterion)-[:HAS_INDICATOR]->(Indicator)
+  (Document|Standard|Criterion|Indicator)-[:HAS_CHUNK]->(Chunk)
   (Chunk)-[:NEXT_CHUNK]->(Chunk)   ← sequential order within each document
 
-Run
-───
-  python RAG/ingest_graph.py
+Split levels
+────────────
+  #   → Standard   "Standard (1): Program Mission and Management"
+  ##  → Criterion  "Programmatic Accreditation Standards — NAQAAE 2022"
+  ### → Indicator  "Indicator 1-1: Program Mission"
+
+Run (clean wipe + re-ingest)
+────────────────────────────
+  python RAG/ingest_graph.py --clean
+  python RAG/ingest_graph.py          # incremental MERGE (safe to re-run)
 """
 
 from __future__ import annotations
 
+import argparse
 import datetime
 import os
 import pathlib
@@ -34,9 +43,9 @@ from neo4j import GraphDatabase
 load_dotenv()
 
 # ── Tuneable constants ────────────────────────────────────────────────────────
-OLLAMA_MODEL = "bge-m3"   # ← swap this string to change the embedding model
+OLLAMA_MODEL = "bge-m3"   # ← swap to change the embedding model
 EMBED_DIM    = 1024       # bge-m3 output dimension — update if you change the model
-EMBED_BATCH  = 32         # chunks per Ollama embed call (tune for your hardware)
+EMBED_BATCH  = 32         # chunks per Ollama embed call
 DATA_DIR     = pathlib.Path("./RAG/Pre-built/Naqaae_Immutable")
 
 # ── Neo4j credentials (loaded from .env) ─────────────────────────────────────
@@ -45,19 +54,22 @@ NEO4J_USERNAME = os.getenv("NEO4J_USERNAME")
 NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD")
 
 # ── Header split levels ───────────────────────────────────────────────────────
-# H1 (#)  → Standard   (top-level NAQAAE standard, e.g. "Standard One: Governance")
-# H2 (##) → Criterion  (sub-criterion,               e.g. "1.1 Institutional Governance")
+# H1 (#)   → Standard   top-level standard
+# H2 (##)  → Criterion  edition/scope header (one per file)
+# H3 (###) → Indicator  individual indicator — this is what creates one chunk per indicator
 HEADERS_TO_SPLIT_ON = [
-    ("#",  "standard"),
-    ("##", "criterion"),
+    ("#",   "standard"),
+    ("##",  "criterion"),
+    ("###", "indicator"),
 ]
 
 # ── Schema Cypher ─────────────────────────────────────────────────────────────
 _CONSTRAINTS = [
-    "CREATE CONSTRAINT doc_unique   IF NOT EXISTS FOR (d:Document)  REQUIRE d.doc_id       IS UNIQUE",
-    "CREATE CONSTRAINT std_unique   IF NOT EXISTS FOR (s:Standard)  REQUIRE s.standard_id  IS UNIQUE",
-    "CREATE CONSTRAINT crit_unique  IF NOT EXISTS FOR (c:Criterion) REQUIRE c.criterion_id IS UNIQUE",
-    "CREATE CONSTRAINT chunk_unique IF NOT EXISTS FOR (ch:Chunk)    REQUIRE ch.chunk_id    IS UNIQUE",
+    "CREATE CONSTRAINT doc_unique  IF NOT EXISTS FOR (d:Document)  REQUIRE d.doc_id        IS UNIQUE",
+    "CREATE CONSTRAINT std_unique  IF NOT EXISTS FOR (s:Standard)  REQUIRE s.standard_id   IS UNIQUE",
+    "CREATE CONSTRAINT crit_unique IF NOT EXISTS FOR (c:Criterion) REQUIRE c.criterion_id  IS UNIQUE",
+    "CREATE CONSTRAINT ind_unique  IF NOT EXISTS FOR (i:Indicator) REQUIRE i.indicator_id  IS UNIQUE",
+    "CREATE CONSTRAINT chk_unique  IF NOT EXISTS FOR (ch:Chunk)    REQUIRE ch.chunk_id     IS UNIQUE",
 ]
 
 _VECTOR_INDEX = f"""
@@ -98,14 +110,26 @@ MATCH (s:Standard {standard_id: $std_id})
 MERGE (s)-[:HAS_CRITERION]->(c)
 """
 
+_MERGE_INDICATOR = """
+MERGE (i:Indicator {indicator_id: $ind_id})
+SET i.title       = $title,
+    i.criterion_id = $crit_id,
+    i.standard_id  = $std_id,
+    i.doc_id       = $doc_id
+WITH i
+MATCH (c:Criterion {criterion_id: $crit_id})
+MERGE (c)-[:HAS_INDICATOR]->(i)
+"""
+
 _MERGE_CHUNK = """
 MERGE (ch:Chunk {chunk_id: $chunk_id})
-SET ch.content         = $content,
-    ch.embedding       = $embedding,
-    ch.doc_id          = $doc_id,
-    ch.standard_title  = $standard_title,
-    ch.criterion_title = $criterion_title,
-    ch.position        = $position
+SET ch.content          = $content,
+    ch.embedding        = $embedding,
+    ch.doc_id           = $doc_id,
+    ch.standard_title   = $standard_title,
+    ch.criterion_title  = $criterion_title,
+    ch.indicator_title  = $indicator_title,
+    ch.position         = $position
 """
 
 _NEXT_CHUNK = """
@@ -129,23 +153,28 @@ def _setup_schema(driver) -> None:
     print("[schema] Constraints and vector index ensured.")
 
 
+def _wipe_graph(driver) -> None:
+    with driver.session() as s:
+        s.run("MATCH (n) DETACH DELETE n")
+    print("[clean] All nodes and relationships deleted.")
+
+
 def _ingest_file(
     driver,
     embedder: OllamaEmbeddings,
     md_file: pathlib.Path,
-) -> None:
+) -> int:
+    """Ingest one Markdown file. Returns number of chunks written."""
     content = md_file.read_text(encoding="utf-8")
-
-    # Deterministic doc_id so re-runs are fully idempotent
-    doc_id = str(uuid.uuid5(uuid.NAMESPACE_URL, str(md_file.resolve())))
+    doc_id  = str(uuid.uuid5(uuid.NAMESPACE_URL, str(md_file.resolve())))
 
     splitter = MarkdownHeaderTextSplitter(
         headers_to_split_on=HEADERS_TO_SPLIT_ON,
-        strip_headers=False,   # keep headers inside chunk text for full context
+        strip_headers=False,
     )
     docs = splitter.split_text(content)
 
-    # Embed in batches to avoid overwhelming Ollama
+    # Embed all chunks in batches
     all_embeddings: list[list[float]] = []
     for batch in _batched([d.page_content for d in docs], EMBED_BATCH):
         all_embeddings.extend(embedder.embed_documents(batch))
@@ -162,11 +191,11 @@ def _ingest_file(
         prev_chunk_id: Optional[str] = None
 
         for i, (doc, embedding) in enumerate(zip(docs, all_embeddings)):
-            meta            = doc.metadata
-            standard_title  = meta.get("standard")
-            criterion_title = meta.get("criterion")
+            meta             = doc.metadata
+            standard_title   = meta.get("standard")
+            criterion_title  = meta.get("criterion")
+            indicator_title  = meta.get("indicator")
 
-            # Deterministic chunk_id keyed on document + position
             chunk_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"{doc_id}::{i}"))
 
             # ── Standard node (H1) ───────────────────────────────────────────
@@ -179,23 +208,25 @@ def _ingest_file(
                     crit_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"{std_id}::{criterion_title}"))
                     session.run(
                         _MERGE_CRITERION,
-                        crit_id=crit_id,
-                        title=criterion_title,
-                        std_id=std_id,
-                        doc_id=doc_id,
+                        crit_id=crit_id, title=criterion_title,
+                        std_id=std_id, doc_id=doc_id,
                     )
-                    parent_label   = "Criterion"
-                    parent_id_prop = "criterion_id"
-                    parent_id      = crit_id
+
+                    # ── Indicator node (H3) ──────────────────────────────────
+                    if indicator_title:
+                        ind_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"{crit_id}::{indicator_title}"))
+                        session.run(
+                            _MERGE_INDICATOR,
+                            ind_id=ind_id, title=indicator_title,
+                            crit_id=crit_id, std_id=std_id, doc_id=doc_id,
+                        )
+                        parent_label, parent_id_prop, parent_id = "Indicator", "indicator_id", ind_id
+                    else:
+                        parent_label, parent_id_prop, parent_id = "Criterion", "criterion_id", crit_id
                 else:
-                    parent_label   = "Standard"
-                    parent_id_prop = "standard_id"
-                    parent_id      = std_id
+                    parent_label, parent_id_prop, parent_id = "Standard", "standard_id", std_id
             else:
-                # Preamble text before any header — attach directly to Document
-                parent_label   = "Document"
-                parent_id_prop = "doc_id"
-                parent_id      = doc_id
+                parent_label, parent_id_prop, parent_id = "Document", "doc_id", doc_id
 
             # ── Chunk node ───────────────────────────────────────────────────
             session.run(
@@ -206,6 +237,7 @@ def _ingest_file(
                 doc_id=doc_id,
                 standard_title=standard_title,
                 criterion_title=criterion_title,
+                indicator_title=indicator_title,
                 position=i,
             )
 
@@ -217,16 +249,24 @@ def _ingest_file(
             """
             session.run(link_cypher, parent_id=parent_id, chunk_id=chunk_id)
 
-            # Sequential chain for context-window expansion during retrieval
             if prev_chunk_id:
                 session.run(_NEXT_CHUNK, prev=prev_chunk_id, curr=chunk_id)
 
             prev_chunk_id = chunk_id
 
+    return len(docs)
+
 
 # ── Entry point ───────────────────────────────────────────────────────────────
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description="NAQAAE GraphRAG ingestion pipeline")
+    parser.add_argument(
+        "--clean", action="store_true",
+        help="Wipe all existing nodes before ingesting (required when schema changes).",
+    )
+    args = parser.parse_args()
+
     missing = [v for v in ("NEO4J_URI", "NEO4J_USERNAME", "NEO4J_PASSWORD") if not os.getenv(v)]
     if missing:
         raise EnvironmentError(f"Missing environment variables: {', '.join(missing)}")
@@ -243,15 +283,20 @@ def main() -> None:
     driver   = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USERNAME, NEO4J_PASSWORD))
     embedder = OllamaEmbeddings(model=OLLAMA_MODEL)
 
+    if args.clean:
+        _wipe_graph(driver)
+
     _setup_schema(driver)
 
+    total_chunks = 0
     for md_file in md_files:
         print(f"[ingest] {md_file.name} ...", end=" ", flush=True)
-        _ingest_file(driver, embedder, md_file)
-        print("done")
+        n = _ingest_file(driver, embedder, md_file)
+        total_chunks += n
+        print(f"{n} chunks")
 
     driver.close()
-    print(f"\nPipeline complete — {len(md_files)} document(s) ingested into Neo4j.")
+    print(f"\nPipeline complete — {len(md_files)} document(s), {total_chunks} chunk(s) ingested.")
 
 
 if __name__ == "__main__":

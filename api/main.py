@@ -1064,153 +1064,174 @@ def run_survey(req: SurveyRequest, background_tasks: BackgroundTasks):
 # ── 7 Strategic Pillars for gap analysis ─────────────────────────────────────
 
 _GAP_PILLARS = [
-    "Leadership & Governance",
-    "Strategic Planning",
-    "Quality Assurance Systems",
-    "Faculty Development",
-    "Student Learning Outcomes",
-    "Curriculum Design",
-    "Research & Innovation",
+    "Program Mission and Management",
+    "Program Design",
+    "Teaching, Learning and Assessment",
+    "Students and Graduate Outcomes",
+    "Faculty and Teaching Assistants",
+    "Resources and Learning Facilities",
+    "Quality Assurance and Program Evaluation",
 ]
 
 # ── Mock target states (used when Neo4j returns no matching Standard node) ────
 
 _MOCK_TARGET_STATES: dict[str, str] = {
-    "Leadership & Governance": (
-        "The institution shall have a clear, documented governance structure with "
-        "defined roles and responsibilities at all levels. Leadership must demonstrate "
-        "a visible commitment to quality culture, transparent decision-making, and "
-        "continuous improvement aligned with NAQAAE accreditation standards. A formal "
-        "succession planning process and annual leadership effectiveness review are required."
+    "Program Mission and Management": (
+        "The program shall have a clearly articulated, formally approved mission that "
+        "guides its objectives, curriculum, and operational decisions. Governance "
+        "structures must define roles and responsibilities at all levels, with "
+        "transparent decision-making and documented annual leadership effectiveness "
+        "reviews aligned to NAQAAE accreditation requirements."
     ),
-    "Strategic Planning": (
-        "The institution shall develop, formally approve, implement, and regularly "
-        "review a comprehensive strategic plan with SMART objectives and measurable "
-        "KPIs. The plan must demonstrate documented alignment to national higher "
-        "education priorities, resource allocation decisions, and NAQAAE accreditation "
-        "requirements. All stakeholders shall have access to progress reports."
+    "Program Design": (
+        "The program shall follow a systematic, stakeholder-inclusive design process. "
+        "Program and course learning outcomes must be current, industry-validated "
+        "through active advisory boards, regularly reviewed on a maximum 3-year cycle, "
+        "explicitly mapped to course-level assessments, and aligned to national "
+        "qualifications framework level descriptors."
     ),
-    "Quality Assurance Systems": (
-        "The institution shall operate a fully documented internal quality assurance "
+    "Teaching, Learning and Assessment": (
+        "The program shall employ diverse, evidence-based teaching and learning "
+        "strategies aligned to intended learning outcomes. Assessment methods must "
+        "include both formative and summative components, use calibrated rubrics, "
+        "and results must be systematically analysed to drive documented curriculum "
+        "improvements each academic cycle."
+    ),
+    "Students and Graduate Outcomes": (
+        "The program shall demonstrate measurable graduate outcomes aligned to the "
+        "national qualifications framework. Student support services, progression "
+        "tracking, graduate attribute mapping, and alumni engagement must be "
+        "systematically managed with documented evidence of continuous improvement "
+        "driven by outcome data."
+    ),
+    "Faculty and Teaching Assistants": (
+        "The program shall have structured, funded faculty recruitment, induction, "
+        "professional development, performance appraisal, and career progression "
+        "mechanisms. Academic staff must maintain current disciplinary expertise, "
+        "adopt research-informed teaching, and have access to mentoring. Teaching "
+        "load policies must allow meaningful engagement with development activities."
+    ),
+    "Resources and Learning Facilities": (
+        "The program shall be supported by adequate, well-maintained physical and "
+        "digital learning resources including laboratories, libraries, and technology "
+        "infrastructure. Resources must be regularly reviewed for currency, "
+        "accessibility, and alignment to program needs, with a transparent "
+        "resource allocation and renewal plan."
+    ),
+    "Quality Assurance and Program Evaluation": (
+        "The program shall operate a fully documented internal quality assurance "
         "system covering all academic and administrative processes. The system must "
         "include systematic review cycles, evidence-based improvement actions, "
         "structured student feedback loops, and cross-departmental QA collaboration "
         "with documented outcomes and closure of corrective actions."
-    ),
-    "Faculty Development": (
-        "The institution shall have structured, funded programs for faculty recruitment, "
-        "induction, professional development, performance appraisal, and career "
-        "progression. These programs must ensure academic staff maintain current "
-        "disciplinary expertise, adopt research-informed teaching methodologies, and "
-        "have access to mentoring. Teaching load policies must allow meaningful "
-        "engagement with development activities."
-    ),
-    "Student Learning Outcomes": (
-        "The institution shall define measurable student learning outcomes for all "
-        "academic programs, aligned to the national qualifications framework. Outcomes "
-        "must be systematically assessed using both direct and indirect methods, with "
-        "calibrated rubrics, results analysed at program level, and documented "
-        "curriculum improvements driven by assessment findings each academic cycle."
-    ),
-    "Curriculum Design": (
-        "The institution shall follow a systematic, stakeholder-inclusive curriculum "
-        "design process. Program and course learning outcomes must be current, "
-        "industry-validated through active advisory boards, regularly reviewed on a "
-        "maximum 3-year cycle, explicitly mapped to course-level assessments, and "
-        "aligned to national qualifications framework level descriptors."
-    ),
-    "Research & Innovation": (
-        "The institution shall demonstrate a growing, sustainable research culture "
-        "evidenced by increasing externally funded projects, peer-reviewed publications "
-        "meeting national benchmarks per faculty member, documented innovation "
-        "initiatives, formal mechanisms connecting research to teaching practice, and "
-        "measurable community and industry benefit from research outputs."
     ),
 }
 
 # ── Mock strengths / weaknesses (Supabase placeholder until fully wired) ──────
 
 _MOCK_STRENGTHS: dict[str, str] = {
-    "Leadership & Governance": (
-        "Board of Trustees charter is formally documented and published. Annual "
-        "leadership performance reviews are conducted with documented outcomes. "
-        "University council meets quarterly with published minutes and action logs."
+    "Program Mission and Management": (
+        "Program mission statement is formally documented and publicly accessible. "
+        "Annual leadership performance reviews are conducted with documented outcomes. "
+        "Program committee meets regularly with published minutes and action logs."
     ),
-    "Strategic Planning": (
-        "A five-year institutional strategic plan (2022–2027) is published and "
-        "publicly accessible. KPIs are tracked in an internal performance dashboard "
-        "reviewed quarterly. Department heads submit annual strategic alignment reports."
-    ),
-    "Quality Assurance Systems": (
-        "A dedicated Quality Assurance Unit with a full-time director is operational. "
-        "Internal audit cycles are completed bi-annually across all faculties. "
-        "ISO 9001 certification process has been initiated for administrative processes."
-    ),
-    "Faculty Development": (
-        "An annual professional development budget is allocated per faculty member. "
-        "Participation in international conferences is financially supported. "
-        "A classroom observation and peer-review protocol is formally in place."
-    ),
-    "Student Learning Outcomes": (
-        "Program learning outcomes are documented and published for all undergraduate "
-        "programs. Graduate exit surveys are administered every semester. "
-        "An alumni tracking and engagement study was launched in the current academic year."
-    ),
-    "Curriculum Design": (
+    "Program Design": (
         "Program advisory boards include active industry representatives. "
         "Curriculum review meetings are scheduled and held annually per program. "
         "Course syllabi are standardised in format and centrally stored."
     ),
-    "Research & Innovation": (
-        "A research ethics review board is fully operational. Internal seed-funding "
-        "grants are awarded competitively on an annual basis. An open-access "
-        "institutional repository for faculty publications is available and maintained."
+    "Teaching, Learning and Assessment": (
+        "A variety of active learning methodologies are employed across core courses. "
+        "Assessment blueprints are aligned to stated course learning outcomes. "
+        "Faculty receive training on formative assessment design each academic year."
+    ),
+    "Students and Graduate Outcomes": (
+        "Program learning outcomes are documented and published for all undergraduate "
+        "programs. Graduate exit surveys are administered every semester. "
+        "An alumni tracking and engagement study was launched in the current academic year."
+    ),
+    "Faculty and Teaching Assistants": (
+        "An annual professional development budget is allocated per faculty member. "
+        "Participation in international conferences is financially supported. "
+        "A classroom observation and peer-review protocol is formally in place."
+    ),
+    "Resources and Learning Facilities": (
+        "Laboratories are equipped with up-to-date instrumentation aligned to program "
+        "needs. An online learning platform (LMS) is fully deployed and actively used. "
+        "Library digital collections are reviewed and renewed annually."
+    ),
+    "Quality Assurance and Program Evaluation": (
+        "A dedicated Quality Assurance Unit with a full-time director is operational. "
+        "Internal audit cycles are completed bi-annually across all faculties. "
+        "ISO 9001 certification process has been initiated for administrative processes."
     ),
 }
 
 _MOCK_WEAKNESSES: dict[str, str] = {
-    "Leadership & Governance": (
-        "Governance policies are not consistently communicated or applied across "
-        "departments. Decision-making authority boundaries at the middle-management "
-        "level remain unclear. No formal succession planning process exists for "
-        "key leadership positions."
+    "Program Mission and Management": (
+        "Program mission is not consistently communicated or applied across "
+        "departments. Decision-making authority at middle-management level remains "
+        "unclear. No formal succession planning process exists for key program "
+        "leadership positions."
     ),
-    "Strategic Planning": (
-        "Faculty awareness of the strategic plan's specific annual objectives is "
-        "limited. Progress monitoring reports are not published to all internal "
-        "stakeholders. Resource allocation decisions are not visibly or transparently "
-        "linked to stated strategic priorities."
-    ),
-    "Quality Assurance Systems": (
-        "QA unit findings rarely result in documented, time-bound corrective action "
-        "plans with assigned owners. Student feedback collection loops are incomplete "
-        "and results are not communicated back to students. Cross-departmental QA "
-        "collaboration remains minimal and informal."
-    ),
-    "Faculty Development": (
-        "No structured mentoring or coaching program exists for junior faculty. "
-        "Professional development is largely self-directed with inconsistent uptake. "
-        "Teaching load volumes prevent meaningful engagement with available training "
-        "and development opportunities."
-    ),
-    "Student Learning Outcomes": (
-        "Indirect assessment methods dominate; direct evidence of student learning "
-        "is sparse and inconsistently collected. Graduate attribute mapping across "
-        "the curriculum is incomplete. Assessment rubrics lack formal calibration "
-        "across evaluators, raising consistency concerns."
-    ),
-    "Curriculum Design": (
+    "Program Design": (
         "Curriculum revision cycles exceed three years for several programs, creating "
         "currency risks. Industry advisory board engagement is inconsistent and "
         "poorly documented. Learning outcomes are not regularly validated against "
         "current labour market data or employer feedback."
     ),
-    "Research & Innovation": (
-        "Publication output per faculty member is below the national benchmark for "
-        "comparable institutions. A formal research-teaching nexus policy has not "
-        "been articulated or implemented. Grant application success rate requires "
-        "targeted improvement through pre-submission mentoring."
+    "Teaching, Learning and Assessment": (
+        "Indirect assessment methods dominate; direct evidence of student learning "
+        "is sparse and inconsistently collected. Assessment rubrics lack formal "
+        "calibration across evaluators. Feedback turnaround to students exceeds "
+        "recommended timelines in several courses."
     ),
+    "Students and Graduate Outcomes": (
+        "Graduate attribute mapping across the curriculum is incomplete. Alumni "
+        "engagement is sporadic and not systematically tracked. Career placement "
+        "data is collected inconsistently, limiting outcome benchmarking."
+    ),
+    "Faculty and Teaching Assistants": (
+        "No structured mentoring or coaching program exists for junior faculty. "
+        "Professional development is largely self-directed with inconsistent uptake. "
+        "Teaching load volumes prevent meaningful engagement with available training "
+        "and development opportunities."
+    ),
+    "Resources and Learning Facilities": (
+        "Some laboratory equipment is outdated and not calibrated to current "
+        "industry standards. Remote access to digital resources is limited for "
+        "off-campus students. A formal resource adequacy review process has not "
+        "been established."
+    ),
+    "Quality Assurance and Program Evaluation": (
+        "QA unit findings rarely result in documented, time-bound corrective action "
+        "plans with assigned owners. Student feedback collection loops are incomplete "
+        "and results are not communicated back to students. Cross-departmental QA "
+        "collaboration remains minimal and informal."
+    ),
+}
+
+# ── Pillar → NAQAAE Standard keyword map ─────────────────────────────────────
+#
+# H1 headers in the ingested Markdown files produce Standard node titles like:
+#   "Standard (1): Program Mission and Management — 4 Indicators (Amended)"
+#   "Standard (2): Program Design — 4 Indicators (Amended)"
+#   "Standard (3): Teaching, Learning and Assessment — ..."
+#   "Standard (4): Students and Graduates — ..."
+#   "Standard (5): Faculty and Teaching Assistants — ..."
+#   "Standard (6): Resources and Learning Facilities — ..."
+#   "Standard (7): Quality Assurance and Program Evaluation — ..."
+#
+# Each list is tried in order; the first keyword that returns chunks wins.
+
+_PILLAR_KEYWORDS: dict[str, list[str]] = {
+    "Program Mission and Management":           ["Mission and Management"],
+    "Program Design":                           ["Program Design"],
+    "Teaching, Learning and Assessment":        ["Teaching, Learning"],
+    "Students and Graduate Outcomes":           ["Students and Graduates"],
+    "Faculty and Teaching Assistants":          ["Faculty and Teaching"],
+    "Resources and Learning Facilities":        ["Learning Sources"],
+    "Quality Assurance and Program Evaluation": ["Quality Assurance and Program Evaluation"],
 }
 
 # ── Neo4j lazy connection (reuses credentials from .env) ─────────────────────
@@ -1237,32 +1258,64 @@ def _get_neo4j_driver() -> Any:
 
 def _query_target_state(pillar: str) -> str | None:
     """
-    Query the NAQAAE knowledge graph for a Standard node matching the pillar.
-    Returns the first chunk's content, or None if not found / no DB connection.
+    Query the NAQAAE knowledge graph for all text chunks that belong to the
+    Standard node matching this pillar, then return them concatenated as the
+    target state paragraph.
+
+    Traversal:
+        Standard -[:HAS_CHUNK]-> Chunk           (preamble chunks directly on Standard)
+        Standard -[:HAS_CRITERION]-> Criterion -[:HAS_CHUNK]-> Chunk  (body chunks)
+
+    Keywords are tried in priority order from _PILLAR_KEYWORDS so that
+    "Quality Assurance and Program Evaluation" is tried before the shorter
+    substring "Quality Assurance", preventing accidental partial matches.
     """
     driver = _get_neo4j_driver()
     if driver is None:
+        print(f"[neo4j] No connection — falling back to mock for '{pillar}'")
         return None
-    # Use the first meaningful word as the search keyword
-    keyword = pillar.split("&")[0].strip().split()[0]
-    try:
-        with driver.session() as session:
-            result = session.run(
-                """
-                MATCH (s:Standard)
-                WHERE toLower(s.title) CONTAINS toLower($keyword)
-                OPTIONAL MATCH (s)-[:HAS_CHUNK]->(ch:Chunk)
-                RETURN ch.content AS content
-                ORDER BY ch.position ASC
-                LIMIT 1
-                """,
-                keyword=keyword,
-            )
-            record = result.single()
-            if record and record["content"]:
-                return str(record["content"])
-    except Exception as exc:
-        print(f"[neo4j] Query failed for pillar '{pillar}': {exc}")
+
+    keywords = _PILLAR_KEYWORDS.get(pillar, [pillar])
+
+    for keyword in keywords:
+        try:
+            with driver.session() as session:
+                records = session.run(
+                    """
+                    MATCH (s:Standard)
+                    WHERE toLower(s.title) CONTAINS toLower($keyword)
+                    CALL (s) {
+                        MATCH (s)-[:HAS_CHUNK]->(ch:Chunk)
+                        RETURN ch.content AS content, ch.position AS pos
+                        UNION
+                        MATCH (s)-[:HAS_CRITERION]->()-[:HAS_CHUNK]->(ch:Chunk)
+                        RETURN ch.content AS content, ch.position AS pos
+                        UNION
+                        MATCH (s)-[:HAS_CRITERION]->()-[:HAS_INDICATOR]->()-[:HAS_CHUNK]->(ch:Chunk)
+                        RETURN ch.content AS content, ch.position AS pos
+                    }
+                    RETURN content, pos
+                    ORDER BY pos ASC
+                    """,
+                    keyword=keyword,
+                ).data()
+
+                if records:
+                    combined = "\n\n".join(
+                        r["content"] for r in records if r.get("content")
+                    ).strip()
+                    if combined:
+                        print(
+                            f"[neo4j] '{pillar}' → {len(records)} chunk(s) "
+                            f"from Standard matching '{keyword}'"
+                        )
+                        return combined
+
+        except Exception as exc:
+            print(f"[neo4j] Query error for '{pillar}' / keyword '{keyword}': {exc}")
+            return None  # don't retry further keywords if the driver itself errored
+
+    print(f"[neo4j] No chunks found for '{pillar}' — run ingest_graph.py first")
     return None
 
 
