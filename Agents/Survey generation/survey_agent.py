@@ -14,6 +14,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import BaseModel, Field
 
 from core.llm import JSON_GUARDRAIL, local_brain
+from core.persistence import build_envelope, save_envelope
 
 # ── Pydantic output schemas ───────────────────────────────────────────────────
 
@@ -140,9 +141,24 @@ def compile_and_run(
     if draft is None:
         return {"questions": [], "error": "LLM returned no output."}
 
-    return {
-        "questions": [
-            {"text": q.text, "answer_type": q.answer_type}
-            for q in draft.questions
-        ]
-    }
+    questions = [
+        {"text": q.text, "answer_type": q.answer_type}
+        for q in draft.questions
+    ]
+
+    # Persist run via the unified pipeline (no SWOT items — survey consumes weaknesses).
+    try:
+        envelope = build_envelope(
+            agent_id="survey",
+            swot_items=[],
+            structured_data={
+                "questions":          questions,
+                "input_weaknesses":   weaknesses,
+                "user_request":       req,
+            },
+        )
+        save_envelope(envelope)
+    except Exception as e:
+        print(f"[survey] unified envelope save failed: {e}")
+
+    return {"questions": questions}

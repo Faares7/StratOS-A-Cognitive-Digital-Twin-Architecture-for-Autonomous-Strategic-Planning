@@ -31,6 +31,7 @@ from typing import Any, TypedDict
 from dotenv import load_dotenv
 from langgraph.graph import END, START, StateGraph
 from core.llm import local_brain
+from core.persistence import build_envelope, save_envelope
 
 from .prompts import WORKFORCE_ANALYSIS_PROMPT
 from .schema import WorkforceInsights
@@ -175,6 +176,42 @@ def extract_insights_node(state: WorkforceState) -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
+# Node 4: Categorize S/W and persist via the unified pipeline
+# ---------------------------------------------------------------------------
+
+def _build_swot_items_from_insights(insights: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Convert WorkforceInsights items into the unified SWOT item shape."""
+    items: list[dict[str, Any]] = []
+    for ins in insights:
+        kind = (ins.get("insight_type") or "").lower()
+        if kind not in ("strength", "weakness"):
+            continue
+        items.append({
+            "type": kind,
+            "title": ins.get("metric_category"),
+            "description": ins.get("finding", ""),
+            "evidence": [],
+            "impact_level": (ins.get("impact_level") or "").lower() or None,
+            "source_metadata": {
+                "metric_category": ins.get("metric_category"),
+            },
+        })
+    return items
+
+
+def save_node(state: WorkforceState) -> dict[str, Any]:
+    """Categorize S/W against the 7 NAQAAE pillars and persist to Supabase."""
+    print("☁️ [Database Node] Categorizing S/W and saving to Supabase...")
+    envelope = build_envelope(
+        agent_id="workforce",
+        swot_items=_build_swot_items_from_insights(state.get("insights", [])),
+        structured_data={"calculated_metrics": state.get("calculated_metrics", {})},
+    )
+    save_envelope(envelope)
+    return {}
+
+
+# ---------------------------------------------------------------------------
 # Graph construction
 # ---------------------------------------------------------------------------
 
@@ -185,7 +222,7 @@ def build_graph() -> StateGraph:
 
     Graph topology
     --------------
-    START → load_data_node → calculate_metrics_node → extract_insights_node → END
+    START → load_data_node → calculate_metrics_node → extract_insights_node → save_node → END
     """
     graph = StateGraph(WorkforceState)
 
@@ -193,12 +230,14 @@ def build_graph() -> StateGraph:
     graph.add_node("load_data", load_data_node)
     graph.add_node("calculate_metrics", calculate_metrics_node)
     graph.add_node("extract_insights", extract_insights_node)
+    graph.add_node("save", save_node)
 
     # Wire edges – strictly sequential
     graph.add_edge(START, "load_data")
     graph.add_edge("load_data", "calculate_metrics")
     graph.add_edge("calculate_metrics", "extract_insights")
-    graph.add_edge("extract_insights", END)
+    graph.add_edge("extract_insights", "save")
+    graph.add_edge("save", END)
 
     return graph
 

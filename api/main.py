@@ -699,6 +699,12 @@ async def fathom_webhook(request: Request):
 
     _db_upsert(final_meeting)
 
+    # Unified pipeline: log the parsed meeting in agent_runs.
+    try:
+        mod.save_meeting(final_meeting)
+    except Exception as e:
+        print(f"[fathom-webhook] unified save_meeting failed: {e}")
+
     _webhook_log.insert(0, {
         "received_at":  _NOW(),
         "status":       "ok",

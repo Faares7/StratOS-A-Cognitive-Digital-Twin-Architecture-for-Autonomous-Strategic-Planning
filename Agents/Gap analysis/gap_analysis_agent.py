@@ -24,6 +24,7 @@ if str(_ROOT) not in sys.path:
 
 # CRITICAL: import the shared brain — never instantiate a new LLM here
 from core.llm import local_brain  # noqa: E402
+from core.persistence import build_envelope, save_envelope  # noqa: E402
 
 
 # ── State schema ─────────────────────────────────────────────────────────────
@@ -126,4 +127,21 @@ def compile_and_run(pillars: list[dict]) -> list[dict]:
     graph = builder.compile()
 
     final_state = graph.invoke({"pillars": pillars, "suggestions": []})
-    return final_state["suggestions"]
+    suggestions = final_state["suggestions"]
+
+    # Persist run via the unified pipeline (no SWOT items — gap_analysis consumes S/W,
+    # it doesn't produce them; the editable pillar input is preserved in structured_data).
+    try:
+        envelope = build_envelope(
+            agent_id="gap_analysis",
+            swot_items=[],
+            structured_data={
+                "input_pillars": pillars,
+                "suggestions":   suggestions,
+            },
+        )
+        save_envelope(envelope)
+    except Exception as e:
+        print(f"[gap_analysis] unified envelope save failed: {e}")
+
+    return suggestions

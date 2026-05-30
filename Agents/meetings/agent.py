@@ -18,12 +18,22 @@ import hashlib
 import hmac
 import os
 import re
+import sys
 import time
 import uuid
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any
 
 import requests
+
+# Make project root importable so `core.persistence` resolves even when this
+# module is loaded via the API's dynamic loader.
+_ROOT = Path(__file__).parent.parent.parent.resolve()
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+
+from core.persistence import build_envelope, save_envelope  # noqa: E402
 
 GOOGLE_CALENDAR_API = "https://www.googleapis.com/calendar/v3"
 FATHOM_API_BASE = os.getenv("FATHOM_API_BASE", "https://api.fathom.video/v1")
@@ -339,3 +349,24 @@ def parse_fathom_payload(payload: dict[str, Any]) -> dict[str, Any]:
         "meet_link": "",  # Google Meet URL is not in Fathom's payload
         "data_source": "live",
     }
+
+
+# ── Unified pipeline save ─────────────────────────────────────────────────────
+
+def save_meeting(meeting: dict[str, Any]) -> str | None:
+    """
+    Persist a parsed meeting via the unified pipeline.
+
+    Meetings produce no SWOT items — the full parsed payload goes into
+    structured_data. Called by api/main.py after parse_fathom_payload().
+    """
+    try:
+        envelope = build_envelope(
+            agent_id="meetings",
+            swot_items=[],
+            structured_data=meeting,
+        )
+        return save_envelope(envelope)
+    except Exception as e:
+        print(f"[meetings] unified envelope save failed: {e}")
+        return None

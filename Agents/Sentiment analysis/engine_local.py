@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 from langchain_ollama import OllamaEmbeddings
 from langgraph.graph import StateGraph, END
 from core.llm import JSON_GUARDRAIL, local_brain
+from core.persistence import build_envelope, save_envelope
 
 # ==========================================
 # 1. DEFINE SCHEMAS (Strict Pydantic Guards)
@@ -138,8 +139,41 @@ def aggregate_node(state: SentimentState):
     print("📊 [Aggregate Node] Semantic aggregation complete.")
     return {"aggregated_report": final_report}
 
+def _build_swot_items_from_report(report: dict) -> list[dict]:
+    """Convert the aggregated sentiment report into unified SWOT items."""
+    items: list[dict] = []
+    for kind, key in (("strength", "top_strengths"), ("weakness", "top_weaknesses")):
+        for entry in report.get(key, []):
+            label = entry.get("label", "")
+            quotes = entry.get("quotes", [])
+            description = f"{label}: " + (quotes[0] if quotes else "")
+            items.append({
+                "type": kind,
+                "title": label,
+                "description": description.strip(": ").strip(),
+                "evidence": quotes,
+                "impact_level": None,
+                "source_metadata": {
+                    "count": entry.get("value"),
+                    "percentage": entry.get("percentage"),
+                },
+            })
+    return items
+
+
 def supabase_node(state: SentimentState):
-    print("☁️ [Database Node] Preparing to save to Supabase...")
+    print("☁️ [Database Node] Categorizing S/W and saving to Supabase...")
+    report = state.get("aggregated_report") or {}
+    envelope = build_envelope(
+        agent_id="sentiment_analysis",
+        swot_items=_build_swot_items_from_report(report),
+        structured_data={
+            "aggregated_report": report,
+            "total_students": state.get("total_students", 0),
+            "institution_id": state.get("institution_id"),
+        },
+    )
+    save_envelope(envelope)
     return state
 
 # ==========================================

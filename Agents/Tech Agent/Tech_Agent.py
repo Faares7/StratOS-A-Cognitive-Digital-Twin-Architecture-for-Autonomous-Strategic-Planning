@@ -42,6 +42,7 @@ from langchain_core.messages import HumanMessage, AIMessage
 from typing import TypedDict, Annotated, Optional, List, Literal
 from pydantic import BaseModel, Field
 from core.llm import JSON_GUARDRAIL, local_brain
+from core.persistence import build_envelope, save_envelope
 
 # ─── Logging Setup ──────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -452,6 +453,62 @@ def tech_intelligence_lead_node(state: TechClusterState) -> TechClusterState:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+#  3b. PERSISTENCE NODE — Save unified envelope (O/T, no pillar tagging)
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _build_swot_items_from_strategic(final_out: dict) -> list[dict]:
+    """Convert tech-agent opportunities/threats into the unified SWOT item shape."""
+    items: list[dict] = []
+    for opp in (final_out or {}).get("opportunities", []) or []:
+        items.append({
+            "type": "opportunity",
+            "title": opp.get("title"),
+            "description": opp.get("description", ""),
+            "evidence": opp.get("signal_sources", []),
+            "impact_level": (opp.get("priority") or "").lower() or None,
+            "source_metadata": {
+                "id": opp.get("id"),
+                "time_horizon": opp.get("time_horizon"),
+                "recommended_action": opp.get("recommended_action"),
+            },
+        })
+    for thr in (final_out or {}).get("threats", []) or []:
+        items.append({
+            "type": "threat",
+            "title": thr.get("title"),
+            "description": thr.get("description", ""),
+            "evidence": thr.get("signal_sources", []),
+            "impact_level": (thr.get("priority") or "").lower() or None,
+            "source_metadata": {
+                "id": thr.get("id"),
+                "time_horizon": thr.get("time_horizon"),
+                "recommended_action": thr.get("recommended_action"),
+            },
+        })
+    return items
+
+
+def save_node(state: TechClusterState) -> dict:
+    """Persist the tech-cluster run via the unified pipeline (O/T are not pillar-tagged)."""
+    logger.info("☁️ [Database Node] Saving tech intelligence run to Supabase ...")
+    envelope = build_envelope(
+        agent_id="tech",
+        swot_items=_build_swot_items_from_strategic(state.get("final_strategic_output") or {}),
+        structured_data={
+            "developer_scout_output": state.get("developer_scout_output"),
+            "cyber_scout_output":     state.get("cyber_scout_output"),
+            "market_scout_output":    state.get("market_scout_output"),
+            "final_strategic_output": state.get("final_strategic_output"),
+            "run_timestamp":          state.get("run_timestamp"),
+        },
+        errors=state.get("errors", []),
+        status="error" if state.get("errors") else "success",
+    )
+    save_envelope(envelope)
+    return {}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 #  4. LANGGRAPH CONSTRUCTION — Fan-Out → Fan-In
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -473,6 +530,7 @@ def build_tech_cluster_graph() -> StateGraph:
     graph.add_node("cyber_scout",             cyber_scout_node)
     graph.add_node("market_scout",            market_scout_node)
     graph.add_node("tech_intelligence_lead",  tech_intelligence_lead_node)
+    graph.add_node("save",                    save_node)
 
     # ── Fan-Out: START → 3 Parallel Scout Nodes ───────────────────────────────
     graph.add_edge(START,              "developer_scout")
@@ -485,8 +543,9 @@ def build_tech_cluster_graph() -> StateGraph:
     graph.add_edge("cyber_scout",      "tech_intelligence_lead")
     graph.add_edge("market_scout",     "tech_intelligence_lead")
 
-    # ── Lead Agent → END ──────────────────────────────────────────────────────
-    graph.add_edge("tech_intelligence_lead", END)
+    # ── Lead Agent → Save → END ───────────────────────────────────────────────
+    graph.add_edge("tech_intelligence_lead", "save")
+    graph.add_edge("save", END)
 
     return graph
 

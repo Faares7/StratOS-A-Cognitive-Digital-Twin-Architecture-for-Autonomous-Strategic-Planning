@@ -5,6 +5,8 @@ from psycopg2.extras import Json
 import time
 from dotenv import load_dotenv
 
+from core.persistence import build_envelope, save_envelope
+
 load_dotenv()
 
 DB_CONNECTION_STRING = os.getenv("DB_CONNECTION_STRING", "")
@@ -201,12 +203,33 @@ def write_all_to_db(all_data: list[dict]) -> None:
 
 def compile_and_run() -> dict:
     """
-    Fast entry point for the FastAPI bridge (no DB writes).
+    Fast entry point for the FastAPI bridge (no DB writes to the per-university tables).
     The API task calls _fetch_all_parsed() + _format_result() directly so it can
     hand off all_data to write_all_to_db() in a daemon thread after finishing the job.
+
+    Also writes a unified-pipeline envelope to agent_runs (no SWOT items).
     """
     all_data = _fetch_all_parsed()
-    return _format_result(all_data)
+    result = _format_result(all_data)
+
+    # Unified envelope — additive: per-university rows still go to write_all_to_db().
+    try:
+        envelope = build_envelope(
+            agent_id="benchmark",
+            swot_items=[],
+            structured_data={
+                "nile_university": result.get("nile_university"),
+                "competitors":     result.get("competitors", []),
+                "data_source":     result.get("data_source", "live"),
+            },
+            errors=result.get("errors", []),
+            status="error" if result.get("errors") else "success",
+        )
+        save_envelope(envelope)
+    except Exception as e:
+        print(f"[benchmark] unified envelope save failed: {e}")
+
+    return result
 
 
 # ── Legacy per-university helpers (nightly DB pipeline only) ──────────────────
