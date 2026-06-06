@@ -1,0 +1,515 @@
+{
+  "_meta": {
+    "description": "Static institutional profile for ITCS, Nile University. Used by the Chief Editor Agent to populate fixed sections of the strategic plan PDF. All data sourced from itcs.nu.edu.eg (scraped 2026-05-30) and the ITCS Strategic Plan 2020-2024 PDF (NAQAAE, approved Dec 2019, updated Dec 2022).",
+    "sources": [
+      "https://itcs.nu.edu.eg/why-itcs",
+      "https://itcs.nu.edu.eg/program/computer-science",
+      "https://itcs.nu.edu.eg/program/biomedical-informatics",
+      "https://itcs.nu.edu.eg/program/artificial-intelligence",
+      "https://itcs.nu.edu.eg/members",
+      "ITCS Strategic Plan 2020-2024 PDF (Arabic)"
+    ]
+  },
+
+  "institution": {
+    "school_name_arabic": "كلية تكنولوجيا المعلومات وعلوم الحاسب",
+    "school_name_english": "School of Information Technology and Computer Science (ITCS)",
+    "university_name_arabic": "جامعة النيل الأهلية",
+    "university_name_english": "Nile University",
+    "founding_year_university": 2006,
+    "founding_year_school_as_itcs": 2018,
+    "founding_year_cs_program": 2016,
+    "accreditation_date_initial": "December 2019",
+    "accreditation_date_updated": "December 2022",
+    "location": {
+      "address": "Juhayna Square, 26th of July Corridor, El Sheikh Zayed",
+      "city": "El Sheikh Zayed",
+      "governorate": "Giza",
+      "country": "Egypt",
+      "proximity_note": "Located near the Smart Village technology hub"
+    },
+    "contact": {
+      "website": "https://itcs.nu.edu.eg",
+      "email": "itcsdean.office@nu.edu.eg",
+      "phone": "+20238541790"
+    },
+    "study_duration_undergraduate": "8 semesters",
+    "legal_decree": "Presidential Decree 2018 (renaming to ITCS)"
+  },
+
+  "vision_mission": {
+    "university_vision_english": "To be a world-class inspirational institution with significant public benefit",
+    "university_mission_english": "To contribute to the development of cultural values and to technology-driven economics in Egypt and the region through the pursuit of education, research, innovation, and entrepreneurship at the highest levels of excellence.",
+    "school_vision_arabic": "أن تكون الكلية مؤسسة علمية مرموقة معترف بها دولياً كواحدة من أفضل كليات تكنولوجيا المعلومات وعلوم الحاسب إقليمياً في مجال البحث والتعليم وريادة الأعمال",
+    "school_vision_english": "To be a world-class school recognized as one of the top information technology and computer science schools in the region for research, education, and entrepreneurship.",
+    "school_mission_arabic": "تلتزم الكلية بإعداد خريج متميز علمياً ومهنياً في تخصصات عدة في مجال تكنولوجيا المعلومات وعلوم الحاسب. كما تعمل على المساهمة في ازدهار المجتمع وتحقيق أهداف التنمية المستدامة ودعم صناعة تكنولوجيا المعلومات من خلال البحث العلمي متعدد التخصصات والابتكار وتعزيز قدرات ريادة الأعمال",
+    "school_mission_english": "The school is committed to preparing scientifically and professionally distinguished graduates in many information technology and computer science disciplines. It strives to strongly contribute to society's prosperity; achieve sustainable development goals; and support the information technology industry through multidisciplinary scientific research, innovation and enhancement of entrepreneurial capabilities."
+  },
+
+  "governing_values": [
+    {
+      "name_arabic": "التميز والابتكار",
+      "name_english": "Excellence and Innovation",
+      "description": "The capacity to harness available potential to achieve ambitious goals, leaving no room for failure."
+    },
+    {
+      "name_arabic": "الأخلاق والنزاهة",
+      "name_english": "Ethics and Integrity",
+      "description": "Commitment to practical and scientific integrity standards."
+    },
+    {
+      "name_arabic": "التنوع والتكامل",
+      "name_english": "Diversity and Complementarity",
+      "description": "Accepting differences and seeking complementary perspectives."
+    },
+    {
+      "name_arabic": "احترام الخصوصية",
+      "name_english": "Respect for Privacy",
+      "description": "Acceptance of individuality."
+    }
+  ],
+
+  "undergraduate_programs": [
+    {
+      "name_arabic": "برنامج علوم الحاسب",
+      "name_english": "Computer Science",
+      "launched_year": 2016,
+      "accreditation": "NAQAAE",
+      "mission": "To achieve the academic and technical level necessary for students to cope with the steady growth in modern technology in developed societies.",
+      "description": "Focuses on developing deep understanding of modern computing systems. Equips students to apply Computer Science theories, abstraction, design, and implementation to solve real-life problems.",
+      "key_competencies": [
+        "Mastery of essential programming techniques",
+        "Mathematical foundations of computer science",
+        "Computer architecture",
+        "Algorithm and automata analysis",
+        "Data processing and business intelligence",
+        "Contemporary computing problem-solving"
+      ],
+      "enrollment_2022_2023": 820
+    },
+    {
+      "name_arabic": "برنامج المعلوماتية الطبية الحيوية",
+      "name_english": "Biomedical Informatics",
+      "launched_year": 2018,
+      "accreditation": "NAQAAE (national); ABET accreditation application planned August 2025",
+      "mission": "To equip students with advanced skills in AI and computer science to analyze biomedical data, develop diagnostic tools, propose effective treatments, and manage clinical information efficiently.",
+      "description": "Interdisciplinary field combining Computer Science, Information Technology, and Biomedical Engineering to improve biomedicine and human health.",
+      "program_educational_objectives": [
+        "Interdisciplinary CS professionals integrating AI in healthcare",
+        "Leaders in innovation and cutting-edge medical data research",
+        "Entrepreneurs developing biomedical solutions for real-world challenges",
+        "Ethical graduates contributing to public health and societal welfare"
+      ],
+      "abet_student_outcomes": [
+        "Analyze complex computing problems and apply computing principles to identify solutions",
+        "Design, implement, and evaluate computing-based solutions meeting specific requirements",
+        "Communicate effectively in professional contexts",
+        "Make informed judgments based on legal and ethical principles",
+        "Function effectively as team members or leaders",
+        "Apply data science lifecycle techniques to satisfy stakeholder needs"
+      ],
+      "enrollment_2022_2023": 261
+    },
+    {
+      "name_arabic": "برنامج الذكاء الاصطناعي",
+      "name_english": "Artificial Intelligence",
+      "launched_year": 2020,
+      "accreditation": "NAQAAE",
+      "mission": "To prepare generations of distinguished specialists in the field of artificial intelligence and its subfields such as Machine Learning, computer vision, pattern recognition, intelligent information systems, natural language processing, recommendation systems, and smart cities.",
+      "description": "Focuses on intelligence demonstrated by machines that mimic cognitive functions associated with the human mind. Students gain broad AI knowledge while developing practical skills to solve real-world problems.",
+      "key_competencies": [
+        "Essential programming techniques",
+        "Mathematical foundations of CS and AI",
+        "Algorithm analysis",
+        "High-performance computing",
+        "Automata and AI applications"
+      ],
+      "enrollment_2022_2023": 223
+    },
+    {
+      "name_arabic": "برنامج الأمن السيبراني",
+      "name_english": "Cybersecurity",
+      "launched_year": 2022,
+      "note": "Mentioned on website but no dedicated program page scraped",
+      "enrollment_2022_2023": null
+    }
+  ],
+
+  "postgraduate_programs": [
+    {
+      "name": "MSc in Informatics",
+      "launched_year": 2008,
+      "enrollment_2022_2023": 164
+    },
+    {
+      "name": "MSc in Information Security",
+      "launched_year": 2008,
+      "enrollment_2022_2023": 39
+    },
+    {
+      "name": "MSc in Software Engineering",
+      "launched_year": 2008,
+      "enrollment_2022_2023": 24
+    },
+    {
+      "name": "Professional MSc (multiple tracks)",
+      "launched_year": 2008,
+      "note": "Available alongside academic MSc"
+    },
+    {
+      "name": "PhD in Informatics",
+      "launched_year": 2020,
+      "ministerial_decree_year": 2020,
+      "enrollment_2022_2023": 7
+    }
+  ],
+
+  "professional_diplomas": [
+    {
+      "name": "Big Data and Data Science Diploma",
+      "launched_year": 2015,
+      "note": "Nile University was the first Egyptian university to offer a professional diploma in data science."
+    },
+    {
+      "name": "Biomedical Informatics Professional Diploma",
+      "launched_year": 2018
+    },
+    {
+      "name": "Computational Drug Discovery and Development (C3D) Diploma",
+      "launched_year": 2021
+    }
+  ],
+
+  "enrollment_history": {
+    "_source": "ITCS Strategic Plan 2020-2024 PDF, p.13 (undergraduate) and p.14 (postgraduate)",
+    "undergraduate": [
+      {
+        "academic_year": "2018-2019",
+        "Computer_Science": 124,
+        "Biomedical_Informatics": 15,
+        "Artificial_Intelligence": null
+      },
+      {
+        "academic_year": "2019-2020",
+        "Computer_Science": 182,
+        "Biomedical_Informatics": 91,
+        "Artificial_Intelligence": null
+      },
+      {
+        "academic_year": "2020-2021",
+        "Computer_Science": 348,
+        "Biomedical_Informatics": 208,
+        "Artificial_Intelligence": 77
+      },
+      {
+        "academic_year": "2021-2022",
+        "Computer_Science": 530,
+        "Biomedical_Informatics": 229,
+        "Artificial_Intelligence": 176
+      },
+      {
+        "academic_year": "2022-2023",
+        "Computer_Science": 820,
+        "Biomedical_Informatics": 261,
+        "Artificial_Intelligence": 223
+      }
+    ],
+    "postgraduate": [
+      {
+        "academic_year": "2018-2019",
+        "Informatics": 169,
+        "Information_Security": 127,
+        "Software_Engineering": 75,
+        "PhD": null
+      },
+      {
+        "academic_year": "2019-2020",
+        "Informatics": 206,
+        "Information_Security": 122,
+        "Software_Engineering": 82,
+        "PhD": null
+      },
+      {
+        "academic_year": "2020-2021",
+        "Informatics": 93,
+        "Information_Security": 24,
+        "Software_Engineering": 15,
+        "PhD": 4
+      },
+      {
+        "academic_year": "2021-2022",
+        "Informatics": 110,
+        "Information_Security": 24,
+        "Software_Engineering": 16,
+        "PhD": 5
+      },
+      {
+        "academic_year": "2022-2023",
+        "Informatics": 164,
+        "Information_Security": 39,
+        "Software_Engineering": 24,
+        "PhD": 7
+      }
+    ]
+  },
+
+  "faculty_history": {
+    "_source": "ITCS Strategic Plan 2020-2024 PDF, p.15",
+    "counts_by_year": [
+      {
+        "academic_year": "2019-2020",
+        "faculty_members": 6,
+        "teaching_assistants": 11,
+        "total": 17
+      },
+      {
+        "academic_year": "2020-2021",
+        "faculty_members": 11,
+        "teaching_assistants": 21,
+        "total": 32
+      },
+      {
+        "academic_year": "2021-2022",
+        "faculty_members": 20,
+        "teaching_assistants": 40,
+        "total": 60
+      },
+      {
+        "academic_year": "2022-2023",
+        "faculty_members": 18,
+        "teaching_assistants": 43,
+        "total": 61
+      }
+    ]
+  },
+
+  "named_faculty": {
+    "_source": "https://itcs.nu.edu.eg/members (scraped 2026-05-30)",
+    "members": [
+      {
+        "name": "Prof. Ahmed Hazem El-Mahdy",
+        "title": "Acting Vice President for Research & Dean of ITCS"
+      },
+      {
+        "name": "Prof. Walid Al-Atabany",
+        "title": "Associate Dean for Undergraduate Programs & Director of Centre for Informatics (CIS)"
+      },
+      {
+        "name": "Prof. Mohamed El-Helw",
+        "title": "Associate Dean for Postgraduate Programs"
+      },
+      {
+        "name": "Prof. Heba Kamal Aslan",
+        "title": "Professor"
+      },
+      {
+        "name": "Prof. Sahar Ali Fawzi",
+        "title": "Postgraduate Program Director (MSc & PhD)"
+      },
+      {
+        "name": "Prof. Mai Saeed Mabrouk",
+        "title": "Professor"
+      },
+      {
+        "name": "Dr. Ghada Khoriba",
+        "title": "Associate Professor & Quality Unit Director"
+      },
+      {
+        "name": "Dr. Walaa Medhat",
+        "title": "Program Director of Computer Science"
+      },
+      {
+        "name": "Dr. Mustafa Elattar",
+        "title": "Program Director of Artificial Intelligence"
+      },
+      {
+        "name": "Dr. Mohamed Mysara",
+        "title": "Associate Professor; Director of Biomedical Informatics Program, Bioinformatics Professional Diploma, and Computational Drug Discovery & Development Diploma (C3D)"
+      },
+      {
+        "name": "Dr. Tamer Arafa",
+        "title": "Associate Professor & Program Director for Big Data Professional Diploma"
+      },
+      {
+        "name": "Dr. Sahar Selim",
+        "title": "Associate Professor"
+      },
+      {
+        "name": "Dr. Islam Tharwat",
+        "title": "Assistant Professor"
+      },
+      {
+        "name": "Dr. Ahmed F. Elnokrashy",
+        "title": "Assistant Professor"
+      },
+      {
+        "name": "Dr. Ensaf H. Mohamed",
+        "title": "Associate Professor"
+      },
+      {
+        "name": "Dr. Noha Gamal",
+        "title": "Assistant Professor"
+      }
+    ]
+  },
+
+  "physical_resources": {
+    "_source": "ITCS Strategic Plan 2020-2024 PDF, p.19",
+    "buildings": ["UB1", "UB2"],
+    "lecture_halls_classrooms": 36,
+    "area_range_classrooms_sqm": "42–96",
+    "area_range_halls_sqm": "80–240",
+    "computer_labs": 5,
+    "computer_lab_capacity_seats": 150,
+    "computer_lab_spec": "Intel Core i5, 4-8 GB RAM",
+    "specialized_labs": [
+      "Big Data and High-Performance Computing Lab",
+      "Augmented Reality / Virtual Reality Lab",
+      "Physics Lab",
+      "Electronics Lab",
+      "Logic Design Circuits Lab"
+    ],
+    "library_area_sqm": 730,
+    "library_capacity_students": 150,
+    "library_features": ["Air-conditioned", "Electronic catalogue", "Digital collections for researchers"],
+    "medical_clinic": true,
+    "sports_facilities": ["Gymnasium", "Football pitch", "Volleyball court", "Ping pong tables"]
+  },
+
+  "excellence_features": {
+    "_source": "ITCS Strategic Plan 2020-2024 PDF, p.20",
+    "features": [
+      "First Egyptian research university (founded 2006) with strong focus on scientific research",
+      "Diverse faculty specializations across multiple programs",
+      "Majority of faculty hold PhDs from leading American, European, and Japanese universities",
+      "Dedicated research center (Centre for Informatics - CIS) with specialized research groups",
+      "Internally and externally funded research projects",
+      "Innovation supported through the Nile Pioneers (Rowad El-Nil) entrepreneurship center",
+      "Located adjacent to the Smart Village technology hub",
+      "State-supported AI and Biomedical Informatics programs aligned with Egypt Vision 2030",
+      "Distinguished postgraduate programs serving students from diverse disciplines",
+      "Moodle LMS fully deployed and used by faculty and teaching assistants",
+      "Alumni hold distinguished positions in global technology companies",
+      "Annual conference jointly with the Engineering school",
+      "Responsible for teaching computing courses across all Nile University programs",
+      "Continuous student engagement via Power-campus and digital platforms",
+      "Full Wi-Fi coverage and specialized digital library for researchers",
+      "Active college website with up-to-date information",
+      "Efficient administrative team serving students and faculty",
+      "Adequate facilities for academic, athletic, and cultural activities",
+      "Periodic self-assessment system for faculty to maintain educational and research quality",
+      "Annual career fair and support for student field training",
+      "Merit-based scholarship system for outstanding students"
+    ]
+  },
+
+  "research_groups": {
+    "_source": "ITCS Strategic Plan 2020-2024 PDF, p.16",
+    "groups": [
+      {
+        "name": "Bioinformatics Research Group",
+        "focus": "Developing new software tools for biological data analysis and integration"
+      },
+      {
+        "name": "Pervasive and Distributed Computing Research Group",
+        "focus": "Smart environments with security, proactive healthcare, traffic management, and environmental monitoring applications"
+      },
+      {
+        "name": "Medical Imaging and Image Processing Research Group",
+        "focus": "New imaging, sensing, and precision detection methods for disease diagnosis"
+      },
+      {
+        "name": "Text Mining Research Group",
+        "focus": "Tools and algorithms for text analysis: sentiment analysis, smart information retrieval, rumor detection, social media analysis"
+      },
+      {
+        "name": "Medical Informatics Research Group",
+        "focus": "Analysis and integration of medical and biological data and signals"
+      },
+      {
+        "name": "Information Security Research Group",
+        "focus": "Tools for threat analysis and data integration in information security"
+      }
+    ]
+  },
+
+  "strategic_goals": {
+    "_source": "ITCS Strategic Plan 2020-2024 PDF, pp.53-54",
+    "goals": [
+      {
+        "goal_number": 1,
+        "title_arabic": "إعداد خريجين متميزين مؤهلين للمنافسة محلياً ودولياً",
+        "title_english": "Preparing distinguished graduates qualified to compete locally and internationally",
+        "objectives": [
+          "Attract outstanding students",
+          "Continuously develop programs to keep pace with global advances",
+          "Provide appropriate environment for educational, cultural, and sports activities",
+          "Enhance graduates' competitive capabilities",
+          "Link education to scientific research",
+          "Qualify students for student exchange programs and international research laboratories"
+        ]
+      },
+      {
+        "goal_number": 2,
+        "title_arabic": "عضو هيئة تدريس وهيئة معاونة متميز علمياً وبحثياً وفي مجال الجودة",
+        "title_english": "Distinguished faculty and teaching assistants academically, in research, and in quality",
+        "objectives": [
+          "Create a flexible, motivating work environment for teaching and research",
+          "Apply a clear system for appointment, evaluation, and responsibility assignment",
+          "Raise the efficiency of faculty, teaching assistants, administrators, and staff"
+        ]
+      },
+      {
+        "goal_number": 3,
+        "title_arabic": "بحث علمي مؤثر والتواصل مع الجامعات والعلماء المتميزين محلياً ودولياً",
+        "title_english": "Impactful scientific research and engagement with distinguished universities and scientists locally and internationally",
+        "objectives": [
+          "Encourage faculty in scientific research and innovation",
+          "Strengthen partnership programs with distinguished international and local universities",
+          "Attract Egyptian diaspora scientists"
+        ]
+      },
+      {
+        "goal_number": 4,
+        "title_arabic": "دعم صناعة تكنولوجيا المعلومات والمساهمة في حل المشكلات المحلية والدولية والمشاركة المجتمعية",
+        "title_english": "Supporting the IT industry and contributing to solving local and international problems and community engagement",
+        "objectives": [
+          "Actively participate in national projects",
+          "Contribute to community development in IT",
+          "Cooperate with the IT industry sector"
+        ]
+      },
+      {
+        "goal_number": 5,
+        "title_arabic": "دعم الابتكار وريادة الأعمال",
+        "title_english": "Supporting innovation and entrepreneurship",
+        "objectives": [
+          "Spread the concept of entrepreneurship and freelancing culture",
+          "Support formation of startups",
+          "Encourage conversion of research outputs into prototypes and support production and development"
+        ]
+      }
+    ]
+  },
+
+  "distinctive_features_website": {
+    "_source": "https://itcs.nu.edu.eg/why-itcs",
+    "study_abroad_partner": "Glasgow Caledonian University (UK) — semester-long exchange",
+    "practical_experience": "Competitions, hackathons, internships, and research projects",
+    "entrepreneurship_support": "Startup incubators, entrepreneurship courses",
+    "research_focus": "Students engage in faculty research projects from early years"
+  },
+
+  "admission_requirements": {
+    "_source": "ITCS Strategic Plan 2020-2024 PDF, p.12",
+    "undergraduate": [
+      "Egyptian Thanawiya Amma (Science — Mathematics track)",
+      "Egyptian Thanawiya Amma (Science — Biology track, with Mathematics 2 course requirement)",
+      "Equivalent foreign and Arab certificates"
+    ],
+    "postgraduate": [
+      "Bachelor's degree in a relevant discipline, or",
+      "Prior experience in IT/CS fields with demonstrated seriousness and capability"
+    ]
+  }
+}

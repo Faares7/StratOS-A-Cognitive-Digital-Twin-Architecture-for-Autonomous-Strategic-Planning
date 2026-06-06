@@ -1,4 +1,5 @@
 import os
+import sys
 import json
 import time
 import glob
@@ -9,6 +10,13 @@ from groq import Groq
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# Ensure project root is on sys.path so core.persistence is importable
+_ROOT = Path(__file__).parent.parent.resolve()
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+
+from core.persistence import build_envelope, save_envelope  # noqa: E402
 
 # ── Config ────────────────────────────────────────────────────────────────────
 GROQ_API_KEY   = os.getenv("GROQ_API_KEY")
@@ -272,11 +280,6 @@ def compile_and_run(raw_data_path: str | None = None) -> dict:
         confidence = int(best.get("confidence", 0.8) * 100)
         count = len(posts)
 
-        pillar = (
-            "Pillar 8: Community Engagement"
-            if category == "opportunity"
-            else "Pillar 2: Strategic Planning"
-        )
         impact = "high" if count >= 3 else "medium" if count >= 2 else "low"
 
         insights.append({
@@ -284,7 +287,7 @@ def compile_and_run(raw_data_path: str | None = None) -> dict:
             "category": category,
             "title": theme,
             "description": best.get("signal", ""),
-            "pillar_tag": pillar,
+            "pillar_tag": "",
             "impact_level": impact,
             "confidence_score": confidence,
             "reference_count": count,
@@ -311,9 +314,40 @@ def compile_and_run(raw_data_path: str | None = None) -> dict:
     threats = sum(1 for s in signals if s.get("swot_type") == "THREAT")
 
     print(f"[social] Done. {opps} opportunities, {threats} threats across {len(insights)} themes.")
+
+    _persist_run(insights, len(signals))
+
     return {
         "insights": insights,
         "opportunities": opps,
         "threats": threats,
         "total_posts_analyzed": len(signals),
     }
+
+
+def _persist_run(insights: list[dict], total_posts: int) -> None:
+    """Save the social media run to Supabase via the unified persistence pipeline."""
+    swot_items = [
+        {
+            "type": ins["category"],           # "opportunity" or "threat"
+            "title": ins.get("title", ""),
+            "description": ins.get("description", ""),
+            "evidence": [ins["evidence"]] if ins.get("evidence") else [],
+            "impact_level": ins.get("impact_level"),
+            "source_metadata": {
+                "confidence_score": ins.get("confidence_score"),
+                "reference_count": ins.get("reference_count"),
+                "data_source": "social_media",
+            },
+        }
+        for ins in insights
+    ]
+    try:
+        envelope = build_envelope(
+            agent_id="social_media",
+            swot_items=swot_items,
+            structured_data={"total_posts_analyzed": total_posts},
+        )
+        save_envelope(envelope)
+    except Exception as exc:
+        print(f"[social] unified envelope save failed: {exc}")

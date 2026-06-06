@@ -1,12 +1,20 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import ReactMarkdown from "react-markdown";
 import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { fetchGapDraft, calculateGap } from "@/services/gapAnalysisApi";
-import type { PillarDraft, GapCalculationResult } from "@/types";
+import type { PillarDraft, GapCalculationResult, SwotItemDetail } from "@/types";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -17,6 +25,7 @@ import {
   Loader2,
   RotateCcw,
   Sparkles,
+  ExternalLink,
 } from "lucide-react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -57,6 +66,176 @@ function EditableField({
         "disabled:cursor-not-allowed disabled:opacity-50",
       )}
     />
+  );
+}
+
+// ── SWOT item traceability ────────────────────────────────────────────────────
+
+const AGENT_LABELS: Record<string, string> = {
+  tech:               "Tech Intelligence",
+  workforce:          "Workforce Analysis",
+  sentiment_analysis: "Sentiment Analysis",
+  social_media:       "Social Media",
+};
+
+const IMPACT_STYLES: Record<string, string> = {
+  critical: "bg-red-500/15 text-red-400 border-red-500/30",
+  high:     "bg-orange-500/15 text-orange-400 border-orange-500/30",
+  medium:   "bg-amber-500/15 text-amber-400 border-amber-500/30",
+  low:      "bg-slate-500/15 text-slate-400 border-slate-500/30",
+};
+
+const SWOT_CHIP_STYLES: Record<string, string> = {
+  strength:    "border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20",
+  weakness:    "border-rose-500/30    bg-rose-500/10    text-rose-300    hover:bg-rose-500/20",
+  opportunity: "border-cyan-500/30    bg-cyan-500/10    text-cyan-300    hover:bg-cyan-500/20",
+  threat:      "border-orange-500/30  bg-orange-500/10  text-orange-300  hover:bg-orange-500/20",
+};
+
+function SwotItemDetailDialog({
+  item,
+  category,
+  open,
+  onClose,
+}: {
+  item: SwotItemDetail;
+  category: string;
+  open: boolean;
+  onClose: () => void;
+}) {
+  const sm = item.source_metadata as Record<string, unknown> | null;
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="text-sm font-semibold leading-snug">
+            {item.title}
+          </DialogTitle>
+          <DialogDescription className="sr-only">SWOT item detail</DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 text-xs">
+          {/* Badges row */}
+          <div className="flex flex-wrap gap-2">
+            <span className={cn(
+              "rounded-full border px-2.5 py-0.5 text-[10px] font-medium capitalize",
+              SWOT_CHIP_STYLES[category] ?? ""
+            )}>
+              {category}
+            </span>
+            <span className={cn(
+              "rounded-full border px-2.5 py-0.5 text-[10px] font-medium capitalize",
+              IMPACT_STYLES[item.impact_level] ?? IMPACT_STYLES.medium
+            )}>
+              {item.impact_level} impact
+            </span>
+            {item.agent_id && (
+              <span className="rounded-full border border-violet-500/30 bg-violet-500/10 px-2.5 py-0.5 text-[10px] font-medium text-violet-300">
+                {AGENT_LABELS[item.agent_id] ?? item.agent_id}
+              </span>
+            )}
+          </div>
+
+          {/* Description */}
+          <div>
+            <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+              Description
+            </p>
+            <p className="leading-relaxed text-slate-300">{item.description}</p>
+          </div>
+
+          {/* Pillar */}
+          {item.pillar_name && (
+            <div>
+              <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                NAQAAE Pillar
+              </p>
+              <p className="text-slate-400">{item.pillar_name}</p>
+            </div>
+          )}
+
+          {/* Source metadata */}
+          {sm && Object.keys(sm).length > 0 && (
+            <div>
+              <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                Source Data
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                {Object.entries(sm).map(([k, v]) => (
+                  <div key={k} className="rounded-lg border border-white/5 bg-white/[0.02] px-3 py-2">
+                    <p className="text-[10px] text-slate-500 capitalize">
+                      {k.replace(/_/g, " ")}
+                    </p>
+                    <p className="mt-0.5 font-medium text-slate-300">{String(v)}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function SwotItemChip({
+  item,
+  category,
+}: {
+  item: SwotItemDetail;
+  category: string;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className={cn(
+          "flex items-center gap-1.5 rounded-full border px-2.5 py-1",
+          "text-[11px] font-medium transition-colors text-left",
+          SWOT_CHIP_STYLES[category] ?? "border-white/10 bg-white/5 text-slate-400"
+        )}
+      >
+        <span className="max-w-[180px] truncate">{item.title}</span>
+        <ExternalLink className="h-2.5 w-2.5 shrink-0 opacity-60" />
+      </button>
+      <SwotItemDetailDialog
+        item={item}
+        category={category}
+        open={open}
+        onClose={() => setOpen(false)}
+      />
+    </>
+  );
+}
+
+/** Renders a list of clickable chips when structured items exist, else falls back to plain text. */
+function SwotItemList({
+  items,
+  fallbackText,
+  category,
+  textClassName,
+}: {
+  items?: SwotItemDetail[];
+  fallbackText: string;
+  category: string;
+  textClassName?: string;
+}) {
+  if (items && items.length > 0) {
+    return (
+      <div className="flex flex-wrap gap-1.5">
+        {items.map((item) => (
+          <SwotItemChip key={item.item_id} item={item} category={category} />
+        ))}
+      </div>
+    );
+  }
+  if (!fallbackText) return <p className="text-[11px] italic text-slate-600">None identified.</p>;
+  return (
+    <p className={cn("text-xs leading-relaxed", textClassName ?? "text-slate-400")}>
+      {fallbackText}
+    </p>
   );
 }
 
@@ -119,20 +298,18 @@ function PillarEditCard({
           </div>
           <div>
             <FieldLabel>Current Strengths</FieldLabel>
-            <EditableField
-              rows={6}
-              disabled={disabled}
-              value={draft.strengths}
-              onChange={(v) => onChange(index, "strengths", v)}
+            <SwotItemList
+              items={draft.strength_items}
+              fallbackText={draft.strengths}
+              category="strength"
             />
           </div>
           <div>
             <FieldLabel>Current Weaknesses</FieldLabel>
-            <EditableField
-              rows={6}
-              disabled={disabled}
-              value={draft.weaknesses}
-              onChange={(v) => onChange(index, "weaknesses", v)}
+            <SwotItemList
+              items={draft.weakness_items}
+              fallbackText={draft.weaknesses}
+              category="weakness"
             />
           </div>
         </div>
@@ -148,7 +325,7 @@ function PillarResultCard({
   index,
 }: {
   draft: PillarDraft;
-  suggestions: string[];
+  suggestions: GapCalculationResult[number]["suggestions"];
   index: number;
 }) {
   return (
@@ -159,6 +336,11 @@ function PillarResultCard({
           {index + 1}
         </span>
         <h3 className="text-sm font-semibold text-slate-100">{draft.pillar}</h3>
+        {draft.swot_source === "live" && (
+          <span className="ml-auto rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400">
+            live data
+          </span>
+        )}
       </div>
 
       <div className="grid gap-0 md:grid-cols-2">
@@ -166,22 +348,83 @@ function PillarResultCard({
         <div className="space-y-3 border-b border-white/5 p-4 md:border-b-0 md:border-r">
           <div>
             <FieldLabel>Target State</FieldLabel>
-            <p className="text-xs leading-relaxed text-slate-400">
-              {draft.target_state}
-            </p>
+            <div className="relative max-h-72 overflow-y-auto rounded-lg border border-white/5 bg-white/[0.02] p-3 [scrollbar-width:thin] [scrollbar-color:#334155_transparent]">
+              <ReactMarkdown
+                components={{
+                  h3: ({ children }) => (
+                    <h3 className="mb-1 mt-3 text-[11px] font-semibold tracking-wide text-cyan-400 first:mt-0">
+                      {children}
+                    </h3>
+                  ),
+                  p: ({ children }) => (
+                    <p className="mb-1.5 text-[11px] leading-relaxed text-slate-400">
+                      {children}
+                    </p>
+                  ),
+                  strong: ({ children }) => (
+                    <strong className="font-semibold text-slate-300">
+                      {children}
+                    </strong>
+                  ),
+                  ul: ({ children }) => (
+                    <ul className="mb-2 space-y-0.5 pl-3">{children}</ul>
+                  ),
+                  li: ({ children }) => (
+                    <li className="flex gap-1.5 text-[11px] leading-relaxed text-slate-400">
+                      <span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-slate-600" />
+                      <span>{children}</span>
+                    </li>
+                  ),
+                  hr: () => (
+                    <hr className="my-2.5 border-white/5" />
+                  ),
+                  blockquote: ({ children }) => (
+                    <blockquote className="mt-2 rounded border-l-2 border-amber-500/40 bg-amber-500/5 py-1.5 pl-3 text-[11px] leading-relaxed text-amber-300/70 italic">
+                      {children}
+                    </blockquote>
+                  ),
+                }}
+              >
+                {draft.target_state}
+              </ReactMarkdown>
+            </div>
           </div>
           <div>
             <FieldLabel>Strengths</FieldLabel>
-            <p className="text-xs leading-relaxed text-emerald-400/80">
-              {draft.strengths}
-            </p>
+            <SwotItemList
+              items={draft.strength_items}
+              fallbackText={draft.strengths}
+              category="strength"
+            />
           </div>
           <div>
             <FieldLabel>Weaknesses</FieldLabel>
-            <p className="text-xs leading-relaxed text-rose-400/80">
-              {draft.weaknesses}
-            </p>
+            <SwotItemList
+              items={draft.weakness_items}
+              fallbackText={draft.weaknesses}
+              category="weakness"
+            />
           </div>
+          {(draft.opportunity_items?.length || draft.opportunities) ? (
+            <div>
+              <FieldLabel>Opportunities</FieldLabel>
+              <SwotItemList
+                items={draft.opportunity_items}
+                fallbackText={draft.opportunities ?? ""}
+                category="opportunity"
+              />
+            </div>
+          ) : null}
+          {(draft.threat_items?.length || draft.threats) ? (
+            <div>
+              <FieldLabel>Threats</FieldLabel>
+              <SwotItemList
+                items={draft.threat_items}
+                fallbackText={draft.threats ?? ""}
+                category="threat"
+              />
+            </div>
+          ) : null}
         </div>
 
         {/* Right: LLM suggestions */}
@@ -193,11 +436,18 @@ function PillarResultCard({
           {suggestions.length === 0 ? (
             <p className="text-xs text-slate-600 italic">No suggestions generated.</p>
           ) : (
-            <ul className="space-y-2">
+            <ul className="space-y-4">
               {suggestions.map((s, i) => (
-                <li key={i} className="flex gap-2 text-xs leading-relaxed text-slate-200">
-                  <span className="mt-0.5 shrink-0 text-amber-400">•</span>
-                  <span>{s}</span>
+                <li key={i} className="rounded-lg border border-white/5 bg-white/[0.02] p-3 text-xs">
+                  <p className="font-medium leading-relaxed text-slate-100">
+                    {s.suggestion}
+                  </p>
+                  <p className="mt-1.5 text-[11px] leading-relaxed text-slate-500 italic">
+                    Gap: {s.gap_identified}
+                  </p>
+                  <p className="mt-1.5 text-[11px] leading-relaxed text-slate-400">
+                    {s.reasoning}
+                  </p>
                 </li>
               ))}
             </ul>

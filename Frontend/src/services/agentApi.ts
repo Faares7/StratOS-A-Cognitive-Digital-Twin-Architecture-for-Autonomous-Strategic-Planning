@@ -52,6 +52,26 @@ export async function getJobStatus(jobId: string): Promise<JobStatus> {
   return res.json() as Promise<JobStatus>;
 }
 
+// ── DB result loader ─────────────────────────────────────────────────────────
+
+export interface AgentRunMeta {
+  run_timestamp: string;
+  status: string;
+  count: number;
+}
+
+export interface LatestResultsResponse {
+  insights: import("@/types").InsightCard[];
+  agents: Record<string, AgentRunMeta>;
+}
+
+/** Fetch the latest stored InsightCards for all SWOT agents without triggering a new run. */
+export async function fetchLatestResults(): Promise<LatestResultsResponse> {
+  const res = await fetch(`${BASE_URL}/api/agents/results/latest`);
+  if (!res.ok) throw new Error("Failed to fetch latest results from DB");
+  return res.json() as Promise<LatestResultsResponse>;
+}
+
 // ── High-level poller ────────────────────────────────────────────────────────
 
 interface PollOptions {

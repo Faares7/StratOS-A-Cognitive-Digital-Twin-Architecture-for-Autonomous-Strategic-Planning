@@ -41,8 +41,7 @@ export default function CommandCenterPage() {
 
   // Pull live agent results from the global persistent context.
   // If agents have been run (on any page), their insights appear here automatically.
-  const { results } = useAgentResults();
-  const liveInsights = results.insights;
+  const { insights: liveInsights, results } = useAgentResults();
   const researchData = results.research;
 
   // Always use live agent results — show empty state until agents are run

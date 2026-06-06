@@ -42,6 +42,20 @@ _SYSTEM_PROMPT = (
     + JSON_GUARDRAIL
 )
 
+_SYSTEM_PROMPT_ALL = (
+    "You are a NAQAAE accreditation categorizer. For each input SWOT statement "
+    "(a strength, weakness, opportunity, or threat about a university program), "
+    "choose the ONE pillar from the list below that best fits the statement's intent.\n\n"
+    "The 7 NAQAAE pillars:\n"
+    f"{pillars_prompt_block()}\n\n"
+    "Rules:\n"
+    "- Pick exactly one pillar_id (1-7) per item.\n"
+    "- Choose based on the dominant concept of the statement, not surface keywords.\n"
+    "- If a statement could fit multiple pillars, pick the one whose indicators "
+    "most directly cover the issue raised."
+    + JSON_GUARDRAIL
+)
+
 
 def _build_user_message(items: list[dict]) -> str:
     lines = ["Categorize the following statements. Respond with one assignment per item.\n"]
@@ -97,3 +111,37 @@ def categorize_one(item: dict) -> dict:
     if not _is_sw(item):
         return item
     return categorize_swot_items([item])[0]
+
+
+def categorize_all_swot_items(items: list[dict]) -> list[dict]:
+    """
+    Like categorize_swot_items but processes ALL four SWOT types (S/W/O/T).
+    Mutates each item in-place with pillar_id and pillar_name.
+    Returns the same list for chaining.
+    """
+    if not items:
+        return items
+
+    structured_llm = local_brain.with_structured_output(_PillarAssignments)
+    try:
+        response: _PillarAssignments = structured_llm.invoke([
+            SystemMessage(content=_SYSTEM_PROMPT_ALL),
+            HumanMessage(content=_build_user_message(items)),
+        ])
+    except Exception as e:
+        print(f"[categorizer] LLM call failed: {e}. Leaving items uncategorized.")
+        return items
+
+    by_index = {a.index: a for a in response.items}
+    for i, item in enumerate(items):
+        assignment = by_index.get(i)
+        if not assignment:
+            continue
+        pillar = get_pillar(assignment.pillar_id)
+        if not pillar:
+            print(f"[categorizer] Invalid pillar_id {assignment.pillar_id} for item {i}; skipping.")
+            continue
+        item["pillar_id"] = pillar["pillar_id"]
+        item["pillar_name"] = pillar["name"]
+
+    return items

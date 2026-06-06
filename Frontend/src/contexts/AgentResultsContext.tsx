@@ -18,15 +18,19 @@ interface SocialMeta {
   lastRun: string;
 }
 
+// Insights are stored per-agent so running agent X replaces only X's slot.
+// The displayed board is Object.values(agentInsights).flat().
 interface AgentResults {
-  insights: InsightCard[];
+  agentInsights: Record<string, InsightCard[]>;
   research: ResearchIntelligence | null;
   socialMeta: SocialMeta | null;
 }
 
 interface ContextValue {
   results: AgentResults;
-  addInsights: (newInsights: InsightCard[]) => void;
+  // Flat view used by consumers
+  insights: InsightCard[];
+  setAgentInsights: (agent: string, insights: InsightCard[]) => void;
   setResearch: (data: ResearchIntelligence) => void;
   setSocialMeta: (meta: SocialMeta) => void;
   clearAll: () => void;
@@ -35,22 +39,22 @@ interface ContextValue {
 // ── Reducer ───────────────────────────────────────────────────────────────────
 
 type Action =
-  | { type: "ADD_INSIGHTS"; insights: InsightCard[] }
+  | { type: "SET_AGENT"; agent: string; insights: InsightCard[] }
   | { type: "SET_RESEARCH"; data: ResearchIntelligence }
   | { type: "SET_SOCIAL_META"; meta: SocialMeta }
   | { type: "LOAD"; results: AgentResults }
   | { type: "CLEAR" };
 
-const DEFAULT: AgentResults = { insights: [], research: null, socialMeta: null };
-const STORAGE_KEY = "stratos_agent_results_v2";
+const DEFAULT: AgentResults = { agentInsights: {}, research: null, socialMeta: null };
+const STORAGE_KEY = "stratos_swot_v1";
 
 function reducer(state: AgentResults, action: Action): AgentResults {
   switch (action.type) {
-    case "ADD_INSIGHTS": {
-      const liveIds = new Set(action.insights.map((i) => i.id));
-      const base = state.insights.filter((i) => !liveIds.has(i.id));
-      return { ...state, insights: [...base, ...action.insights] };
-    }
+    case "SET_AGENT":
+      return {
+        ...state,
+        agentInsights: { ...state.agentInsights, [action.agent]: action.insights },
+      };
     case "SET_RESEARCH":
       return { ...state, research: action.data };
     case "SET_SOCIAL_META":
@@ -68,7 +72,8 @@ function reducer(state: AgentResults, action: Action): AgentResults {
 
 const AgentResultsContext = createContext<ContextValue>({
   results: DEFAULT,
-  addInsights: () => {},
+  insights: [],
+  setAgentInsights: () => {},
   setResearch: () => {},
   setSocialMeta: () => {},
   clearAll: () => {},
@@ -79,12 +84,13 @@ const AgentResultsContext = createContext<ContextValue>({
 export function AgentResultsProvider({ children }: { children: React.ReactNode }) {
   const [results, dispatch] = useReducer(reducer, DEFAULT);
 
+  // Restore from localStorage on mount
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const parsed: AgentResults = JSON.parse(raw);
-        if (parsed.insights || parsed.research || parsed.socialMeta) {
+        if (parsed.agentInsights) {
           dispatch({ type: "LOAD", results: parsed });
         }
       }
@@ -93,6 +99,7 @@ export function AgentResultsProvider({ children }: { children: React.ReactNode }
     }
   }, []);
 
+  // Persist to localStorage on every change
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(results));
@@ -101,8 +108,8 @@ export function AgentResultsProvider({ children }: { children: React.ReactNode }
     }
   }, [results]);
 
-  const addInsights = useCallback((newInsights: InsightCard[]) => {
-    dispatch({ type: "ADD_INSIGHTS", insights: newInsights });
+  const setAgentInsights = useCallback((agent: string, insights: InsightCard[]) => {
+    dispatch({ type: "SET_AGENT", agent, insights });
   }, []);
 
   const setResearch = useCallback((data: ResearchIntelligence) => {
@@ -118,8 +125,13 @@ export function AgentResultsProvider({ children }: { children: React.ReactNode }
     try { localStorage.removeItem(STORAGE_KEY); } catch {}
   }, []);
 
+  // Flat view: all agents' insights combined
+  const insights = Object.values(results.agentInsights).flat();
+
   return (
-    <AgentResultsContext.Provider value={{ results, addInsights, setResearch, setSocialMeta, clearAll }}>
+    <AgentResultsContext.Provider
+      value={{ results, insights, setAgentInsights, setResearch, setSocialMeta, clearAll }}
+    >
       {children}
     </AgentResultsContext.Provider>
   );

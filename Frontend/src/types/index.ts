@@ -44,6 +44,7 @@ export interface InsightCard {
   is_validated: boolean;
   evidence: Evidence;
   ai_suggestion?: boolean;
+  source_agent?: string; // which agent produced this insight
 }
 
 // ─── KPIs ──────────────────────────────────────────────────────────────────────
@@ -200,12 +201,31 @@ export interface ChatMessage {
 }
 
 // ─── HITL Gap Analysis ─────────────────────────────────────────────────────────
+
+export interface SwotItemDetail {
+  item_id: string;
+  title: string;
+  description: string;
+  agent_id: string;
+  impact_level: string;
+  pillar_name: string;
+  evidence: unknown;
+  source_metadata: Record<string, unknown> | null;
+}
+
 export interface PillarDraft {
   pillar: string;
   target_state: string;
   strengths: string;
   weaknesses: string;
+  opportunities?: string;
+  threats?: string;
+  strength_items?: SwotItemDetail[];
+  weakness_items?: SwotItemDetail[];
+  opportunity_items?: SwotItemDetail[];
+  threat_items?: SwotItemDetail[];
   target_source?: "neo4j" | "mock";
+  swot_source?: "live" | "mock";
 }
 
 export interface GapDraft {
@@ -213,9 +233,15 @@ export interface GapDraft {
   data_source: string;
 }
 
+export interface GapSuggestion {
+  suggestion: string;
+  reasoning: string;
+  gap_identified: string;
+}
+
 export interface PillarSuggestion {
   pillar: string;
-  suggestions: string[];
+  suggestions: GapSuggestion[];
 }
 
 export type GapCalculationResult = PillarSuggestion[];
