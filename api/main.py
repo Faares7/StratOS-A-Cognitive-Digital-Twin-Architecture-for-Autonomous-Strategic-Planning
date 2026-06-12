@@ -1093,6 +1093,86 @@ def run_survey(req: SurveyRequest, background_tasks: BackgroundTasks):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+#  KPI GENERATION AGENT
+#  Planning Phase: maps measurable KPIs to the 7 NAQAAE Programmatic Standards.
+#  Uses Nile University's KPI style (عدد/نسبة/وجود prefixes, internal entities).
+#  Does NOT assign data sources — that is handled by a separate agent downstream.
+# ══════════════════════════════════════════════════════════════════════════════
+
+KPI_AGENT_PATH: Path = AGENTS_DIR / "kpi_generation" / "agent.py"
+
+
+class KPIRequest(BaseModel):
+    program_name: str = "علوم الحاسب"
+    college_name: str = "كلية تكنولوجيا المعلومات وعلوم الحاسب"
+    university_name: str = "جامعة النيل الأهلية"
+    # Year range that sets the planning horizon and default timeframe label.
+    planning_horizon: str = "2025-2028"
+    # KPIs generated per NAQAAE standard (1–7 recommended; 3 is a good default).
+    kpis_per_standard: int = 3
+
+
+def _task_kpi(job_id: str, req: KPIRequest) -> None:
+    try:
+        if str(ROOT_DIR) not in sys.path:
+            sys.path.insert(0, str(ROOT_DIR))
+
+        sys.modules.pop("kpi_agent", None)
+
+        if not KPI_AGENT_PATH.exists():
+            raise FileNotFoundError(f"KPI agent not found: {KPI_AGENT_PATH}")
+
+        mod = _load_module("kpi_agent", KPI_AGENT_PATH)
+
+        result: dict = mod.compile_and_run(
+            program_name=req.program_name,
+            college_name=req.college_name,
+            university_name=req.university_name,
+            planning_horizon=req.planning_horizon,
+            kpis_per_standard=req.kpis_per_standard,
+        )
+
+        if result.get("error"):
+            _fail(job_id, result["error"])
+            return
+
+        _finish(job_id, result)
+    except Exception as exc:
+        _fail(job_id, str(exc))
+
+
+@app.post("/api/agents/kpi/run", status_code=202)
+def run_kpi(req: KPIRequest, background_tasks: BackgroundTasks):
+    """
+    Trigger the KPI Generation Agent.
+
+    Generates measurable KPIs for each of the 7 NAQAAE Programmatic Standards
+    in the style of Nile University's strategic plan. This is the Planning Phase
+    only — KPIs are text/target drafts without data-source assignments.
+
+    Poll GET /api/jobs/{job_id} for the result:
+        {
+          "kpis": [
+            {
+              "standard_id":        "1"–"7",
+              "kpi_name":           "<Arabic name starting with عدد/نسبة/وجود/مدى>",
+              "target_description": "<specific quantified target in Arabic>",
+              "responsible_entity": "<internal NU role in Arabic>",
+              "timeframe":          "<Arabic timeframe>"
+            },
+            ...
+          ],
+          "metadata": { "program", "college", "university",
+                        "planning_horizon", "kpis_per_standard",
+                        "total_kpis", "standards_covered" }
+        }
+    """
+    job_id = _new_job()
+    background_tasks.add_task(_task_kpi, job_id, req)
+    return {"job_id": job_id}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 #  HITL GAP ANALYSIS
 #  Phase 1 — GET  /api/gap-analysis/draft     → fetch editable draft data
 #  Phase 2 — POST /api/gap-analysis/calculate → LangGraph QA agent → job_id

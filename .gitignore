@@ -21,6 +21,14 @@ Frontend/tsconfig.tsbuildinfo
 .env.test.local
 .env.production.local
 
+# Secrets / credentials — never commit
+gcp-credentials-new.json
+gcp-credentials*.json
+*-credentials*.json
+*service-account*.json
+*.pem
+*.key
+
 # Python
 __pycache__/
 *.py[cod]
@@ -43,4 +51,6 @@ Thumbs.db
 .idea/
 .env/
 env/
+
+Test-KPI-Agent.ps1
 
