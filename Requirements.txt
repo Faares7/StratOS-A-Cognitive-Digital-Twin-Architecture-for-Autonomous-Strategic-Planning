@@ -41,6 +41,9 @@ psycopg2-binary>=2.9.9             # Benchmark Agent → Supabase PostgreSQL
 # ── Environment ──────────────────────────────────────────────
 python-dotenv>=1.0.0
 
+# ── Social Media Scraping Agent ───────────────────────────────
+selenium>=4.44.0                   # Facebook group scraper (Selenium Manager auto-downloads ChromeDriver)
+
 # ── Typing ───────────────────────────────────────────────────
 typing_extensions>=4.11.0
 pydantic>=2.0.0

@@ -1017,6 +1017,12 @@ async def run_sentiment(background_tasks: BackgroundTasks):
 
 def _task_social_media(job_id: str) -> None:
     try:
+        # Evict cached modules so every run picks up the latest code and
+        # so a previously failed selenium import doesn't stay frozen in cache.
+        sys.modules.pop("nlp_pipeline", None)
+        sys.modules.pop("scraper", None)
+        sys.modules.pop("keywords", None)
+
         mod = _load_module(
             "nlp_pipeline",
             SOCIAL_AGENT_DIR / "nlp_pipeline.py",
@@ -1032,10 +1038,14 @@ def _task_social_media(job_id: str) -> None:
             ins["source_agent"] = "social_media"
         _apply_pillar_tags(sm_insights)
         _finish(job_id, {
-            "insights": sm_insights,
-            "opportunities": result.get("opportunities", 0),
-            "threats": result.get("threats", 0),
+            "insights":             sm_insights,
+            "strengths":            result.get("strengths", 0),
+            "weaknesses":           result.get("weaknesses", 0),
+            "opportunities":        result.get("opportunities", 0),
+            "threats":              result.get("threats", 0),
             "total_posts_analyzed": result.get("total_posts_analyzed", 0),
+            "scrape_status":        result.get("scrape_status", "unknown"),
+            "scrape_error":         result.get("scrape_error", ""),
         })
     except Exception as exc:
         _fail(job_id, str(exc))
