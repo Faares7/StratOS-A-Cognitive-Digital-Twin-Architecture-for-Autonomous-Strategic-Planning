@@ -1328,6 +1328,100 @@ _MOCK_WEAKNESSES: dict[str, str] = {
     ),
 }
 
+# ── Gap Analysis Feedback (few-shot store) ────────────────────────────────────
+#
+# Approved user-added suggestions are persisted here and injected as few-shot
+# examples on the next compile_and_run call for the same pillar.
+
+_GAP_FEEDBACK_TABLE_SQL = """
+CREATE TABLE IF NOT EXISTS gap_analysis_feedback (
+    id             UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    pillar_name    TEXT        NOT NULL,
+    pillar_id      INTEGER,
+    user_query     TEXT        NOT NULL,
+    suggestion     TEXT        NOT NULL,
+    reasoning      TEXT        NOT NULL,
+    gap_identified TEXT        NOT NULL,
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+"""
+
+
+def _ensure_gap_feedback_table() -> None:
+    conn = _get_db_conn()
+    if not conn:
+        return
+    try:
+        with conn.cursor() as cur:
+            cur.execute(_GAP_FEEDBACK_TABLE_SQL)
+        conn.commit()
+    except Exception as exc:
+        print(f"[gap-feedback] table creation failed: {exc}")
+
+
+def _fetch_gap_feedback(pillar_names: list[str]) -> dict[str, list[dict]]:
+    """Return up to 3 approved suggestions per pillar, newest first."""
+    conn = _get_db_conn()
+    if not conn:
+        return {}
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT DISTINCT ON (pillar_name, id)
+                    pillar_name, suggestion, reasoning, gap_identified
+                FROM gap_analysis_feedback
+                WHERE pillar_name = ANY(%s)
+                ORDER BY pillar_name, created_at DESC
+                """,
+                (pillar_names,),
+            )
+            rows = cur.fetchall()
+    except Exception as exc:
+        print(f"[gap-feedback] fetch failed: {exc}")
+        return {}
+
+    result: dict[str, list[dict]] = {}
+    for row in rows:
+        pn = row["pillar_name"]
+        if pn not in result:
+            result[pn] = []
+        if len(result[pn]) < 3:
+            result[pn].append({
+                "suggestion":     row["suggestion"],
+                "reasoning":      row["reasoning"],
+                "gap_identified": row["gap_identified"],
+            })
+    return result
+
+
+def _save_gap_feedback(
+    pillar_name: str,
+    pillar_id: int | None,
+    user_query: str,
+    suggestion: str,
+    reasoning: str,
+    gap_identified: str,
+) -> None:
+    _ensure_gap_feedback_table()
+    conn = _get_db_conn()
+    if not conn:
+        return
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO gap_analysis_feedback
+                    (pillar_name, pillar_id, user_query, suggestion, reasoning, gap_identified)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                """,
+                (pillar_name, pillar_id, user_query, suggestion, reasoning, gap_identified),
+            )
+        conn.commit()
+    except Exception as exc:
+        print(f"[gap-feedback] save failed: {exc}")
+
+
 # ── Pillar → NAQAAE Standard keyword map ─────────────────────────────────────
 #
 # H1 headers in the ingested Markdown files produce Standard node titles like:
@@ -1677,17 +1771,14 @@ class GapCalculateRequest(BaseModel):
 
 def _task_gap_calculate(job_id: str, pillars: list[dict]) -> None:
     try:
-        # Ensure project root is on sys.path so `from core.llm import ...` resolves
         if str(ROOT_DIR) not in sys.path:
             sys.path.insert(0, str(ROOT_DIR))
 
         # Always evict the cached entry before loading.
         # _load_module registers the module in sys.modules BEFORE exec_module runs,
         # so a failed first load leaves a broken empty shell in the cache.
-        # Every subsequent call would return that shell (missing compile_and_run).
         sys.modules.pop("gap_analysis_agent", None)
 
-        
         if not GAP_ANALYSIS_AGENT_PATH.exists():
             raise FileNotFoundError(f"Agent file not found: {GAP_ANALYSIS_AGENT_PATH}")
 
@@ -1699,7 +1790,37 @@ def _task_gap_calculate(job_id: str, pillars: list[dict]) -> None:
                 "Check the agent file for top-level import errors."
             )
 
-        result: list[dict] = mod.compile_and_run(pillars)
+        pillar_names = [p["pillar"] for p in pillars if p.get("pillar")]
+        feedback = _fetch_gap_feedback(pillar_names)
+
+        result: list[dict] = mod.compile_and_run(pillars, feedback=feedback)
+        _finish(job_id, result)
+    except Exception as exc:
+        _fail(job_id, str(exc))
+
+
+def _task_suggest_one(job_id: str, pillar_data: dict, user_query: str) -> None:
+    """Background task: generate a single suggestion from a user's natural-language query."""
+    try:
+        if str(ROOT_DIR) not in sys.path:
+            sys.path.insert(0, str(ROOT_DIR))
+
+        sys.modules.pop("gap_analysis_agent", None)
+
+        if not GAP_ANALYSIS_AGENT_PATH.exists():
+            raise FileNotFoundError(f"Agent file not found: {GAP_ANALYSIS_AGENT_PATH}")
+
+        mod = _load_module("gap_analysis_agent", GAP_ANALYSIS_AGENT_PATH)
+
+        if not hasattr(mod, "generate_user_suggestion"):
+            raise AttributeError("gap_analysis_agent missing generate_user_suggestion")
+
+        pillar_name = pillar_data.get("pillar", "")
+        feedback_examples = _fetch_gap_feedback([pillar_name]).get(pillar_name, [])
+
+        result: dict = mod.generate_user_suggestion(
+            pillar_data, user_query, feedback_examples
+        )
         _finish(job_id, result)
     except Exception as exc:
         _fail(job_id, str(exc))
@@ -1720,3 +1841,52 @@ async def calculate_gap_analysis(
     job_id = _new_job()
     background_tasks.add_task(_task_gap_calculate, job_id, req.pillars)
     return {"job_id": job_id}
+
+
+# ── HITL: user-initiated single suggestion ────────────────────────────────────
+
+class SuggestOneRequest(BaseModel):
+    pillar_data: dict  # PillarDraft from the frontend (pillar, target_state, strengths, weaknesses)
+    user_query: str    # administrator's natural-language intent
+
+
+@app.post("/api/gap-analysis/suggest-one", status_code=202)
+async def suggest_one(req: SuggestOneRequest, background_tasks: BackgroundTasks):
+    """
+    Generate a single structured suggestion from the user's natural-language query.
+    The LLM reasons against the specific pillar's NAQAAE target state and SWOT data.
+    Previously approved suggestions for this pillar are injected as few-shot examples.
+    Returns a job_id; poll GET /api/jobs/{job_id} for the result.
+    """
+    job_id = _new_job()
+    background_tasks.add_task(_task_suggest_one, job_id, req.pillar_data, req.user_query)
+    return {"job_id": job_id}
+
+
+# ── HITL: approve and persist a suggestion as feedback ───────────────────────
+
+class FeedbackRequest(BaseModel):
+    pillar_name:    str
+    pillar_id:      int | None = None
+    user_query:     str
+    suggestion:     str
+    reasoning:      str
+    gap_identified: str
+
+
+@app.post("/api/gap-analysis/feedback", status_code=201)
+def submit_gap_feedback(req: FeedbackRequest):
+    """
+    Persist an approved user-added suggestion as a few-shot feedback example.
+    On the next compile_and_run call for this pillar, this suggestion will be
+    injected into the system prompt to guide the model's output style and quality.
+    """
+    _save_gap_feedback(
+        pillar_name=req.pillar_name,
+        pillar_id=req.pillar_id,
+        user_query=req.user_query,
+        suggestion=req.suggestion,
+        reasoning=req.reasoning,
+        gap_identified=req.gap_identified,
+    )
+    return {"status": "saved"}

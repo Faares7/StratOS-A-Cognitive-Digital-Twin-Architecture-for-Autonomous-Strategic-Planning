@@ -117,16 +117,65 @@ _USER_TEMPLATE = (
 _NO_DATA = "None identified yet."
 
 
+# ── Few-shot feedback injection ────────────────────────────────────────────────
+
+def _few_shot_block(examples: list[dict]) -> str:
+    """Build a few-shot section from previously approved user suggestions."""
+    if not examples:
+        return ""
+    lines = [
+        "\n\nPREVIOUSLY APPROVED SUGGESTIONS FOR THIS PILLAR "
+        "(use as a quality and specificity reference — do not repeat them verbatim):"
+    ]
+    for i, ex in enumerate(examples[:3], 1):
+        lines.extend([
+            f"\n  [{i}] gap_identified: {ex['gap_identified']}",
+            f"       suggestion:     {ex['suggestion']}",
+            f"       reasoning:      {ex['reasoning']}",
+        ])
+    return "\n".join(lines)
+
+
+# ── Single-suggestion prompts (for user-initiated HITL additions) ─────────────
+
+_USER_SUGGESTION_SYSTEM = (
+    "You are a senior Quality Assurance expert specializing in NAQAAE higher education "
+    "accreditation. A university administrator has described an improvement they wish to "
+    "make for a specific accreditation pillar. Your job is to formalize their intent into "
+    "ONE structured, NAQAAE-grounded improvement suggestion.\n\n"
+    "Requirements:\n"
+    "- The suggestion must be specific and immediately actionable.\n"
+    "- The reasoning must cite concrete evidence from the provided strengths/weaknesses "
+    "and target state — never fabricate.\n"
+    "- The gap_identified must identify the specific shortfall in one sentence, traceable "
+    "to a weakness or compliance gap.\n"
+    "- Stay within the scope of the named pillar and the administrator's stated intent."
+    + JSON_GUARDRAIL
+)
+
+_USER_SUGGESTION_TEMPLATE = (
+    "Pillar: {pillar}\n\n"
+    "Target State (NAQAAE Standard Requirement):\n{target_state}\n\n"
+    "Current Strengths:\n{strengths}\n\n"
+    "Current Weaknesses:\n{weaknesses}\n\n"
+    "Administrator's stated intent:\n\"{user_query}\"\n\n"
+    "Formalize this into one structured improvement suggestion with "
+    "suggestion, reasoning, and gap_identified fields."
+)
+
+
 # ── Graph node ────────────────────────────────────────────────────────────────
 
-def _generate_suggestions(state: GapState) -> GapState:
+def _run_suggestions(state: GapState, feedback: dict[str, list[dict]]) -> GapState:
     structured_llm = local_brain.with_structured_output(PillarSuggestions)
     results: List[PillarSuggestion] = []
 
     for p in state["pillars"]:
+        examples = feedback.get(p["pillar"], [])
+        system = _SYSTEM_PROMPT + _few_shot_block(examples)
         try:
             response: PillarSuggestions = structured_llm.invoke([
-                SystemMessage(content=_SYSTEM_PROMPT),
+                SystemMessage(content=system),
                 HumanMessage(content=_USER_TEMPLATE.format(
                     pillar=p["pillar"],
                     target_state=p.get("target_state") or _NO_DATA,
@@ -147,23 +196,30 @@ def _generate_suggestions(state: GapState) -> GapState:
     return {**state, "suggestions": results}
 
 
-# ── Public entry point ────────────────────────────────────────────────────────
+# ── Public entry points ───────────────────────────────────────────────────────
 
-def compile_and_run(pillars: list[dict]) -> list[dict]:
+def compile_and_run(pillars: list[dict], feedback: dict | None = None) -> list[dict]:
     """
     Called by api/main.py via the dynamic module loader.
 
     Args:
-        pillars: list of dicts with keys:
-                 pillar, target_state, strengths, weaknesses,
-                 opportunities (optional), threats (optional)
+        pillars:  list of dicts with keys:
+                  pillar, target_state, strengths, weaknesses,
+                  opportunities (optional), threats (optional)
+        feedback: optional dict mapping pillar_name → list of approved suggestion
+                  dicts {suggestion, reasoning, gap_identified}.
+                  Injected as few-shot examples into the system prompt per pillar.
 
     Returns:
-        list of dicts with keys:
-          pillar, suggestions (list of {suggestion, reasoning, gap_identified})
+        list of dicts: pillar, suggestions [{suggestion, reasoning, gap_identified}]
     """
+    fb = feedback or {}
+
+    def _node(state: GapState) -> GapState:
+        return _run_suggestions(state, fb)
+
     builder: StateGraph = StateGraph(GapState)
-    builder.add_node("generate_suggestions", _generate_suggestions)
+    builder.add_node("generate_suggestions", _node)
     builder.add_edge(START, "generate_suggestions")
     builder.add_edge("generate_suggestions", END)
     graph = builder.compile()
@@ -185,3 +241,35 @@ def compile_and_run(pillars: list[dict]) -> list[dict]:
         print(f"[gap_analysis] unified envelope save failed: {e}")
 
     return suggestions
+
+
+def generate_user_suggestion(
+    pillar_data: dict,
+    user_query: str,
+    feedback_examples: list[dict] | None = None,
+) -> dict:
+    """
+    Generate a single structured suggestion from a user's natural-language query.
+    Called by the API for the HITL add-suggestion flow.
+
+    Args:
+        pillar_data:       dict with pillar, target_state, strengths, weaknesses
+        user_query:        the administrator's stated intent in natural language
+        feedback_examples: previously approved suggestions for this pillar (few-shot)
+
+    Returns:
+        Suggestion as a dict {suggestion, reasoning, gap_identified}
+    """
+    system = _USER_SUGGESTION_SYSTEM + _few_shot_block(feedback_examples or [])
+    structured_llm = local_brain.with_structured_output(Suggestion)
+    response: Suggestion = structured_llm.invoke([
+        SystemMessage(content=system),
+        HumanMessage(content=_USER_SUGGESTION_TEMPLATE.format(
+            pillar=pillar_data["pillar"],
+            target_state=pillar_data.get("target_state") or _NO_DATA,
+            strengths=pillar_data.get("strengths") or _NO_DATA,
+            weaknesses=pillar_data.get("weaknesses") or _NO_DATA,
+            user_query=user_query,
+        )),
+    ])
+    return response.model_dump()

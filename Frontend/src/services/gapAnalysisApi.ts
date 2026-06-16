@@ -5,9 +5,12 @@
  * Phase 1 — fetchGapDraft()      → GET  /api/gap-analysis/draft
  * Phase 2 — calculateGap()       → POST /api/gap-analysis/calculate
  *                                   then polls GET /api/jobs/{jobId}
+ * HITL add  — suggestOne()       → POST /api/gap-analysis/suggest-one
+ *                                   then polls GET /api/jobs/{jobId}
+ * HITL save  — approveSuggestion() → POST /api/gap-analysis/feedback
  */
 
-import type { GapDraft, GapCalculationResult, PillarDraft } from "@/types";
+import type { GapDraft, GapCalculationResult, GapSuggestion, FeedbackRequest, PillarDraft } from "@/types";
 
 const BASE = (
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
@@ -70,5 +73,63 @@ export async function calculateGap(
     if (job.status === "failed") {
       throw new Error(job.error ?? "Gap calculation failed on the backend.");
     }
+  }
+}
+
+// ── HITL: generate a single suggestion from user query ────────────────────────
+
+export async function suggestOne(
+  pillarData: PillarDraft,
+  userQuery: string,
+  onPoll?: () => void,
+): Promise<GapSuggestion> {
+  const submitRes = await fetch(`${BASE}/api/gap-analysis/suggest-one`, {
+    method:  "POST",
+    headers: { "Content-Type": "application/json" },
+    body:    JSON.stringify({ pillar_data: pillarData, user_query: userQuery }),
+  });
+
+  if (!submitRes.ok) {
+    const body = await submitRes.text();
+    throw new Error(`Failed to start suggestion generation: ${body}`);
+  }
+
+  const { job_id } = (await submitRes.json()) as { job_id: string };
+  const deadline = Date.now() + POLL_TIMEOUT_MS;
+
+  while (true) {
+    if (Date.now() > deadline) {
+      throw new Error("Suggestion generation timed out — the local LLM may be unavailable.");
+    }
+    await new Promise<void>((r) => setTimeout(r, POLL_INTERVAL_MS));
+    onPoll?.();
+
+    const pollRes = await fetch(`${BASE}/api/jobs/${job_id}`);
+    if (!pollRes.ok) continue;
+
+    const job = (await pollRes.json()) as {
+      status: "running" | "complete" | "failed";
+      result?: GapSuggestion;
+      error?: string;
+    };
+
+    if (job.status === "complete") return job.result!;
+    if (job.status === "failed") {
+      throw new Error(job.error ?? "Suggestion generation failed on the backend.");
+    }
+  }
+}
+
+// ── HITL: persist an approved suggestion as few-shot feedback ─────────────────
+
+export async function approveSuggestion(req: FeedbackRequest): Promise<void> {
+  const res = await fetch(`${BASE}/api/gap-analysis/feedback`, {
+    method:  "POST",
+    headers: { "Content-Type": "application/json" },
+    body:    JSON.stringify(req),
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Failed to save feedback: ${body}`);
   }
 }

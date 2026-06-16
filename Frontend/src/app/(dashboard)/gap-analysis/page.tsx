@@ -6,8 +6,8 @@ import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
-import { fetchGapDraft, calculateGap } from "@/services/gapAnalysisApi";
-import type { PillarDraft, GapCalculationResult, SwotItemDetail } from "@/types";
+import { fetchGapDraft, calculateGap, suggestOne, approveSuggestion } from "@/services/gapAnalysisApi";
+import type { PillarDraft, GapCalculationResult, GapSuggestion, SwotItemDetail } from "@/types";
 import {
   Dialog,
   DialogContent,
@@ -23,9 +23,11 @@ import {
   Database,
   Lightbulb,
   Loader2,
+  Plus,
   RotateCcw,
   Sparkles,
   ExternalLink,
+  X,
 } from "lucide-react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -323,10 +325,12 @@ function PillarResultCard({
   draft,
   suggestions,
   index,
+  onSuggestionAdded,
 }: {
   draft: PillarDraft;
   suggestions: GapCalculationResult[number]["suggestions"];
   index: number;
+  onSuggestionAdded: (suggestion: GapSuggestion) => void;
 }) {
   return (
     <div className="overflow-hidden rounded-xl border border-white/5 bg-[#0d1117]">
@@ -427,22 +431,37 @@ function PillarResultCard({
           ) : null}
         </div>
 
-        {/* Right: LLM suggestions */}
+        {/* Right: LLM suggestions + HITL add panel */}
         <div className="p-4">
           <div className="mb-3 flex items-center gap-1.5">
             <Lightbulb className="h-3.5 w-3.5 text-amber-400" />
             <FieldLabel>Improvement Suggestions</FieldLabel>
           </div>
           {suggestions.length === 0 ? (
-            <p className="text-xs text-slate-600 italic">No suggestions generated.</p>
+            <p className="text-xs italic text-slate-600">No suggestions generated.</p>
           ) : (
             <ul className="space-y-4">
               {suggestions.map((s, i) => (
-                <li key={i} className="rounded-lg border border-white/5 bg-white/[0.02] p-3 text-xs">
-                  <p className="font-medium leading-relaxed text-slate-100">
-                    {s.suggestion}
-                  </p>
-                  <p className="mt-1.5 text-[11px] leading-relaxed text-slate-500 italic">
+                <li
+                  key={i}
+                  className={cn(
+                    "rounded-lg border p-3 text-xs",
+                    s.is_user_added
+                      ? "border-cyan-500/20 bg-cyan-500/5"
+                      : "border-white/5 bg-white/[0.02]",
+                  )}
+                >
+                  <div className="mb-1.5 flex items-center gap-2">
+                    <p className="font-medium leading-relaxed text-slate-100">
+                      {s.suggestion}
+                    </p>
+                    {s.is_user_added && (
+                      <span className="shrink-0 rounded-full bg-cyan-500/10 px-2 py-0.5 text-[10px] font-medium text-cyan-400">
+                        You added
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-1.5 text-[11px] leading-relaxed italic text-slate-500">
                     Gap: {s.gap_identified}
                   </p>
                   <p className="mt-1.5 text-[11px] leading-relaxed text-slate-400">
@@ -452,11 +471,170 @@ function PillarResultCard({
               ))}
             </ul>
           )}
+
+          <AddSuggestionPanel draft={draft} onApproved={onSuggestionAdded} />
         </div>
       </div>
     </div>
   );
 }
+
+// ── HITL: user-initiated suggestion panel ────────────────────────────────────
+
+type AddPhase = "idle" | "generating" | "preview";
+
+function AddSuggestionPanel({
+  draft,
+  onApproved,
+}: {
+  draft: PillarDraft;
+  onApproved: (suggestion: GapSuggestion) => void;
+}) {
+  const [expanded, setExpanded]   = useState(false);
+  const [phase, setPhase]         = useState<AddPhase>("idle");
+  const [query, setQuery]         = useState("");
+  const [pollTick, setPollTick]   = useState(0);
+  const [generated, setGenerated] = useState<GapSuggestion | null>(null);
+  const [error, setError]         = useState<string | null>(null);
+
+  const handleGenerate = async () => {
+    if (!query.trim()) return;
+    setPhase("generating");
+    setPollTick(0);
+    setError(null);
+    try {
+      const result = await suggestOne(draft, query.trim(), () =>
+        setPollTick((t) => t + 1),
+      );
+      setGenerated(result);
+      setPhase("preview");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setPhase("idle");
+    }
+  };
+
+  const handleApprove = async () => {
+    if (!generated) return;
+    try {
+      await approveSuggestion({
+        pillar_name:    draft.pillar,
+        user_query:     query,
+        suggestion:     generated.suggestion,
+        reasoning:      generated.reasoning,
+        gap_identified: generated.gap_identified,
+      });
+      onApproved({ ...generated, is_user_added: true });
+      setQuery("");
+      setGenerated(null);
+      setPhase("idle");
+      setExpanded(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const handleDiscard = () => {
+    setGenerated(null);
+    setPhase("idle");
+    setError(null);
+  };
+
+  return (
+    <div className="mt-4 border-t border-white/5 pt-4">
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={() => setExpanded((p) => !p)}
+        className="w-full justify-between border-dashed border-white/10 text-slate-400 hover:border-cyan-500/40 hover:text-cyan-400"
+      >
+        <span className="flex items-center gap-1.5">
+          <Plus className="h-3.5 w-3.5" />
+          Add your own suggestion
+        </span>
+        {expanded
+          ? <ChevronUp className="h-3.5 w-3.5" />
+          : <ChevronDown className="h-3.5 w-3.5" />}
+      </Button>
+
+      {expanded && (
+        <div className="mt-3 space-y-3">
+          <div>
+            <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+              Describe your improvement intent
+            </p>
+            <textarea
+              rows={3}
+              disabled={phase === "generating"}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={`e.g. "We should implement a mid-semester feedback loop between faculty and students"`}
+              className={cn(
+                "w-full resize-none rounded-lg border border-white/10 bg-[#0d1117] px-3 py-2.5",
+                "text-xs text-slate-200 placeholder-slate-600 outline-none",
+                "transition-colors focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20",
+                "disabled:cursor-not-allowed disabled:opacity-50",
+              )}
+            />
+          </div>
+
+          {phase !== "preview" && (
+            <Button
+              size="sm"
+              disabled={phase === "generating" || !query.trim()}
+              onClick={handleGenerate}
+            >
+              {phase === "generating" ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Generating… (poll #{pollTick})
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Generate suggestion
+                </>
+              )}
+            </Button>
+          )}
+
+          {error && (
+            <p className="text-[11px] text-rose-400">{error}</p>
+          )}
+
+          {phase === "preview" && generated && (
+            <div className="space-y-2 rounded-lg border border-cyan-500/20 bg-cyan-500/5 p-3 text-xs">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-cyan-400">
+                Review before approving
+              </p>
+              <p className="font-medium leading-relaxed text-slate-100">
+                {generated.suggestion}
+              </p>
+              <p className="text-[11px] leading-relaxed italic text-slate-500">
+                Gap: {generated.gap_identified}
+              </p>
+              <p className="text-[11px] leading-relaxed text-slate-400">
+                {generated.reasoning}
+              </p>
+              <div className="flex gap-2 pt-1">
+                <Button size="sm" onClick={handleApprove}>
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  Approve &amp; save
+                </Button>
+                <Button size="sm" variant="outline" onClick={handleDiscard}>
+                  <X className="h-3.5 w-3.5" />
+                  Discard
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 
 // ── Skeleton ──────────────────────────────────────────────────────────────────
 
@@ -531,6 +709,20 @@ export default function GapAnalysisPage() {
     setError(null);
     setPhase("editing");
   }, []);
+
+  // ── Append a user-added suggestion to the correct pillar in results ──────────
+  const handleSuggestionAdded = useCallback(
+    (pillar: string, suggestion: GapSuggestion) => {
+      setResults((prev) =>
+        prev.map((r) =>
+          r.pillar === pillar
+            ? { ...r, suggestions: [...r.suggestions, suggestion] }
+            : r,
+        ),
+      );
+    },
+    [],
+  );
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
@@ -669,6 +861,7 @@ export default function GapAnalysisPage() {
                     draft={draft}
                     suggestions={r.suggestions}
                     index={i}
+                    onSuggestionAdded={(s) => handleSuggestionAdded(r.pillar, s)}
                   />
                 );
               })}

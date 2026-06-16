@@ -237,6 +237,7 @@ export interface GapSuggestion {
   suggestion: string;
   reasoning: string;
   gap_identified: string;
+  is_user_added?: boolean;
 }
 
 export interface PillarSuggestion {
@@ -245,3 +246,12 @@ export interface PillarSuggestion {
 }
 
 export type GapCalculationResult = PillarSuggestion[];
+
+export interface FeedbackRequest {
+  pillar_name:    string;
+  pillar_id?:     number;
+  user_query:     string;
+  suggestion:     string;
+  reasoning:      string;
+  gap_identified: string;
+}
