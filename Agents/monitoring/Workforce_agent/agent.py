@@ -47,7 +47,7 @@ load_dotenv()  # Loads GOOGLE_API_KEY (or OPENAI_API_KEY) from .env
 # __file__ = GRAD/Agents/monitoring/Workforce_agent/agent.py
 # .parent×4 = GRAD/
 _DEFAULT_DATA_PATH: Path = (
-    Path(__file__).parent.parent.parent.parent / "Data" / "mock_workforce_data.json"
+    Path(__file__).parent.parent.parent.parent / "Data" / "real_workforce_data.json"
 )
 
 

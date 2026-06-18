@@ -43,8 +43,8 @@ from neo4j import GraphDatabase
 load_dotenv()
 
 # ── Tuneable constants ────────────────────────────────────────────────────────
-OLLAMA_MODEL = "bge-m3"   # ← swap to change the embedding model
-EMBED_DIM    = 1024       # bge-m3 output dimension — update if you change the model
+OLLAMA_MODEL = "nomic-embed-text"   # ← swap to change the embedding model
+EMBED_DIM    = 768                  # nomic-embed-text output dimension
 EMBED_BATCH  = 32         # chunks per Ollama embed call
 DATA_DIR     = pathlib.Path("./RAG/Pre-built/Naqaae_Immutable")
 

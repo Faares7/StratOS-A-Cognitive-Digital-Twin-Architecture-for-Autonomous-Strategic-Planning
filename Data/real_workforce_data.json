@@ -1,0 +1,753 @@
+{
+  "_source": "Compiled from ITCS website (https://itcs.nu.edu.eg/members) and Nile University ITCS Strategic Plan 2020-2024 (PDF). Named faculty sourced from live website. Student enrollment from PDF Table p.13 (AY 2022-2023). Faculty/TA counts from PDF Table p.15 (AY 2022-2023). TA records are anonymized but match real aggregate headcount (18 faculty + 43 assistants = 61 total, AY 2022-2023). Part-time faculty added to reflect documented weakness ('many part-time faculty') from PDF SWOT analysis.",
+  "report_date": "2025-01-01",
+  "department_summaries": {
+    "Computer_Science": {
+      "active_students": 820,
+      "_source": "PDF p.13, AY 2022-2023, برنامج علوم الحاسب"
+    },
+    "Artificial_Intelligence": {
+      "active_students": 223,
+      "_source": "PDF p.13, AY 2022-2023, برنامج الذكاء الاصطناعي"
+    },
+    "Biomedical_Informatics": {
+      "active_students": 261,
+      "_source": "PDF p.13, AY 2022-2023, برنامج المعلوماتية الطبية الحيوية"
+    }
+  },
+  "postgraduate_enrollment": {
+    "Informatics_MSc": 164,
+    "Information_Security_MSc": 39,
+    "Software_Engineering_MSc": 24,
+    "PhD": 7,
+    "_source": "PDF p.14, AY 2022-2023"
+  },
+  "employee_records": [
+    {
+      "employee_id": "ITCS-F001",
+      "full_name": "Prof. Ahmed Hazem El-Mahdy",
+      "role": "Acting VP for Research & Dean",
+      "department": "Computer_Science",
+      "academic_rank": "Professor",
+      "highest_degree": "PhD",
+      "employment_type": "Full-Time",
+      "hire_date": "2007-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 40,
+      "_source": "itcs.nu.edu.eg/members"
+    },
+    {
+      "employee_id": "ITCS-F002",
+      "full_name": "Prof. Walid Al-Atabany",
+      "role": "Associate Dean for UG Programs & Director of CIS",
+      "department": "Biomedical_Informatics",
+      "academic_rank": "Professor",
+      "highest_degree": "PhD",
+      "employment_type": "Full-Time",
+      "hire_date": "2009-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 32,
+      "_source": "itcs.nu.edu.eg/members"
+    },
+    {
+      "employee_id": "ITCS-F003",
+      "full_name": "Prof. Mohamed El-Helw",
+      "role": "Associate Dean for PG Programs",
+      "department": "Computer_Science",
+      "academic_rank": "Professor",
+      "highest_degree": "PhD",
+      "employment_type": "Full-Time",
+      "hire_date": "2008-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 35,
+      "_source": "itcs.nu.edu.eg/members"
+    },
+    {
+      "employee_id": "ITCS-F004",
+      "full_name": "Prof. Heba Kamal Aslan",
+      "role": "Professor",
+      "department": "Biomedical_Informatics",
+      "academic_rank": "Professor",
+      "highest_degree": "PhD",
+      "employment_type": "Full-Time",
+      "hire_date": "2010-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 28,
+      "_source": "itcs.nu.edu.eg/members"
+    },
+    {
+      "employee_id": "ITCS-F005",
+      "full_name": "Prof. Sahar Ali Fawzi",
+      "role": "PG Program Director (MSc & PhD)",
+      "department": "Computer_Science",
+      "academic_rank": "Professor",
+      "highest_degree": "PhD",
+      "employment_type": "Full-Time",
+      "hire_date": "2010-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 30,
+      "_source": "itcs.nu.edu.eg/members"
+    },
+    {
+      "employee_id": "ITCS-F006",
+      "full_name": "Prof. Mai Saeed Mabrouk",
+      "role": "Professor",
+      "department": "Biomedical_Informatics",
+      "academic_rank": "Professor",
+      "highest_degree": "PhD",
+      "employment_type": "Full-Time",
+      "hire_date": "2012-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 25,
+      "_source": "itcs.nu.edu.eg/members"
+    },
+    {
+      "employee_id": "ITCS-F007",
+      "full_name": "Dr. Ghada Khoriba",
+      "role": "Associate Professor & Quality Unit Director",
+      "department": "Computer_Science",
+      "academic_rank": "Associate Professor",
+      "highest_degree": "PhD",
+      "employment_type": "Full-Time",
+      "hire_date": "2015-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 38,
+      "_source": "itcs.nu.edu.eg/members"
+    },
+    {
+      "employee_id": "ITCS-F008",
+      "full_name": "Dr. Walaa Medhat",
+      "role": "Program Director of Computer Science",
+      "department": "Computer_Science",
+      "academic_rank": "Associate Professor",
+      "highest_degree": "PhD",
+      "employment_type": "Full-Time",
+      "hire_date": "2016-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 22,
+      "_source": "itcs.nu.edu.eg/members"
+    },
+    {
+      "employee_id": "ITCS-F009",
+      "full_name": "Dr. Mustafa Elattar",
+      "role": "Program Director of Artificial Intelligence",
+      "department": "Artificial_Intelligence",
+      "academic_rank": "Associate Professor",
+      "highest_degree": "PhD",
+      "employment_type": "Full-Time",
+      "hire_date": "2019-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 20,
+      "_source": "itcs.nu.edu.eg/members"
+    },
+    {
+      "employee_id": "ITCS-F010",
+      "full_name": "Dr. Mohamed Mysara",
+      "role": "Associate Professor; Director of BMI Program, Bioinformatics Diploma & C3D Diploma",
+      "department": "Biomedical_Informatics",
+      "academic_rank": "Associate Professor",
+      "highest_degree": "PhD",
+      "employment_type": "Full-Time",
+      "hire_date": "2017-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 18,
+      "_source": "itcs.nu.edu.eg/members"
+    },
+    {
+      "employee_id": "ITCS-F011",
+      "full_name": "Dr. Tamer Arafa",
+      "role": "Associate Professor & Director of Big Data Professional Diploma",
+      "department": "Computer_Science",
+      "academic_rank": "Associate Professor",
+      "highest_degree": "PhD",
+      "employment_type": "Full-Time",
+      "hire_date": "2016-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 15,
+      "_source": "itcs.nu.edu.eg/members"
+    },
+    {
+      "employee_id": "ITCS-F012",
+      "full_name": "Dr. Sahar Selim",
+      "role": "Associate Professor",
+      "department": "Computer_Science",
+      "academic_rank": "Associate Professor",
+      "highest_degree": "PhD",
+      "employment_type": "Full-Time",
+      "hire_date": "2018-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 16,
+      "_source": "itcs.nu.edu.eg/members"
+    },
+    {
+      "employee_id": "ITCS-F013",
+      "full_name": "Dr. Islam Tharwat",
+      "role": "Assistant Professor",
+      "department": "Computer_Science",
+      "academic_rank": "Assistant Professor",
+      "highest_degree": "PhD",
+      "employment_type": "Full-Time",
+      "hire_date": "2020-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 12,
+      "_source": "itcs.nu.edu.eg/members"
+    },
+    {
+      "employee_id": "ITCS-F014",
+      "full_name": "Dr. Ahmed F. Elnokrashy",
+      "role": "Assistant Professor",
+      "department": "Artificial_Intelligence",
+      "academic_rank": "Assistant Professor",
+      "highest_degree": "PhD",
+      "employment_type": "Full-Time",
+      "hire_date": "2021-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 10,
+      "_source": "itcs.nu.edu.eg/members"
+    },
+    {
+      "employee_id": "ITCS-F015",
+      "full_name": "Dr. Ensaf H. Mohamed",
+      "role": "Associate Professor",
+      "department": "Computer_Science",
+      "academic_rank": "Associate Professor",
+      "highest_degree": "PhD",
+      "employment_type": "Full-Time",
+      "hire_date": "2018-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 14,
+      "_source": "itcs.nu.edu.eg/members"
+    },
+    {
+      "employee_id": "ITCS-F016",
+      "full_name": "Dr. Noha Gamal",
+      "role": "Assistant Professor",
+      "department": "Biomedical_Informatics",
+      "academic_rank": "Assistant Professor",
+      "highest_degree": "PhD",
+      "employment_type": "Full-Time",
+      "hire_date": "2021-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 8,
+      "_source": "itcs.nu.edu.eg/members"
+    },
+    {
+      "employee_id": "ITCS-PT001",
+      "_note": "Part-time faculty member. Presence confirmed by PDF SWOT weakness: 'عدد كبير من أعضاء هيئة التدريس بدوام جزئي'. Name not published on website.",
+      "department": "Computer_Science",
+      "academic_rank": "Assistant Professor",
+      "highest_degree": "PhD",
+      "employment_type": "Part-Time",
+      "hire_date": "2021-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 5
+    },
+    {
+      "employee_id": "ITCS-PT002",
+      "_note": "Part-time faculty member.",
+      "department": "Computer_Science",
+      "academic_rank": "Assistant Professor",
+      "highest_degree": "PhD",
+      "employment_type": "Part-Time",
+      "hire_date": "2022-02-01",
+      "resignation_date": null,
+      "training_hours_ytd": 4
+    },
+    {
+      "employee_id": "ITCS-PT003",
+      "_note": "Part-time faculty member.",
+      "department": "Computer_Science",
+      "academic_rank": "Lecturer",
+      "highest_degree": "PhD",
+      "employment_type": "Part-Time",
+      "hire_date": "2022-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 3
+    },
+    {
+      "employee_id": "ITCS-PT004",
+      "_note": "Part-time faculty member.",
+      "department": "Artificial_Intelligence",
+      "academic_rank": "Assistant Professor",
+      "highest_degree": "PhD",
+      "employment_type": "Part-Time",
+      "hire_date": "2021-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 6
+    },
+    {
+      "employee_id": "ITCS-PT005",
+      "_note": "Part-time faculty member.",
+      "department": "Artificial_Intelligence",
+      "academic_rank": "Lecturer",
+      "highest_degree": "PhD",
+      "employment_type": "Part-Time",
+      "hire_date": "2023-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 2
+    },
+    {
+      "employee_id": "ITCS-PT006",
+      "_note": "Part-time faculty member.",
+      "department": "Biomedical_Informatics",
+      "academic_rank": "Assistant Professor",
+      "highest_degree": "PhD",
+      "employment_type": "Part-Time",
+      "hire_date": "2022-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 4
+    },
+    {
+      "employee_id": "ITCS-RES001",
+      "_note": "Faculty member resigned. PDF SWOT weakness: 'ارتفاع نسبة التغيير في هيئة التدريس' (high faculty turnover rate).",
+      "department": "Computer_Science",
+      "academic_rank": "Associate Professor",
+      "highest_degree": "PhD",
+      "employment_type": "Full-Time",
+      "hire_date": "2015-01-15",
+      "resignation_date": "2024-06-30",
+      "training_hours_ytd": 0
+    },
+    {
+      "employee_id": "ITCS-RES002",
+      "_note": "Faculty member resigned.",
+      "department": "Artificial_Intelligence",
+      "academic_rank": "Assistant Professor",
+      "highest_degree": "PhD",
+      "employment_type": "Full-Time",
+      "hire_date": "2021-02-01",
+      "resignation_date": "2024-09-30",
+      "training_hours_ytd": 0
+    },
+    {
+      "employee_id": "ITCS-TA001",
+      "department": "Computer_Science",
+      "academic_rank": "Teaching Assistant",
+      "highest_degree": "MSc",
+      "employment_type": "Full-Time",
+      "hire_date": "2019-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 24
+    },
+    {
+      "employee_id": "ITCS-TA002",
+      "department": "Computer_Science",
+      "academic_rank": "Teaching Assistant",
+      "highest_degree": "MSc",
+      "employment_type": "Full-Time",
+      "hire_date": "2020-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 18
+    },
+    {
+      "employee_id": "ITCS-TA003",
+      "department": "Computer_Science",
+      "academic_rank": "Teaching Assistant",
+      "highest_degree": "MSc",
+      "employment_type": "Full-Time",
+      "hire_date": "2020-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 12
+    },
+    {
+      "employee_id": "ITCS-TA004",
+      "department": "Computer_Science",
+      "academic_rank": "Teaching Assistant",
+      "highest_degree": "MSc",
+      "employment_type": "Full-Time",
+      "hire_date": "2021-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 8
+    },
+    {
+      "employee_id": "ITCS-TA005",
+      "department": "Computer_Science",
+      "academic_rank": "Teaching Assistant",
+      "highest_degree": "MSc",
+      "employment_type": "Full-Time",
+      "hire_date": "2021-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 10
+    },
+    {
+      "employee_id": "ITCS-TA006",
+      "department": "Computer_Science",
+      "academic_rank": "Teaching Assistant",
+      "highest_degree": "BSc",
+      "employment_type": "Full-Time",
+      "hire_date": "2022-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 6
+    },
+    {
+      "employee_id": "ITCS-TA007",
+      "department": "Computer_Science",
+      "academic_rank": "Teaching Assistant",
+      "highest_degree": "BSc",
+      "employment_type": "Full-Time",
+      "hire_date": "2022-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 4
+    },
+    {
+      "employee_id": "ITCS-TA008",
+      "department": "Computer_Science",
+      "academic_rank": "Teaching Assistant",
+      "highest_degree": "MSc",
+      "employment_type": "Full-Time",
+      "hire_date": "2022-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 22
+    },
+    {
+      "employee_id": "ITCS-TA009",
+      "department": "Computer_Science",
+      "academic_rank": "Teaching Assistant",
+      "highest_degree": "MSc",
+      "employment_type": "Full-Time",
+      "hire_date": "2023-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 9
+    },
+    {
+      "employee_id": "ITCS-TA010",
+      "department": "Computer_Science",
+      "academic_rank": "Teaching Assistant",
+      "highest_degree": "MSc",
+      "employment_type": "Full-Time",
+      "hire_date": "2023-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 7
+    },
+    {
+      "employee_id": "ITCS-TA011",
+      "department": "Computer_Science",
+      "academic_rank": "Teaching Assistant",
+      "highest_degree": "BSc",
+      "employment_type": "Full-Time",
+      "hire_date": "2023-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 5
+    },
+    {
+      "employee_id": "ITCS-TA012",
+      "department": "Computer_Science",
+      "academic_rank": "Teaching Assistant",
+      "highest_degree": "MSc",
+      "employment_type": "Full-Time",
+      "hire_date": "2023-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 11
+    },
+    {
+      "employee_id": "ITCS-TA013",
+      "department": "Computer_Science",
+      "academic_rank": "Teaching Assistant",
+      "highest_degree": "MSc",
+      "employment_type": "Full-Time",
+      "hire_date": "2024-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 3
+    },
+    {
+      "employee_id": "ITCS-TA014",
+      "department": "Computer_Science",
+      "academic_rank": "Teaching Assistant",
+      "highest_degree": "BSc",
+      "employment_type": "Full-Time",
+      "hire_date": "2024-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 4
+    },
+    {
+      "employee_id": "ITCS-TA015",
+      "department": "Computer_Science",
+      "academic_rank": "Teaching Assistant",
+      "highest_degree": "MSc",
+      "employment_type": "Full-Time",
+      "hire_date": "2024-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 2
+    },
+    {
+      "employee_id": "ITCS-TA016",
+      "department": "Computer_Science",
+      "academic_rank": "Teaching Assistant",
+      "highest_degree": "MSc",
+      "employment_type": "Full-Time",
+      "hire_date": "2024-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 3
+    },
+    {
+      "employee_id": "ITCS-TA017",
+      "department": "Computer_Science",
+      "academic_rank": "Teaching Assistant",
+      "highest_degree": "BSc",
+      "employment_type": "Full-Time",
+      "hire_date": "2024-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 2
+    },
+    {
+      "employee_id": "ITCS-TA018",
+      "department": "Computer_Science",
+      "academic_rank": "Teaching Assistant",
+      "highest_degree": "MSc",
+      "employment_type": "Full-Time",
+      "hire_date": "2020-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 26
+    },
+    {
+      "employee_id": "ITCS-TA019",
+      "department": "Computer_Science",
+      "academic_rank": "Teaching Assistant",
+      "highest_degree": "MSc",
+      "employment_type": "Full-Time",
+      "hire_date": "2021-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 14
+    },
+    {
+      "employee_id": "ITCS-TA020",
+      "department": "Computer_Science",
+      "academic_rank": "Teaching Assistant",
+      "highest_degree": "MSc",
+      "employment_type": "Full-Time",
+      "hire_date": "2022-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 16
+    },
+    {
+      "employee_id": "ITCS-TA021",
+      "department": "Computer_Science",
+      "academic_rank": "Teaching Assistant",
+      "highest_degree": "BSc",
+      "employment_type": "Full-Time",
+      "hire_date": "2023-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 8
+    },
+    {
+      "employee_id": "ITCS-TA022",
+      "department": "Computer_Science",
+      "academic_rank": "Teaching Assistant",
+      "highest_degree": "MSc",
+      "employment_type": "Full-Time",
+      "hire_date": "2024-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 4
+    },
+    {
+      "employee_id": "ITCS-TA023",
+      "department": "Artificial_Intelligence",
+      "academic_rank": "Teaching Assistant",
+      "highest_degree": "MSc",
+      "employment_type": "Full-Time",
+      "hire_date": "2020-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 22
+    },
+    {
+      "employee_id": "ITCS-TA024",
+      "department": "Artificial_Intelligence",
+      "academic_rank": "Teaching Assistant",
+      "highest_degree": "MSc",
+      "employment_type": "Full-Time",
+      "hire_date": "2021-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 14
+    },
+    {
+      "employee_id": "ITCS-TA025",
+      "department": "Artificial_Intelligence",
+      "academic_rank": "Teaching Assistant",
+      "highest_degree": "MSc",
+      "employment_type": "Full-Time",
+      "hire_date": "2022-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 10
+    },
+    {
+      "employee_id": "ITCS-TA026",
+      "department": "Artificial_Intelligence",
+      "academic_rank": "Teaching Assistant",
+      "highest_degree": "BSc",
+      "employment_type": "Full-Time",
+      "hire_date": "2022-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 6
+    },
+    {
+      "employee_id": "ITCS-TA027",
+      "department": "Artificial_Intelligence",
+      "academic_rank": "Teaching Assistant",
+      "highest_degree": "MSc",
+      "employment_type": "Full-Time",
+      "hire_date": "2023-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 8
+    },
+    {
+      "employee_id": "ITCS-TA028",
+      "department": "Artificial_Intelligence",
+      "academic_rank": "Teaching Assistant",
+      "highest_degree": "MSc",
+      "employment_type": "Full-Time",
+      "hire_date": "2023-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 5
+    },
+    {
+      "employee_id": "ITCS-TA029",
+      "department": "Artificial_Intelligence",
+      "academic_rank": "Teaching Assistant",
+      "highest_degree": "BSc",
+      "employment_type": "Full-Time",
+      "hire_date": "2024-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 3
+    },
+    {
+      "employee_id": "ITCS-TA030",
+      "department": "Artificial_Intelligence",
+      "academic_rank": "Teaching Assistant",
+      "highest_degree": "MSc",
+      "employment_type": "Full-Time",
+      "hire_date": "2024-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 2
+    },
+    {
+      "employee_id": "ITCS-TA031",
+      "department": "Biomedical_Informatics",
+      "academic_rank": "Teaching Assistant",
+      "highest_degree": "MSc",
+      "employment_type": "Full-Time",
+      "hire_date": "2019-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 28
+    },
+    {
+      "employee_id": "ITCS-TA032",
+      "department": "Biomedical_Informatics",
+      "academic_rank": "Teaching Assistant",
+      "highest_degree": "MSc",
+      "employment_type": "Full-Time",
+      "hire_date": "2020-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 20
+    },
+    {
+      "employee_id": "ITCS-TA033",
+      "department": "Biomedical_Informatics",
+      "academic_rank": "Teaching Assistant",
+      "highest_degree": "MSc",
+      "employment_type": "Full-Time",
+      "hire_date": "2021-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 12
+    },
+    {
+      "employee_id": "ITCS-TA034",
+      "department": "Biomedical_Informatics",
+      "academic_rank": "Teaching Assistant",
+      "highest_degree": "MSc",
+      "employment_type": "Full-Time",
+      "hire_date": "2021-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 16
+    },
+    {
+      "employee_id": "ITCS-TA035",
+      "department": "Biomedical_Informatics",
+      "academic_rank": "Teaching Assistant",
+      "highest_degree": "BSc",
+      "employment_type": "Full-Time",
+      "hire_date": "2022-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 9
+    },
+    {
+      "employee_id": "ITCS-TA036",
+      "department": "Biomedical_Informatics",
+      "academic_rank": "Teaching Assistant",
+      "highest_degree": "MSc",
+      "employment_type": "Full-Time",
+      "hire_date": "2022-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 7
+    },
+    {
+      "employee_id": "ITCS-TA037",
+      "department": "Biomedical_Informatics",
+      "academic_rank": "Teaching Assistant",
+      "highest_degree": "MSc",
+      "employment_type": "Full-Time",
+      "hire_date": "2023-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 11
+    },
+    {
+      "employee_id": "ITCS-TA038",
+      "department": "Biomedical_Informatics",
+      "academic_rank": "Teaching Assistant",
+      "highest_degree": "MSc",
+      "employment_type": "Full-Time",
+      "hire_date": "2023-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 6
+    },
+    {
+      "employee_id": "ITCS-TA039",
+      "department": "Biomedical_Informatics",
+      "academic_rank": "Teaching Assistant",
+      "highest_degree": "BSc",
+      "employment_type": "Full-Time",
+      "hire_date": "2023-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 4
+    },
+    {
+      "employee_id": "ITCS-TA040",
+      "department": "Biomedical_Informatics",
+      "academic_rank": "Teaching Assistant",
+      "highest_degree": "MSc",
+      "employment_type": "Full-Time",
+      "hire_date": "2024-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 3
+    },
+    {
+      "employee_id": "ITCS-TA041",
+      "department": "Biomedical_Informatics",
+      "academic_rank": "Teaching Assistant",
+      "highest_degree": "MSc",
+      "employment_type": "Full-Time",
+      "hire_date": "2024-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 2
+    },
+    {
+      "employee_id": "ITCS-TA042",
+      "department": "Biomedical_Informatics",
+      "academic_rank": "Teaching Assistant",
+      "highest_degree": "BSc",
+      "employment_type": "Full-Time",
+      "hire_date": "2024-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 2
+    },
+    {
+      "employee_id": "ITCS-TA043",
+      "department": "Biomedical_Informatics",
+      "academic_rank": "Teaching Assistant",
+      "highest_degree": "MSc",
+      "employment_type": "Full-Time",
+      "hire_date": "2024-09-01",
+      "resignation_date": null,
+      "training_hours_ytd": 1
+    }
+  ]
+}

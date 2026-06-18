@@ -17,6 +17,7 @@ import {
   ChevronRight,
   ChevronLeft,
   ClipboardList,
+  Gauge,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -57,6 +58,7 @@ const mainNav: NavItem[] = [
   { href: "/research", icon: GraduationCap, label: "Research Intelligence" },
   { href: "/meetings", icon: FileText, label: "Meetings" },
   { href: "/surveys", icon: ClipboardList, label: "Survey Generation" },
+  { href: "/kpi-generation", icon: Gauge, label: "KPI Generation" },
 ];
 
 const bottomNav: NavItem[] = [

@@ -198,12 +198,31 @@ _GOOGLE_AUTH_SCOPES = " ".join([
 _PRIORITY_MAP = {"CRITICAL": "critical", "HIGH": "high", "MEDIUM": "medium", "LOW": "low"}
 _NOW = lambda: datetime.now(timezone.utc).isoformat()
 
-NAQAAE_TECH_OPP   = "Pillar 12: Digital Transformation"
-NAQAAE_TECH_THR   = "Pillar 3: Quality Assurance Systems"
-NAQAAE_WORKFORCE  = "Pillar 4: Faculty Development"
-NAQAAE_SENTIMENT  = "Pillar 5: Student Learning Outcomes"
-NAQAAE_SOCIAL_OPP = "Pillar 8: Community Engagement"
-NAQAAE_SOCIAL_THR = "Pillar 2: Strategic Planning"
+def _apply_pillar_tags(insights: list) -> None:
+    """
+    Run the categorizer on every insight and write the resulting pillar name
+    back as pillar_tag.  Falls back silently so a categorizer failure never
+    breaks an agent task.
+    """
+    if not insights:
+        return
+    try:
+        from Agents.categorizer import categorize_all_swot_items
+        swot_items = [
+            {
+                "type": ins.get("category", ""),
+                "title": ins.get("title", ""),
+                "description": ins.get("description", ""),
+            }
+            for ins in insights
+        ]
+        categorize_all_swot_items(swot_items)
+        for ins, item in zip(insights, swot_items):
+            pillar_name = item.get("pillar_name")
+            if pillar_name:
+                ins["pillar_tag"] = pillar_name
+    except Exception as exc:
+        print(f"[categorizer] pillar tagging failed: {exc}")
 
 
 # ── Module loader (cached) ────────────────────────────────────────────────────
@@ -742,7 +761,8 @@ def _task_tech(job_id: str) -> None:
                 "category": "opportunity",
                 "title": opp["title"],
                 "description": opp["description"],
-                "pillar_tag": NAQAAE_TECH_OPP,
+                "pillar_tag": "",
+                "source_agent": "tech",
                 "impact_level": _PRIORITY_MAP.get(opp.get("priority", "MEDIUM"), "medium"),
                 "confidence_score": confidence,
                 "reference_count": len(opp.get("signal_sources", [])),
@@ -765,7 +785,8 @@ def _task_tech(job_id: str) -> None:
                 "category": "threat",
                 "title": thr["title"],
                 "description": thr["description"],
-                "pillar_tag": NAQAAE_TECH_THR,
+                "pillar_tag": "",
+                "source_agent": "tech",
                 "impact_level": _PRIORITY_MAP.get(thr.get("priority", "HIGH"), "high"),
                 "confidence_score": confidence,
                 "reference_count": len(thr.get("signal_sources", [])),
@@ -783,6 +804,7 @@ def _task_tech(job_id: str) -> None:
                 },
             })
 
+        _apply_pillar_tags(insights)
         _finish(job_id, {
             "insights": insights,
             "executive_summary": result.get("executive_summary"),
@@ -847,7 +869,7 @@ def _task_workforce(job_id: str) -> None:
     try:
         from Workforce_agent.agent import compile_and_run as workforce_run  # noqa: PLC0415
 
-        data_path = os.getenv("WORKFORCE_DATA_PATH") or str(DATA_DIR / "mock_workforce_data.json")
+        data_path = os.getenv("WORKFORCE_DATA_PATH") or str(DATA_DIR / "real_workforce_data.json")
         result: dict = workforce_run(data_path=data_path)
 
         impact_map = {"High": "high", "Medium": "medium", "Low": "low"}
@@ -860,7 +882,8 @@ def _task_workforce(job_id: str) -> None:
                 "category": category,
                 "title": item.get("metric_category", "HR Metric"),
                 "description": item.get("finding", ""),
-                "pillar_tag": NAQAAE_WORKFORCE,
+                "pillar_tag": "",
+                "source_agent": "workforce",
                 "impact_level": impact_map.get(item.get("impact_level", "Medium"), "medium"),
                 "confidence_score": 85,
                 "reference_count": 1,
@@ -875,6 +898,7 @@ def _task_workforce(job_id: str) -> None:
                 },
             })
 
+        _apply_pillar_tags(insights)
         _finish(job_id, {
             "insights": insights,
             "calculated_metrics": result.get("calculated_metrics", {}),
@@ -917,11 +941,12 @@ async def _task_sentiment_async(job_id: str, csv_path: str) -> None:
                 "id": f"sa-s-{label[:16].replace(' ', '-').lower()}",
                 "category": "strength",
                 "title": label,
+                "source_agent": "sentiment_analysis",
                 "description": (
                     f"Mentioned by {item['value']} students "
                     f"({item.get('percentage', '0')}% of responses)"
                 ),
-                "pillar_tag": NAQAAE_SENTIMENT,
+                "pillar_tag": "",
                 "impact_level": "high" if int(item.get("value", 0)) > 5 else "medium",
                 "confidence_score": 78,
                 "reference_count": int(item.get("value", 0)),
@@ -944,11 +969,12 @@ async def _task_sentiment_async(job_id: str, csv_path: str) -> None:
                 "id": f"sa-w-{label[:16].replace(' ', '-').lower()}",
                 "category": "weakness",
                 "title": label,
+                "source_agent": "sentiment_analysis",
                 "description": (
                     f"Mentioned by {item['value']} students "
                     f"({item.get('percentage', '0')}% of responses)"
                 ),
-                "pillar_tag": NAQAAE_SENTIMENT,
+                "pillar_tag": "",
                 "impact_level": "high" if int(item.get("value", 0)) > 5 else "medium",
                 "confidence_score": 78,
                 "reference_count": int(item.get("value", 0)),
@@ -966,6 +992,7 @@ async def _task_sentiment_async(job_id: str, csv_path: str) -> None:
                 },
             })
 
+        _apply_pillar_tags(insights)
         _finish(job_id, {
             "insights": insights,
             "summary": report.get("summary", {}),
@@ -1002,8 +1029,12 @@ def _task_social_media(job_id: str) -> None:
             _fail(job_id, result["error"])
             return
 
+        sm_insights = result.get("insights", [])
+        for ins in sm_insights:
+            ins["source_agent"] = "social_media"
+        _apply_pillar_tags(sm_insights)
         _finish(job_id, {
-            "insights": result.get("insights", []),
+            "insights": sm_insights,
             "opportunities": result.get("opportunities", 0),
             "threats": result.get("threats", 0),
             "total_posts_analyzed": result.get("total_posts_analyzed", 0),
@@ -1060,6 +1091,86 @@ def run_survey(req: SurveyRequest, background_tasks: BackgroundTasks):
     """Trigger the Survey Agent (LangGraph → local LLM → structured SurveyDraft)."""
     job_id = _new_job()
     background_tasks.add_task(_task_survey, job_id, req)
+    return {"job_id": job_id}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  KPI GENERATION AGENT
+#  Planning Phase: maps measurable KPIs to the 7 NAQAAE Programmatic Standards.
+#  Uses Nile University's KPI style (عدد/نسبة/وجود prefixes, internal entities).
+#  Does NOT assign data sources — that is handled by a separate agent downstream.
+# ══════════════════════════════════════════════════════════════════════════════
+
+KPI_AGENT_PATH: Path = AGENTS_DIR / "kpi_generation" / "agent.py"
+
+
+class KPIRequest(BaseModel):
+    program_name: str = "علوم الحاسب"
+    college_name: str = "كلية تكنولوجيا المعلومات وعلوم الحاسب"
+    university_name: str = "جامعة النيل الأهلية"
+    # Year range that sets the planning horizon and default timeframe label.
+    planning_horizon: str = "2025-2028"
+    # KPIs generated per NAQAAE standard (1–7 recommended; 3 is a good default).
+    kpis_per_standard: int = 3
+
+
+def _task_kpi(job_id: str, req: KPIRequest) -> None:
+    try:
+        if str(ROOT_DIR) not in sys.path:
+            sys.path.insert(0, str(ROOT_DIR))
+
+        sys.modules.pop("kpi_agent", None)
+
+        if not KPI_AGENT_PATH.exists():
+            raise FileNotFoundError(f"KPI agent not found: {KPI_AGENT_PATH}")
+
+        mod = _load_module("kpi_agent", KPI_AGENT_PATH)
+
+        result: dict = mod.compile_and_run(
+            program_name=req.program_name,
+            college_name=req.college_name,
+            university_name=req.university_name,
+            planning_horizon=req.planning_horizon,
+            kpis_per_standard=req.kpis_per_standard,
+        )
+
+        if result.get("error"):
+            _fail(job_id, result["error"])
+            return
+
+        _finish(job_id, result)
+    except Exception as exc:
+        _fail(job_id, str(exc))
+
+
+@app.post("/api/agents/kpi/run", status_code=202)
+def run_kpi(req: KPIRequest, background_tasks: BackgroundTasks):
+    """
+    Trigger the KPI Generation Agent.
+
+    Generates measurable KPIs for each of the 7 NAQAAE Programmatic Standards
+    in the style of Nile University's strategic plan. This is the Planning Phase
+    only — KPIs are text/target drafts without data-source assignments.
+
+    Poll GET /api/jobs/{job_id} for the result:
+        {
+          "kpis": [
+            {
+              "standard_id":        "1"–"7",
+              "kpi_name":           "<Arabic name starting with عدد/نسبة/وجود/مدى>",
+              "target_description": "<specific quantified target in Arabic>",
+              "responsible_entity": "<internal NU role in Arabic>",
+              "timeframe":          "<Arabic timeframe>"
+            },
+            ...
+          ],
+          "metadata": { "program", "college", "university",
+                        "planning_horizon", "kpis_per_standard",
+                        "total_kpis", "standards_covered" }
+        }
+    """
+    job_id = _new_job()
+    background_tasks.add_task(_task_kpi, job_id, req)
     return {"job_id": job_id}
 
 
@@ -1219,6 +1330,100 @@ _MOCK_WEAKNESSES: dict[str, str] = {
     ),
 }
 
+# ── Gap Analysis Feedback (few-shot store) ────────────────────────────────────
+#
+# Approved user-added suggestions are persisted here and injected as few-shot
+# examples on the next compile_and_run call for the same pillar.
+
+_GAP_FEEDBACK_TABLE_SQL = """
+CREATE TABLE IF NOT EXISTS gap_analysis_feedback (
+    id             UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    pillar_name    TEXT        NOT NULL,
+    pillar_id      INTEGER,
+    user_query     TEXT        NOT NULL,
+    suggestion     TEXT        NOT NULL,
+    reasoning      TEXT        NOT NULL,
+    gap_identified TEXT        NOT NULL,
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+"""
+
+
+def _ensure_gap_feedback_table() -> None:
+    conn = _get_db_conn()
+    if not conn:
+        return
+    try:
+        with conn.cursor() as cur:
+            cur.execute(_GAP_FEEDBACK_TABLE_SQL)
+        conn.commit()
+    except Exception as exc:
+        print(f"[gap-feedback] table creation failed: {exc}")
+
+
+def _fetch_gap_feedback(pillar_names: list[str]) -> dict[str, list[dict]]:
+    """Return up to 3 approved suggestions per pillar, newest first."""
+    conn = _get_db_conn()
+    if not conn:
+        return {}
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT DISTINCT ON (pillar_name, id)
+                    pillar_name, suggestion, reasoning, gap_identified
+                FROM gap_analysis_feedback
+                WHERE pillar_name = ANY(%s)
+                ORDER BY pillar_name, created_at DESC
+                """,
+                (pillar_names,),
+            )
+            rows = cur.fetchall()
+    except Exception as exc:
+        print(f"[gap-feedback] fetch failed: {exc}")
+        return {}
+
+    result: dict[str, list[dict]] = {}
+    for row in rows:
+        pn = row["pillar_name"]
+        if pn not in result:
+            result[pn] = []
+        if len(result[pn]) < 3:
+            result[pn].append({
+                "suggestion":     row["suggestion"],
+                "reasoning":      row["reasoning"],
+                "gap_identified": row["gap_identified"],
+            })
+    return result
+
+
+def _save_gap_feedback(
+    pillar_name: str,
+    pillar_id: int | None,
+    user_query: str,
+    suggestion: str,
+    reasoning: str,
+    gap_identified: str,
+) -> None:
+    _ensure_gap_feedback_table()
+    conn = _get_db_conn()
+    if not conn:
+        return
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO gap_analysis_feedback
+                    (pillar_name, pillar_id, user_query, suggestion, reasoning, gap_identified)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                """,
+                (pillar_name, pillar_id, user_query, suggestion, reasoning, gap_identified),
+            )
+        conn.commit()
+    except Exception as exc:
+        print(f"[gap-feedback] save failed: {exc}")
+
+
 # ── Pillar → NAQAAE Standard keyword map ─────────────────────────────────────
 #
 # H1 headers in the ingested Markdown files produce Standard node titles like:
@@ -1327,6 +1532,188 @@ def _query_target_state(pillar: str) -> str | None:
     return None
 
 
+# ── Supabase: fetch live SWOT items grouped by pillar_id ─────────────────────
+
+def _fetch_swot_by_pillar() -> dict[int, dict[str, list[dict]]]:
+    """
+    Return the most recent SWOT items per agent, grouped by pillar_id (1–7)
+    and type. Each item is a structured dict with full metadata for traceability.
+    """
+    conn = _get_db_conn()
+    if not conn:
+        return {}
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                """
+                WITH latest_runs AS (
+                    SELECT DISTINCT ON (agent_id) run_id, agent_id
+                    FROM agent_runs
+                    ORDER BY agent_id, run_timestamp DESC
+                )
+                SELECT si.item_id::text, si.type, si.title, si.description,
+                       si.pillar_id, si.pillar_name, si.impact_level,
+                       si.evidence, si.source_metadata,
+                       lr.agent_id
+                FROM swot_items si
+                JOIN latest_runs lr ON si.run_id = lr.run_id
+                WHERE si.pillar_id IS NOT NULL
+                  AND si.description IS NOT NULL
+                  AND si.description != ''
+                """
+            )
+            rows = cur.fetchall()
+    except Exception as exc:
+        print(f"[gap-analysis] swot query failed: {exc}")
+        return {}
+
+    result: dict[int, dict[str, list[dict]]] = {}
+    for row in rows:
+        pid       = row["pillar_id"]
+        swot_type = row["type"]
+        desc      = (row["description"] or "").replace("\x00", "").strip()
+        if not desc:
+            continue
+        if pid not in result:
+            result[pid] = {"strength": [], "weakness": [], "opportunity": [], "threat": []}
+        if swot_type in result[pid]:
+            result[pid][swot_type].append({
+                "item_id":         row["item_id"],
+                "title":           (row["title"] or "").replace("\x00", "") or desc[:60],
+                "description":     desc,
+                "agent_id":        row["agent_id"] or "",
+                "impact_level":    row["impact_level"] or "medium",
+                "pillar_name":     row["pillar_name"] or "",
+                "evidence":        row["evidence"],
+                "source_metadata": row["source_metadata"],
+            })
+    return result
+
+
+def _join_items(items: list[dict]) -> str:
+    """Join structured SWOT items into a plain-text block for the LLM."""
+    return "\n\n".join(f"• {i['description']}" for i in items)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  LATEST AGENT RESULTS FROM DB
+# ══════════════════════════════════════════════════════════════════════════════
+
+_SWOT_AGENTS = ("tech", "workforce", "sentiment_analysis", "social_media")
+
+
+@app.get("/api/agents/results/latest")
+def get_latest_agent_results():
+    """
+    Return the most recent InsightCards for all four SWOT agents from Supabase.
+    Each insight includes source_agent so the frontend can slot it per-agent.
+    """
+    dsn = os.getenv("DB_CONNECTION_STRING", "")
+    if not dsn:
+        return {"insights": [], "agents": {}}
+    # Use a fresh connection — the shared _db_conn can be in a broken state
+    # from prior requests, causing silent empty results.
+    try:
+        conn = psycopg2.connect(dsn)
+    except Exception as exc:
+        print(f"[latest-results] connection failed: {exc}")
+        return {"insights": [], "agents": {}}
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT DISTINCT ON (agent_id)
+                    run_id, agent_id, run_timestamp, status
+                FROM agent_runs
+                WHERE agent_id = ANY(%s)
+                ORDER BY agent_id, run_timestamp DESC
+                """,
+                (list(_SWOT_AGENTS),),
+            )
+            latest_runs = {r["agent_id"]: dict(r) for r in cur.fetchall()}
+            if not latest_runs:
+                return {"insights": [], "agents": {}}
+
+            run_ids = [str(r["run_id"]) for r in latest_runs.values()]
+            cur.execute(
+                """
+                SELECT si.item_id, si.run_id::text, si.type, si.title, si.description,
+                       si.evidence, si.impact_level, si.pillar_id, si.pillar_name,
+                       si.source_metadata
+                FROM swot_items si
+                WHERE si.run_id::text = ANY(%s)
+                  AND si.description IS NOT NULL
+                ORDER BY si.item_id
+                """,
+                (run_ids,),
+            )
+            rows = cur.fetchall()
+    except Exception as exc:
+        print(f"[latest-results] query failed: {exc}")
+        conn.close()
+        return {"insights": [], "agents": {}}
+
+    run_to_agent = {r["run_id"]: r for r in latest_runs.values()}
+    counts: dict[str, int] = {aid: 0 for aid in latest_runs}
+    insights = []
+
+    for row in rows:
+        meta  = run_to_agent.get(row["run_id"], {})
+        agent = meta.get("agent_id", "unknown")
+        sm    = row["source_metadata"] or {}
+
+        # Sanitize null bytes before any use
+        desc  = (row["description"] or "").replace("\x00", "")
+        title = (row["title"] or desc[:60]).replace("\x00", "")
+        if not desc:
+            continue
+
+        ev_raw = row["evidence"]
+        if isinstance(ev_raw, dict) and ev_raw.get("type"):
+            evidence = ev_raw
+        elif isinstance(ev_raw, list):
+            evidence = next(
+                (item for item in ev_raw if isinstance(item, dict) and item.get("type")),
+                {"type": "raw_text", "explanation": desc, "data_points": {}},
+            )
+        else:
+            evidence = {"type": "raw_text", "explanation": desc, "data_points": {}}
+
+        ts = meta.get("run_timestamp")
+        insights.append({
+            "id":               f"{agent}-{row['item_id']}",
+            "category":         row["type"],
+            "title":            title,
+            "description":      desc,
+            "pillar_tag":       row["pillar_name"] or "",
+            "impact_level":     row["impact_level"] or "medium",
+            "confidence_score": sm.get("confidence_score", 80),
+            "reference_count":  sm.get("reference_count", 1),
+            "created_at":       ts.isoformat() if hasattr(ts, "isoformat") else str(ts or _NOW()),
+            "data_source":      "live",
+            "is_validated":     False,
+            "ai_suggestion":    True,
+            "source_agent":     agent,
+            "evidence":         evidence,
+        })
+        counts[agent] = counts.get(agent, 0) + 1
+
+    agents_meta = {
+        aid: {
+            "run_timestamp": (
+                latest_runs[aid]["run_timestamp"].isoformat()
+                if hasattr(latest_runs[aid]["run_timestamp"], "isoformat")
+                else str(latest_runs[aid]["run_timestamp"])
+            ),
+            "status": latest_runs[aid]["status"],
+            "count":  counts.get(aid, 0),
+        }
+        for aid in latest_runs
+    }
+    conn.close()
+    return {"insights": insights, "agents": agents_meta}
+
+
 # ── Phase 1: Fetch draft ──────────────────────────────────────────────────────
 
 @app.get("/api/gap-analysis/draft")
@@ -1334,21 +1721,48 @@ def get_gap_analysis_draft():
     """
     Fetch editable draft data for the 7 Strategic Pillars.
 
-    Target States are sourced from the Neo4j NAQAAE knowledge graph when
-    available, falling back to curated mock text. Strengths and Weaknesses
-    are mock placeholders until Supabase is fully wired.
+    Target states come from the Neo4j NAQAAE knowledge graph (mock fallback).
+    Strengths, weaknesses, opportunities, and threats come from the latest
+    Supabase agent run results (mock fallback when no real data exists).
+
+    pillar_id is derived from position in _GAP_PILLARS (1-indexed) which
+    matches the categorizer's canonical pillar IDs 1–7.
     """
+    swot_by_pillar = _fetch_swot_by_pillar()
+
     pillars_data = []
-    for pillar in _GAP_PILLARS:
+    for idx, pillar in enumerate(_GAP_PILLARS, start=1):
         neo4j_content = _query_target_state(pillar)
+        real = swot_by_pillar.get(idx, {})
+
+        s_items  = real.get("strength",    [])
+        w_items  = real.get("weakness",    [])
+        o_items  = real.get("opportunity", [])
+        t_items  = real.get("threat",      [])
+        has_live_sw = bool(s_items or w_items)
+
+        # Plain text for LLM; structured items for UI clickable chips
+        strengths_text  = _join_items(s_items) if s_items else _MOCK_STRENGTHS.get(pillar, "")
+        weaknesses_text = _join_items(w_items) if w_items else _MOCK_WEAKNESSES.get(pillar, "")
+        opps_text       = _join_items(o_items) if o_items else ""
+        threats_text    = _join_items(t_items) if t_items else ""
+
         pillars_data.append({
-            "pillar":       pillar,
-            "target_state": neo4j_content or _MOCK_TARGET_STATES[pillar],
-            "strengths":    _MOCK_STRENGTHS[pillar],
-            "weaknesses":   _MOCK_WEAKNESSES[pillar],
-            "target_source": "neo4j" if neo4j_content else "mock",
+            "pillar":             pillar,
+            "target_state":       neo4j_content or _MOCK_TARGET_STATES[pillar],
+            "strengths":          strengths_text,
+            "weaknesses":         weaknesses_text,
+            "opportunities":      opps_text,
+            "threats":            threats_text,
+            "strength_items":     s_items,
+            "weakness_items":     w_items,
+            "opportunity_items":  o_items,
+            "threat_items":       t_items,
+            "target_source":      "neo4j" if neo4j_content else "mock",
+            "swot_source":        "live"  if has_live_sw   else "mock",
         })
-    return {"pillars": pillars_data, "data_source": "neo4j+mock"}
+
+    return {"pillars": pillars_data, "data_source": "live+neo4j"}
 
 
 # ── Phase 2: Calculate gap ────────────────────────────────────────────────────
@@ -1359,17 +1773,14 @@ class GapCalculateRequest(BaseModel):
 
 def _task_gap_calculate(job_id: str, pillars: list[dict]) -> None:
     try:
-        # Ensure project root is on sys.path so `from core.llm import ...` resolves
         if str(ROOT_DIR) not in sys.path:
             sys.path.insert(0, str(ROOT_DIR))
 
         # Always evict the cached entry before loading.
         # _load_module registers the module in sys.modules BEFORE exec_module runs,
         # so a failed first load leaves a broken empty shell in the cache.
-        # Every subsequent call would return that shell (missing compile_and_run).
         sys.modules.pop("gap_analysis_agent", None)
 
-        
         if not GAP_ANALYSIS_AGENT_PATH.exists():
             raise FileNotFoundError(f"Agent file not found: {GAP_ANALYSIS_AGENT_PATH}")
 
@@ -1381,7 +1792,37 @@ def _task_gap_calculate(job_id: str, pillars: list[dict]) -> None:
                 "Check the agent file for top-level import errors."
             )
 
-        result: list[dict] = mod.compile_and_run(pillars)
+        pillar_names = [p["pillar"] for p in pillars if p.get("pillar")]
+        feedback = _fetch_gap_feedback(pillar_names)
+
+        result: list[dict] = mod.compile_and_run(pillars, feedback=feedback)
+        _finish(job_id, result)
+    except Exception as exc:
+        _fail(job_id, str(exc))
+
+
+def _task_suggest_one(job_id: str, pillar_data: dict, user_query: str) -> None:
+    """Background task: generate a single suggestion from a user's natural-language query."""
+    try:
+        if str(ROOT_DIR) not in sys.path:
+            sys.path.insert(0, str(ROOT_DIR))
+
+        sys.modules.pop("gap_analysis_agent", None)
+
+        if not GAP_ANALYSIS_AGENT_PATH.exists():
+            raise FileNotFoundError(f"Agent file not found: {GAP_ANALYSIS_AGENT_PATH}")
+
+        mod = _load_module("gap_analysis_agent", GAP_ANALYSIS_AGENT_PATH)
+
+        if not hasattr(mod, "generate_user_suggestion"):
+            raise AttributeError("gap_analysis_agent missing generate_user_suggestion")
+
+        pillar_name = pillar_data.get("pillar", "")
+        feedback_examples = _fetch_gap_feedback([pillar_name]).get(pillar_name, [])
+
+        result: dict = mod.generate_user_suggestion(
+            pillar_data, user_query, feedback_examples
+        )
         _finish(job_id, result)
     except Exception as exc:
         _fail(job_id, str(exc))
@@ -1402,6 +1843,55 @@ async def calculate_gap_analysis(
     job_id = _new_job()
     background_tasks.add_task(_task_gap_calculate, job_id, req.pillars)
     return {"job_id": job_id}
+
+
+# ── HITL: user-initiated single suggestion ────────────────────────────────────
+
+class SuggestOneRequest(BaseModel):
+    pillar_data: dict  # PillarDraft from the frontend (pillar, target_state, strengths, weaknesses)
+    user_query: str    # administrator's natural-language intent
+
+
+@app.post("/api/gap-analysis/suggest-one", status_code=202)
+async def suggest_one(req: SuggestOneRequest, background_tasks: BackgroundTasks):
+    """
+    Generate a single structured suggestion from the user's natural-language query.
+    The LLM reasons against the specific pillar's NAQAAE target state and SWOT data.
+    Previously approved suggestions for this pillar are injected as few-shot examples.
+    Returns a job_id; poll GET /api/jobs/{job_id} for the result.
+    """
+    job_id = _new_job()
+    background_tasks.add_task(_task_suggest_one, job_id, req.pillar_data, req.user_query)
+    return {"job_id": job_id}
+
+
+# ── HITL: approve and persist a suggestion as feedback ───────────────────────
+
+class FeedbackRequest(BaseModel):
+    pillar_name:    str
+    pillar_id:      int | None = None
+    user_query:     str
+    suggestion:     str
+    reasoning:      str
+    gap_identified: str
+
+
+@app.post("/api/gap-analysis/feedback", status_code=201)
+def submit_gap_feedback(req: FeedbackRequest):
+    """
+    Persist an approved user-added suggestion as a few-shot feedback example.
+    On the next compile_and_run call for this pillar, this suggestion will be
+    injected into the system prompt to guide the model's output style and quality.
+    """
+    _save_gap_feedback(
+        pillar_name=req.pillar_name,
+        pillar_id=req.pillar_id,
+        user_query=req.user_query,
+        suggestion=req.suggestion,
+        reasoning=req.reasoning,
+        gap_identified=req.gap_identified,
+    )
+    return {"status": "saved"}
 
 
 # ══════════════════════════════════════════════════════════════════════════════

@@ -308,19 +308,19 @@ def market_scout_node(state: TechClusterState) -> TechClusterState:
             resp = requests.get(SERPAPI_BASE_URL, params=params)
             jobs = resp.json().get("jobs_results", [])
             all_jobs.extend(jobs)     # Add them to our master list
-        
-        # Now you have ~180 jobs to analyze instead of 30!
-        logger.info("📊 [Market Scout] Raw jobs returned: %d", len(jobs))
+
+        # ~180 jobs across all 6 roles
+        logger.info("📊 [Market Scout] Raw jobs returned: %d", len(all_jobs))
 
         # ── Aggregate skill frequency ──────────────────────────────────────
         skill_freq: dict[str, int] = {}
         SKILL_KEYWORDS = [
-            "Python", "Java", "TypeScript", "Rust", "Go", 
+            "Python", "Java", "TypeScript", "Rust", "Go",
             "AWS", "Azure", "GCP", "Docker", "Kubernetes", "Terraform",
             "Machine Learning", "LLM", "Data Science", "DevOps", "CI/CD",
             "Cybersecurity", "Zero Trust", "GraphQL", "Apache Kafka"
         ]
-        for job in jobs:
+        for job in all_jobs:
             desc = (job.get("description") or "").lower()
             for skill in SKILL_KEYWORDS:
                 if skill.lower() in desc:
@@ -332,7 +332,7 @@ def market_scout_node(state: TechClusterState) -> TechClusterState:
             "source": "SerpApi Google Jobs (LIVE)",
             "retrieved_at": datetime.utcnow().isoformat(),
             "market": "Egypt / MENA",
-            "total_jobs_analyzed": len(jobs),
+            "total_jobs_analyzed": len(all_jobs),
             "top_demanded_skills": [
                 {"rank": i + 1, "skill": s, "job_mentions": c}
                 for i, (s, c) in enumerate(top_skills)

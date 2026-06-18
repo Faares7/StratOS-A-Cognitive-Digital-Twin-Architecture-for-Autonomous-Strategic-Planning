@@ -9,7 +9,7 @@ import { useAgentResults } from "@/contexts/AgentResultsContext";
 import type { InsightCard } from "@/types";
 
 export function SocialMediaWidget() {
-  const { results, addInsights, setSocialMeta } = useAgentResults();
+  const { results, setAgentInsights, setSocialMeta } = useAgentResults();
   const { socialMeta } = results;
 
   const [running, setRunning] = useState(false);
@@ -26,7 +26,8 @@ export function SocialMediaWidget() {
         threats?: number;
       };
       if (result?.insights && result.insights.length > 0) {
-        addInsights(result.insights);
+        const tagged = result.insights.map((i) => ({ ...i, source_agent: "social_media" }));
+        setAgentInsights("social_media", tagged);
       }
       setSocialMeta({
         postsAnalyzed: result?.total_posts_analyzed ?? 0,
@@ -39,7 +40,7 @@ export function SocialMediaWidget() {
     } finally {
       setRunning(false);
     }
-  }, [addInsights, setSocialMeta]);
+  }, [setAgentInsights, setSocialMeta]);
 
   const lastRunLabel = socialMeta
     ? new Date(socialMeta.lastRun).toLocaleString(undefined, {
