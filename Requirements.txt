@@ -28,7 +28,9 @@ langchain-huggingface>=0.0.3       # Sentiment Agent (HuggingFace embeddings)
 # ── Data & ML ────────────────────────────────────────────────
 numpy>=1.26.0
 pandas>=2.0.0
-scikit-learn>=1.4.0                # Optional: for advanced similarity in sentiment
+scikit-learn>=1.4.0                # similarity in sentiment + clustering silhouette/k-selection
+igraph>=0.11.0                     # goals_planner clustering: Leiden similarity graph
+leidenalg>=0.10.0                  # goals_planner clustering: Leiden community detection
 
 # ── HTTP & APIs ──────────────────────────────────────────────
 requests>=2.31.0

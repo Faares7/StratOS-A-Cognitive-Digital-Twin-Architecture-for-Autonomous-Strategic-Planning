@@ -9,6 +9,7 @@ import {
   BarChart3,
   FileText,
   GraduationCap,
+  Milestone,
   Settings,
   Bell,
   Users,
@@ -51,7 +52,8 @@ interface NavItem {
 const mainNav: NavItem[] = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Command Center" },
   { href: "/swot", icon: Target, label: "SWOT Analysis" },
-  { href: "/gap-analysis", icon: BarChart3, label: "Gap Analysis" },
+  { href: "/gap-analysis", icon: BarChart3,  label: "Gap Analysis" },
+  { href: "/strategy",     icon: Milestone,  label: "Strategic Goals" },
   { href: "/research", icon: GraduationCap, label: "Research Intelligence" },
   { href: "/meetings", icon: FileText, label: "Meetings" },
   { href: "/surveys", icon: ClipboardList, label: "Survey Generation" },
