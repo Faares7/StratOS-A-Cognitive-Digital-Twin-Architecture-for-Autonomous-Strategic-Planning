@@ -22,6 +22,7 @@ import { deleteMeeting, fetchLiveMeeting } from "@/services/meetingsApi";
 import type { Meeting } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { cn, formatDate } from "@/lib/utils";
+import { useRole } from "@/hooks/useRole";
 
 const TYPE_BADGE_MAP: Record<string, "board" | "department" | "committee" | "default"> = {
   "Board Meeting": "board",
@@ -83,6 +84,7 @@ export default function MeetingDetailPage({
   params: { id: string };
 }) {
   const router = useRouter();
+  const { canMutate } = useRole();
   const [meeting, setMeeting] = useState<Meeting | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -166,7 +168,7 @@ export default function MeetingDetailPage({
             All Meetings
           </Link>
 
-          {meeting.data_source === "live" && (
+          {meeting.data_source === "live" && canMutate && (
             confirmDelete ? (
               <div className="flex items-center gap-2">
                 <span className="text-xs text-slate-400">Delete this meeting?</span>

@@ -30,6 +30,7 @@ export interface ScheduleMeetingInput {
   attendee_emails: string[];
   meeting_type: string;
   description?: string;
+  access_token?: string;
 }
 
 export interface ScheduleMeetingResult {

@@ -12,6 +12,7 @@ import { useAgentResults } from "@/contexts/AgentResultsContext";
 import type { ResearchIntelligence } from "@/types";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useRole } from "@/hooks/useRole";
 
 // 12 distinct colours — enough for Nile U + up to 10 competitors
 const COLORS = [
@@ -22,6 +23,7 @@ const COLORS = [
 
 export default function ResearchPage() {
   const { results, setResearch } = useAgentResults();
+  const { canMutate } = useRole();
   const [mockData, setMockData]   = useState<ResearchIntelligence | null>(null);
   const [loading, setLoading]     = useState(true);
   const [agentRunning, setAgentRunning] = useState(false);
@@ -145,7 +147,7 @@ export default function ResearchPage() {
           </div>
           <button
             onClick={runBenchmark}
-            disabled={agentRunning}
+            disabled={agentRunning || !canMutate}
             className={cn(
               "flex items-center gap-2 rounded-lg border px-4 py-2 text-xs font-medium transition-all",
               agentRunning

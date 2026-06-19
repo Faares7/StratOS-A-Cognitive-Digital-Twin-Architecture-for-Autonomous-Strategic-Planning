@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Search, Bell } from "lucide-react";
+import { Search } from "lucide-react";
 import { SyncStatus } from "@/components/shared/SyncStatus";
 
 interface HeaderProps {
@@ -22,11 +22,6 @@ export function Header({ title, subtitle }: HeaderProps) {
 
         <button className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-white/5 hover:text-slate-200">
           <Search className="h-4 w-4" />
-        </button>
-
-        <button className="relative flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-white/5 hover:text-slate-200">
-          <Bell className="h-4 w-4" />
-          <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-cyan-400" />
         </button>
       </div>
     </header>

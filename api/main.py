@@ -398,6 +398,29 @@ def google_auth_status():
     return {"connected": True, "email": tok.get("email", "")}
 
 
+class _TokenHandoff(BaseModel):
+    access_token:  str
+    refresh_token: str | None = None
+    email:         str | None = None
+
+
+@app.post("/api/auth/google/handoff")
+def google_auth_handoff(body: _TokenHandoff):
+    """
+    Accept the Google access+refresh token from the NextAuth session
+    (set during onboarding) so the meetings agent can use it without
+    a separate OAuth popup.
+    """
+    _google_tokens["primary"] = {
+        "access_token":  body.access_token,
+        "refresh_token": body.refresh_token or "",
+        "email":         body.email or "",
+        "expires_at":    time.time() + 3500,   # ~1 h; refresh logic handles expiry
+    }
+    _db_save_tokens(_google_tokens["primary"])
+    return {"ok": True, "email": body.email}
+
+
 def _get_valid_access_token() -> str | None:
     """Return a valid access token, refreshing via refresh_token if expired."""
     tok = _google_tokens.get("primary")
@@ -437,17 +460,22 @@ def _find_scheduled_meeting(fathom_data: dict, raw_payload: dict | None = None) 
 
     Strategy (in order):
       1. scheduled_start_time from raw payload vs meeting.date (≤ 10 min) — most reliable.
-      2. Title (meeting_title) + recording start time within 3 hours — fallback.
+      2. recording_start_time vs meeting.date within 3 hours — handles Fathom labelling
+         calendar events as "Impromptu" (title is unreliable; time is not).
+         Picks the closest unprocessed meeting when multiple exist.
+      3. meeting_title + recording time within 3 hours — last resort when time alone
+         is ambiguous (e.g. two back-to-back meetings in the same window).
 
     Fathom's `title` field is auto-generated ("Impromptu Google Meet Meeting") and
-    unreliable; `meeting_title` is the Google Calendar event name and is used for #2.
+    must NOT be used for matching. `meeting_title` is the Google Calendar event name.
     """
     unprocessed = {mid: m for mid, m in _meetings.items() if not m.get("fathom_call_id")}
     if not unprocessed:
         return None
 
-    # ── Strategy 1: scheduled_start_time exact match ─────────────────────────
     raw = raw_payload or {}
+
+    # ── Strategy 1: scheduled_start_time exact match ─────────────────────────
     sched_str = raw.get("scheduled_start_time", "")
     if sched_str:
         try:
@@ -463,8 +491,31 @@ def _find_scheduled_meeting(fathom_data: dict, raw_payload: dict | None = None) 
         except Exception:
             pass
 
-    # ── Strategy 2: meeting_title + recording time within 3 hours ────────────
-    title    = _as_str(raw.get("meeting_title") or fathom_data.get("title"), "").strip().lower()
+    # ── Strategy 2: recording_start_time proximity (title-independent) ────────
+    # Fathom calls calendar-booked meetings "Impromptu" when it auto-joins, so
+    # we cannot rely on the title. Matching by time is sufficient in practice.
+    rec_str = raw.get("recording_start_time") or fathom_data.get("date", "")
+    if rec_str:
+        try:
+            rec_dt = datetime.fromisoformat(rec_str.replace("Z", "+00:00"))
+            best_mid, best_delta = None, float("inf")
+            for mid, m in unprocessed.items():
+                try:
+                    m_dt = datetime.fromisoformat(m.get("date", "").replace("Z", "+00:00"))
+                    delta = abs((rec_dt - m_dt).total_seconds())
+                    if delta < 10_800 and delta < best_delta:  # within 3 h, pick closest
+                        best_delta = delta
+                        best_mid = mid
+                except Exception:
+                    pass
+            if best_mid:
+                print(f"[meetings] Matched by recording_start_time proximity → {best_mid}")
+                return best_mid
+        except Exception:
+            pass
+
+    # ── Strategy 3: meeting_title + recording time within 3 hours ────────────
+    title    = str(raw.get("meeting_title") or fathom_data.get("title") or "").strip().lower()
     date_str = fathom_data.get("date", "")
     if title and date_str:
         try:
@@ -492,6 +543,7 @@ class ScheduleMeetingRequest(BaseModel):
     attendee_emails: list[str] = []
     meeting_type: str = "Board Meeting"
     description: str = ""
+    access_token: str = ""  # user's own Google token from NextAuth session
 
 
 @app.post("/api/meetings/schedule", status_code=201)
@@ -501,9 +553,12 @@ def schedule_meeting(req: ScheduleMeetingRequest):
     Calendar event with a Google Meet link and invites all attendees.
     """
     meeting_id = f"cal-{uuid.uuid4().hex[:10]}"
-    access_token = _get_valid_access_token()
 
     meet_link = calendar_event_id = html_link = ""
+
+    # Prefer the user's own Google token (forwarded from NextAuth session);
+    # fall back to the shared admin token for backward compatibility.
+    access_token = req.access_token or _get_valid_access_token()
 
     if access_token:
         try:
@@ -1019,6 +1074,12 @@ async def run_sentiment(background_tasks: BackgroundTasks):
 
 def _task_social_media(job_id: str) -> None:
     try:
+        # Evict cached modules so every run picks up the latest code and
+        # so a previously failed selenium import doesn't stay frozen in cache.
+        sys.modules.pop("nlp_pipeline", None)
+        sys.modules.pop("scraper", None)
+        sys.modules.pop("keywords", None)
+
         mod = _load_module(
             "nlp_pipeline",
             SOCIAL_AGENT_DIR / "nlp_pipeline.py",
@@ -1034,10 +1095,14 @@ def _task_social_media(job_id: str) -> None:
             ins["source_agent"] = "social_media"
         _apply_pillar_tags(sm_insights)
         _finish(job_id, {
-            "insights": sm_insights,
-            "opportunities": result.get("opportunities", 0),
-            "threats": result.get("threats", 0),
+            "insights":             sm_insights,
+            "strengths":            result.get("strengths", 0),
+            "weaknesses":           result.get("weaknesses", 0),
+            "opportunities":        result.get("opportunities", 0),
+            "threats":              result.get("threats", 0),
             "total_posts_analyzed": result.get("total_posts_analyzed", 0),
+            "scrape_status":        result.get("scrape_status", "unknown"),
+            "scrape_error":         result.get("scrape_error", ""),
         })
     except Exception as exc:
         _fail(job_id, str(exc))
@@ -1059,12 +1124,10 @@ def run_social(background_tasks: BackgroundTasks):
 
 class SurveyRequest(BaseModel):
     audience: str = "All students"
+    audience_key: str = ""
     min_questions: int = 5
     max_questions: int = 10
     instructions: str = ""
-    # Optional: pass current weaknesses from the live graph state so the agent
-    # can tailor questions to known institutional gaps.
-    current_weaknesses: list[str] = []
 
 
 def _task_survey(job_id: str, req: SurveyRequest) -> None:
@@ -1073,14 +1136,15 @@ def _task_survey(job_id: str, req: SurveyRequest) -> None:
             "survey_agent",
             AGENTS_DIR / "Survey generation" / "survey_agent.py",
         )
-        state_snapshot = {"current_weaknesses": req.current_weaknesses}
         user_request = {
-            "audience": req.audience,
+            "audience":      req.audience,
+            "audience_key":  req.audience_key,
             "min_questions": req.min_questions,
             "max_questions": req.max_questions,
-            "instructions": req.instructions,
+            "instructions":  req.instructions,
         }
-        result: dict = mod.compile_and_run(state_snapshot, user_request)
+        # state_snapshot is empty — the agent auto-loads SWOT from the DB
+        result: dict = mod.compile_and_run({}, user_request)
         _finish(job_id, result)
     except Exception as exc:
         _fail(job_id, str(exc))
@@ -1091,6 +1155,185 @@ def run_survey(req: SurveyRequest, background_tasks: BackgroundTasks):
     """Trigger the Survey Agent (LangGraph → local LLM → structured SurveyDraft)."""
     job_id = _new_job()
     background_tasks.add_task(_task_survey, job_id, req)
+    return {"job_id": job_id}
+
+
+# ── Survey UI convenience routes (synchronous, used by the Surveys page) ──────
+
+_SURVEY_TEMPLATES_PATH = ROOT_DIR / "Data" / "survey_templates.json"
+
+def _load_survey_templates() -> dict:
+    try:
+        with open(_SURVEY_TEMPLATES_PATH, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"[survey] could not load templates from {_SURVEY_TEMPLATES_PATH}: {e}")
+        return {}
+
+
+@app.get("/api/survey/templates")
+def survey_templates():
+    """Return the bilingual template question sets keyed by audience (loaded from Data/survey_templates.json)."""
+    return _load_survey_templates()
+
+
+class SurveyGenerateRequest(BaseModel):
+    audience: str = "mixed"
+    audience_key: str = ""
+    custom_prompt: str = ""
+
+
+@app.post("/api/survey/generate-full")
+def survey_generate_full(req: SurveyGenerateRequest):
+    """
+    Synchronously generate a survey via the LLM.
+
+    Returns {questions: list[str], source: "ai"} on success.
+    Raises HTTP 502 if the LLM call fails.
+    """
+    try:
+        mod = _load_module(
+            "survey_agent",
+            AGENTS_DIR / "Survey generation" / "survey_agent.py",
+        )
+        result: dict = mod.compile_and_run(
+            state_snapshot={},
+            user_request={
+                "audience":     req.audience,
+                "audience_key": req.audience_key,
+                "min_questions": 5,
+                "max_questions": 10,
+                "instructions": req.custom_prompt,
+            },
+        )
+        if result.get("error"):
+            raise HTTPException(status_code=502, detail=result["error"])
+
+        raw_questions = result.get("questions", [])
+        # return full dicts {text, answer_type, pillar} so the frontend can use all fields
+        question_objects = [
+            q if isinstance(q, dict) else {"text": str(q), "answer_type": "strongly-agree-disagree", "pillar": ""}
+            for q in raw_questions
+        ]
+        return {"questions": question_objects, "source": "ai"}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+class RegenerateQuestionRequest(BaseModel):
+    original_question: str
+    user_instruction: str
+
+
+@app.post("/api/survey/regenerate-question")
+def survey_regenerate_question(req: RegenerateQuestionRequest):
+    """
+    Tweak a single survey question using the LLM.
+
+    Returns {question: str} with the rewritten question text.
+    """
+    try:
+        from core.llm import local_brain
+        from langchain_core.messages import HumanMessage, SystemMessage
+
+        prompt = (
+            f"Original question: {req.original_question}\n\n"
+            f"Instruction: {req.user_instruction}\n\n"
+            "Rewrite the question following the instruction. "
+            "Keep it concise (≤15 words), unambiguous, and suitable for a university survey. "
+            "Return ONLY the rewritten question text — no explanation, no quotes."
+        )
+        response = local_brain.invoke(
+            [
+                SystemMessage(content="You are an expert university survey designer."),
+                HumanMessage(content=prompt),
+            ]
+        )
+        text = response.content.strip().strip('"').strip("'")
+        return {"question": text}
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  KPI GENERATION AGENT
+#  Planning Phase: maps measurable KPIs to the 7 NAQAAE Programmatic Standards.
+#  Uses Nile University's KPI style (عدد/نسبة/وجود prefixes, internal entities).
+#  Does NOT assign data sources — that is handled by a separate agent downstream.
+# ══════════════════════════════════════════════════════════════════════════════
+
+KPI_AGENT_PATH: Path = AGENTS_DIR / "kpi_generation" / "agent.py"
+
+
+class KPIRequest(BaseModel):
+    program_name: str = "علوم الحاسب"
+    college_name: str = "كلية تكنولوجيا المعلومات وعلوم الحاسب"
+    university_name: str = "جامعة النيل الأهلية"
+    # Year range that sets the planning horizon and default timeframe label.
+    planning_horizon: str = "2025-2028"
+    # KPIs generated per NAQAAE standard (1–7 recommended; 3 is a good default).
+    kpis_per_standard: int = 3
+
+
+def _task_kpi(job_id: str, req: KPIRequest) -> None:
+    try:
+        if str(ROOT_DIR) not in sys.path:
+            sys.path.insert(0, str(ROOT_DIR))
+
+        sys.modules.pop("kpi_agent", None)
+
+        if not KPI_AGENT_PATH.exists():
+            raise FileNotFoundError(f"KPI agent not found: {KPI_AGENT_PATH}")
+
+        mod = _load_module("kpi_agent", KPI_AGENT_PATH)
+
+        result: dict = mod.compile_and_run(
+            program_name=req.program_name,
+            college_name=req.college_name,
+            university_name=req.university_name,
+            planning_horizon=req.planning_horizon,
+            kpis_per_standard=req.kpis_per_standard,
+        )
+
+        if result.get("error"):
+            _fail(job_id, result["error"])
+            return
+
+        _finish(job_id, result)
+    except Exception as exc:
+        _fail(job_id, str(exc))
+
+
+@app.post("/api/agents/kpi/run", status_code=202)
+def run_kpi(req: KPIRequest, background_tasks: BackgroundTasks):
+    """
+    Trigger the KPI Generation Agent.
+
+    Generates measurable KPIs for each of the 7 NAQAAE Programmatic Standards
+    in the style of Nile University's strategic plan. This is the Planning Phase
+    only — KPIs are text/target drafts without data-source assignments.
+
+    Poll GET /api/jobs/{job_id} for the result:
+        {
+          "kpis": [
+            {
+              "standard_id":        "1"–"7",
+              "kpi_name":           "<Arabic name starting with عدد/نسبة/وجود/مدى>",
+              "target_description": "<specific quantified target in Arabic>",
+              "responsible_entity": "<internal NU role in Arabic>",
+              "timeframe":          "<Arabic timeframe>"
+            },
+            ...
+          ],
+          "metadata": { "program", "college", "university",
+                        "planning_horizon", "kpis_per_standard",
+                        "total_kpis", "standards_covered" }
+        }
+    """
+    job_id = _new_job()
+    background_tasks.add_task(_task_kpi, job_id, req)
     return {"job_id": job_id}
 
 

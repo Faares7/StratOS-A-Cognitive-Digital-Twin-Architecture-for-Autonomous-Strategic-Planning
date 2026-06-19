@@ -32,6 +32,8 @@ import type { Meeting } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn, formatRelativeTime } from "@/lib/utils";
+import { useRole } from "@/hooks/useRole";
+import { useSession } from "next-auth/react";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -165,6 +167,7 @@ interface ScheduleDialogProps {
 }
 
 function ScheduleDialog({ open, onClose, onScheduled }: ScheduleDialogProps) {
+  const { data: session } = useSession();
   const [title, setTitle] = useState("");
   const [startDatetime, setStartDatetime] = useState("");
   const [duration, setDuration] = useState(60);
@@ -232,6 +235,7 @@ function ScheduleDialog({ open, onClose, onScheduled }: ScheduleDialogProps) {
       attendee_emails: emails,
       meeting_type: meetingType,
       description: description.trim(),
+      access_token: (session as typeof session & { accessToken?: string })?.accessToken,
     };
 
     try {
@@ -398,6 +402,7 @@ function ScheduleDialog({ open, onClose, onScheduled }: ScheduleDialogProps) {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function MeetingsPage() {
+  const { canMutate } = useRole();
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "past" | "upcoming">("all");
@@ -408,12 +413,17 @@ export default function MeetingsPage() {
   const [logOpen, setLogOpen] = useState(false);
   const [webhookLog, setWebhookLog] = useState<WebhookLog | null>(null);
   const [loadingLog, setLoadingLog] = useState(false);
+  const [backendError, setBackendError] = useState(false);
+  const [connectError, setConnectError] = useState<string | null>(null);
 
   const loadMeetings = useCallback(async () => {
     setLoading(true);
+    setBackendError(false);
     try {
-      const data = await fetchLiveMeetings().catch(() => []);
+      const data = await fetchLiveMeetings();
       setMeetings(data);
+    } catch {
+      setBackendError(true);
     } finally {
       setLoading(false);
     }
@@ -443,13 +453,14 @@ export default function MeetingsPage() {
 
   async function handleConnectGoogle() {
     setConnectingGoogle(true);
+    setConnectError(null);
     try {
       const email = await connectGoogleCalendar();
       setGoogleConnected(true);
       setGoogleEmail(email);
     } catch (err) {
       if (err instanceof Error && err.message !== "Authentication cancelled.") {
-        console.error(err);
+        setConnectError(err.message);
       }
     } finally {
       setConnectingGoogle(false);
@@ -487,10 +498,12 @@ export default function MeetingsPage() {
                   Connect Google Calendar to schedule meetings with Google Meet and auto-import Fathom summaries.
                 </span>
               </div>
-              <Button size="sm" variant="outline" onClick={handleConnectGoogle} disabled={connectingGoogle}
-                className="ml-4 shrink-0 border-yellow-500/30 text-yellow-300 hover:bg-yellow-500/10 text-xs">
-                {connectingGoogle ? "Connecting…" : "Connect"}
-              </Button>
+              {canMutate && (
+                <Button size="sm" variant="outline" onClick={handleConnectGoogle} disabled={connectingGoogle}
+                  className="ml-4 shrink-0 border-yellow-500/30 text-yellow-300 hover:bg-yellow-500/10 text-xs">
+                  {connectingGoogle ? "Connecting…" : "Connect"}
+                </Button>
+              )}
             </div>
           )}
 
@@ -499,6 +512,32 @@ export default function MeetingsPage() {
               <div className="h-1.5 w-1.5 rounded-full bg-green-400" />
               <span className="text-xs text-green-400">
                 Google Calendar connected as <strong>{googleEmail}</strong>
+              </span>
+            </div>
+          )}
+
+          {connectError && (
+            <div className="flex items-start justify-between gap-3 rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3">
+              <div>
+                <p className="text-xs font-medium text-red-400">Google Calendar connection failed</p>
+                <p className="mt-0.5 text-xs text-red-300/70">{connectError}</p>
+                <p className="mt-1 text-[10px] text-slate-500">
+                  Make sure the FastAPI backend is running and ngrok is active:{" "}
+                  <code className="text-slate-400">ngrok http 8000 --url=distill-subpar-bankroll.ngrok-free.dev</code>
+                </p>
+              </div>
+              <button onClick={() => setConnectError(null)} className="shrink-0 text-slate-600 hover:text-slate-400">
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
+
+          {backendError && (
+            <div className="flex items-center gap-2.5 rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3">
+              <XCircle className="h-4 w-4 shrink-0 text-red-400" />
+              <span className="text-xs text-red-300">
+                Could not reach the backend. Is FastAPI running on port 8000?{" "}
+                <button onClick={loadMeetings} className="underline hover:text-red-200">Retry</button>
               </span>
             </div>
           )}
@@ -517,16 +556,20 @@ export default function MeetingsPage() {
               ))}
             </div>
             <div className="flex gap-2">
-              <Button size="sm" variant="outline" className="gap-1.5 text-xs">
-                <Upload className="h-3.5 w-3.5" /> Upload Transcript
-              </Button>
+              {canMutate && (
+                <Button size="sm" variant="outline" className="gap-1.5 text-xs">
+                  <Upload className="h-3.5 w-3.5" /> Upload Transcript
+                </Button>
+              )}
               <Button size="sm" variant="outline" className="gap-1.5 text-xs"
                 onClick={handleOpenLog}>
                 <Activity className="h-3.5 w-3.5" /> Webhook Log
               </Button>
-              <Button size="sm" className="gap-1.5 text-xs" onClick={() => setScheduleOpen(true)}>
-                <Plus className="h-3.5 w-3.5" /> Schedule Meeting
-              </Button>
+              {canMutate && (
+                <Button size="sm" className="gap-1.5 text-xs" onClick={() => setScheduleOpen(true)}>
+                  <Plus className="h-3.5 w-3.5" /> Schedule Meeting
+                </Button>
+              )}
             </div>
           </div>
 
