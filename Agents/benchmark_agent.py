@@ -3,6 +3,7 @@ import requests
 import psycopg2
 from psycopg2.extras import Json
 import time
+from datetime import date
 from dotenv import load_dotenv
 
 from core.persistence import build_envelope, save_envelope
@@ -12,11 +13,119 @@ load_dotenv()
 DB_CONNECTION_STRING = os.getenv("DB_CONNECTION_STRING", "")
 _OPENALEX_HEADERS = {"User-Agent": "StratOS/1.0 (mailto:admin@nileuniversity.edu.eg)"}
 
+# ── The 11 benchmarked universities ───────────────────────────────────────────
+# Only these are fetched from OpenAlex. `enrollment_key` is the exact value in the
+# `universities_enrollment` table's "University" column (names differ from OpenAlex).
+NILE_ID = "I57629906"
+BENCHMARK_UNIVERSITIES = [
+    {"display_name": "Nile University",        "openalex_id": "I57629906",   "enrollment_key": "Nile (NU)"},
+    {"display_name": "Cairo University",       "openalex_id": "I145487455",  "enrollment_key": "Cairo"},
+    {"display_name": "October 6 University",   "openalex_id": "I4210165376", "enrollment_key": "October 6 (O6U)"},
+    {"display_name": "Alexandria University",  "openalex_id": "I84524832",   "enrollment_key": "Alexandria"},
+    {"display_name": "Ain Shams University",   "openalex_id": "I107720978",  "enrollment_key": "Ain Shams"},
+    {"display_name": "Mansoura University",    "openalex_id": "I159247623",  "enrollment_key": "Mansoura"},
+    {"display_name": "Zagazig University",     "openalex_id": "I192398990",  "enrollment_key": "Zagazig"},
+    {"display_name": "Tanta University",       "openalex_id": "I21376657",   "enrollment_key": "Tanta"},
+    {"display_name": "Assiut University",      "openalex_id": "I91041137",   "enrollment_key": "Assiut"},
+    {"display_name": "Al-Azhar University",    "openalex_id": "I184834183",  "enrollment_key": "Al-Azhar"},
+    {"display_name": "Suez Canal University",  "openalex_id": "I114794399",  "enrollment_key": "Suez Canal"},
+]
+_ENROLLMENT_BY_ID = {u["openalex_id"]: u["enrollment_key"] for u in BENCHMARK_UNIVERSITIES}
+
+# Enrollment-adjustment equation tunables.
+RII_SCALE = 1000.0      # readability multiplier for the Research Intensity Index
+LAST_N_YEARS = 5        # publication history window shown on the chart
+
+
+def recent_years() -> list[int]:
+    """The last N complete calendar years (most recent first → oldest), e.g. 2021..2025."""
+    cur = date.today().year
+    return list(range(cur - LAST_N_YEARS, cur))
+
+
+def _norm(name: str) -> str:
+    return (name or "").strip().lower()
+
+
+def research_intensity(publications: float, students: int | None, faculties: int | None) -> float:
+    """
+    Enrollment-adjusted research output ("Research Intensity Index").
+
+    Raw publication counts favour large universities. This normalises output by
+    *both* the student body and the number of faculties so a small, focused
+    university is judged on productivity, not size:
+
+        RII = publications / total_students / faculty_count * RII_SCALE
+
+    Example: 300 papers / 600 students / 3 faculties  →  higher than
+             400 papers / 1000 students / 5 faculties.
+
+    Returns 0.0 when enrollment data is missing so such universities sort last.
+    """
+    if not students or not faculties:
+        return 0.0
+    return round(publications * RII_SCALE / (students * faculties), 2)
+
 
 def get_db_connection():
     if not DB_CONNECTION_STRING:
         raise RuntimeError("DB_CONNECTION_STRING is not set in environment.")
     return psycopg2.connect(DB_CONNECTION_STRING)
+
+
+# ── Selective fetch (only the 11 benchmarked universities) ─────────────────────
+
+def fetch_benchmark_universities() -> list[dict]:
+    """
+    Fetch only the 11 benchmarked universities in a single OpenAlex call using an
+    OR filter on their institution IDs. Includes works_count, cited_by_count,
+    summary_stats and counts_by_year so no per-university detail call is needed.
+    """
+    ids = "|".join(u["openalex_id"] for u in BENCHMARK_UNIVERSITIES)
+    select = "id,display_name,works_count,cited_by_count,summary_stats,counts_by_year"
+    url = (
+        "https://api.openalex.org/institutions"
+        f"?filter=openalex:{ids}&per_page=50&select={select}"
+    )
+    try:
+        resp = requests.get(url, timeout=30, headers=_OPENALEX_HEADERS)
+        resp.raise_for_status()
+        results = resp.json().get("results", [])
+        print(f"[benchmark] Fetched {len(results)}/{len(BENCHMARK_UNIVERSITIES)} benchmarked universities")
+        return results
+    except Exception as e:
+        print(f"[benchmark] OpenAlex selective fetch error: {e}")
+        return []
+
+
+def load_enrollment() -> dict[str, dict]:
+    """
+    Load student counts + faculty counts from the `universities_enrollment` table,
+    keyed by the normalised "University" value. Returns {} if the DB is unavailable.
+    """
+    try:
+        conn = get_db_connection()
+    except Exception as e:
+        print(f"[benchmark] enrollment DB unavailable: {e}")
+        return {}
+    out: dict[str, dict] = {}
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            'SELECT "University", "Total Students", "Faculty Count" FROM universities_enrollment;'
+        )
+        for name, students, faculties in cur.fetchall():
+            out[_norm(name)] = {
+                "students": int(students) if students is not None else None,
+                "faculties": int(faculties) if faculties is not None else None,
+            }
+        cur.close()
+        print(f"[benchmark] Loaded enrollment for {len(out)} universities")
+    except Exception as e:
+        print(f"[benchmark] enrollment query failed: {e}")
+    finally:
+        conn.close()
+    return out
 
 
 # ── Fast bulk fetch (listing endpoint — no per-university detail call) ─────────
@@ -60,11 +169,31 @@ def fetch_all_universities_bulk() -> list[dict]:
     return all_results
 
 
-def _parse_university(inst: dict) -> dict:
+def _parse_university(inst: dict, enrollment: dict[str, dict] | None = None) -> dict:
     inst_id = inst["id"].replace("https://openalex.org/", "")
     yearly_data = inst.get("counts_by_year", [])
     total_publications = inst.get("works_count", 0)
     total_oa = sum(y.get("oa_works_count", 0) for y in yearly_data)
+
+    # Raw publications per year, restricted to the last N complete years.
+    years = recent_years()
+    works_by_year = {y.get("year"): y.get("works_count", 0) for y in yearly_data}
+    publications_history = [{"year": yr, "value": works_by_year.get(yr, 0)} for yr in years]
+
+    # Enrollment lookup (students + faculties) for this university.
+    enrollment = enrollment or {}
+    enr_key = _ENROLLMENT_BY_ID.get(inst_id)
+    enr = enrollment.get(_norm(enr_key), {}) if enr_key else {}
+    students = enr.get("students")
+    faculties = enr.get("faculties")
+
+    # Enrollment-adjusted research output (chart series + headline score).
+    intensity_history = [
+        {"year": p["year"], "value": research_intensity(p["value"], students, faculties)}
+        for p in publications_history
+    ]
+    rii_total = research_intensity(total_publications, students, faculties)
+
     return {
         "institution_id": inst_id,
         "display_name": inst.get("display_name", ""),
@@ -75,34 +204,48 @@ def _parse_university(inst: dict) -> dict:
             round((total_oa / total_publications) * 100)
             if total_publications > 0 else 0
         ),
-        "h_index_history": [
-            {"year": y["year"], "value": y.get("works_count", 0)}
-            for y in sorted(yearly_data, key=lambda x: x.get("year", 0))
-            if y.get("year", 0) >= 2019
-        ],
+        "total_students": students,
+        "faculty_count": faculties,
+        "research_intensity": rii_total,
+        # h_index_history retained (raw per-year publications) for back-compat + DB save.
+        "h_index_history": list(publications_history),
+        "publications_history": publications_history,
+        "intensity_history": intensity_history,
     }
 
 
 # ── Internal helpers shared by API and DB pipeline ────────────────────────────
 
 def _fetch_all_parsed() -> list[dict]:
-    """Fetch and parse all universities (sorted by h-index desc). No DB, no formatting."""
-    print("[benchmark] Starting bulk fetch from OpenAlex...")
-    raw = fetch_all_universities_bulk()
+    """
+    Fetch and parse the 11 benchmarked universities, attach enrollment data and
+    compute the enrollment-adjusted Research Intensity Index, then sort by it
+    (descending) so the fair, size-normalised ranking drives the result.
+    """
+    print("[benchmark] Fetching the 11 benchmarked universities from OpenAlex...")
+    raw = fetch_benchmark_universities()
+    enrollment = load_enrollment()
     print(f"[benchmark] Parsing {len(raw)} universities...")
     all_data = []
     for inst in raw:
         try:
-            all_data.append(_parse_university(inst))
+            all_data.append(_parse_university(inst, enrollment))
         except Exception as e:
             print(f"[benchmark] Parse error for {inst.get('id', '?')}: {e}")
-    all_data.sort(key=lambda u: u.get("h_index", 0), reverse=True)
+    # Fair ranking: by enrollment-adjusted intensity, then raw publications as tie-break.
+    all_data.sort(
+        key=lambda u: (u.get("research_intensity", 0), u.get("total_publications", 0)),
+        reverse=True,
+    )
     return all_data
 
 
 def _format_result(all_data: list[dict], errors: list[str] | None = None) -> dict:
-    """Format parsed list into ResearchIntelligence-compatible dict for the frontend."""
-    NILE_ID = "I57629906"
+    """Format parsed list into ResearchIntelligence-compatible dict for the frontend.
+
+    `all_data` is already sorted by Research Intensity Index (desc), so list position
+    is the global, enrollment-adjusted rank shared by Nile and every competitor.
+    """
     nile_u = next(
         (u for u in all_data
          if u["institution_id"] == NILE_ID
@@ -113,7 +256,6 @@ def _format_result(all_data: list[dict], errors: list[str] | None = None) -> dic
         (i + 1 for i, u in enumerate(all_data) if u is nile_u),
         None,
     )
-    competitors = [u for u in all_data if u is not nile_u]
 
     def to_metrics(u: dict, rank: int | None = None) -> dict:
         return {
@@ -121,18 +263,30 @@ def _format_result(all_data: list[dict], errors: list[str] | None = None) -> dic
             "publications": u.get("total_publications", 0),
             "h_index": u.get("h_index", 0),
             "total_citations": u.get("total_citations", 0),
+            "total_students": u.get("total_students"),
+            "faculty_count": u.get("faculty_count"),
+            "research_intensity": u.get("research_intensity", 0),
             "h_index_history": u.get("h_index_history", []),
+            "publications_history": u.get("publications_history", []),
+            "intensity_history": u.get("intensity_history", []),
             "rank": rank,
         }
+
+    # Global ranks (1..N) preserved for every university, Nile included.
+    competitors = [
+        to_metrics(u, i + 1) for i, u in enumerate(all_data) if u is not nile_u
+    ]
 
     print(f"[benchmark] Done. Nile found: {nile_u is not None} (rank {nile_rank}). Competitors: {len(competitors)}")
     return {
         "nile_university": to_metrics(nile_u, nile_rank) if nile_u else {
             "university_name": "Nile University",
             "publications": 0, "h_index": 0, "total_citations": 0,
-            "h_index_history": [], "rank": None,
+            "total_students": None, "faculty_count": None, "research_intensity": 0,
+            "h_index_history": [], "publications_history": [], "intensity_history": [],
+            "rank": None,
         },
-        "competitors": [to_metrics(u, i + 1) for i, u in enumerate(competitors[:10])],
+        "competitors": competitors,
         "data_source": "live",
         "errors": errors or [],
     }

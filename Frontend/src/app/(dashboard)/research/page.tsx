@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { Download, Play, Loader2, AlertCircle } from "lucide-react";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -9,7 +9,7 @@ import { Header } from "@/components/layout/Header";
 import { fetchResearchIntelligence } from "@/services/mockApi";
 import { runAgentAndWait } from "@/services/agentApi";
 import { useAgentResults } from "@/contexts/AgentResultsContext";
-import type { ResearchIntelligence } from "@/types";
+import type { ResearchIntelligence, UniversityResearchMetrics } from "@/types";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -54,19 +54,36 @@ export default function ResearchPage() {
   const nu = data?.nile_university;
   const notRanked = !nu || nu.publications === 0;
 
-  const years = [2019, 2020, 2021, 2022, 2023, 2024];
+  // Chart plots the enrollment-adjusted Research Intensity Index when available
+  // (live data); falls back to raw history for mock data.
+  const seriesOf = useCallback(
+    (u?: UniversityResearchMetrics | null) => {
+      if (!u) return [] as { year: number; value: number }[];
+      const adj = u.intensity_history ?? [];
+      return adj.length ? adj : u.h_index_history;
+    },
+    [],
+  );
+
+  // Year axis derived from the data (last 5 years for live) instead of hardcoded.
+  const years = useMemo(() => {
+    const ys = new Set<number>();
+    [data?.nile_university, ...(data?.competitors ?? [])].forEach((u) =>
+      seriesOf(u).forEach((p) => ys.add(p.year)),
+    );
+    return Array.from(ys).sort((a, b) => a - b);
+  }, [data, seriesOf]);
 
   const chartData = years.map((year) => {
     const entry: Record<string, number | string> = { year };
 
     // Competitors
     data?.competitors.forEach((c) => {
-      const pt = c.h_index_history.find((h) => h.year === year);
+      const pt = seriesOf(c).find((h) => h.year === year);
       entry[c.university_name] = pt?.value ?? 0;
     });
 
-    // ── BUG FIX: was hardcoded `entry["Nile University"] = 0` ──────────────
-    const nuPt = data?.nile_university?.h_index_history?.find((h) => h.year === year);
+    const nuPt = seriesOf(data?.nile_university).find((h) => h.year === year);
     entry["Nile University"] = nuPt?.value ?? 0;
 
     return entry;
@@ -83,7 +100,10 @@ export default function ResearchPage() {
     rows.push(["Generated", new Date().toLocaleString()]);
     rows.push(["Data source", isLive ? "OpenAlex (live)" : "Mock data"]);
     rows.push([]);
-    rows.push(["University", "Rank", "Publications", "H-Index", "Total Citations"]);
+    rows.push([
+      "University", "Rank", "Publications", "H-Index", "Total Citations",
+      "Total Students", "Faculty Count", "Research Intensity (RII)",
+    ]);
     allUnis.forEach((u) => {
       rows.push([
         u.university_name,
@@ -91,18 +111,36 @@ export default function ResearchPage() {
         String(u.publications),
         String(u.h_index),
         String(u.total_citations),
+        u.total_students != null ? String(u.total_students) : "—",
+        u.faculty_count != null ? String(u.faculty_count) : "—",
+        u.research_intensity != null ? String(u.research_intensity) : "—",
       ]);
     });
 
-    // ── Section 2: h-index history ─────────────────────────────────────────────
+    // ── Section 2: raw publications per year ───────────────────────────────────
     rows.push([]);
-    rows.push(["H-Index History"]);
+    rows.push(["Publications per Year (raw)"]);
     rows.push(["Year", ...allUnis.map((u) => u.university_name)]);
     years.forEach((year) => {
       rows.push([
         String(year),
         ...allUnis.map((u) => {
-          const pt = u.h_index_history.find((h) => h.year === year);
+          const hist = u.publications_history ?? u.h_index_history;
+          const pt = hist.find((h) => h.year === year);
+          return String(pt?.value ?? 0);
+        }),
+      ]);
+    });
+
+    // ── Section 3: enrollment-adjusted research intensity per year ─────────────
+    rows.push([]);
+    rows.push(["Research Intensity per Year (adjusted for students & faculties)"]);
+    rows.push(["Year", ...allUnis.map((u) => u.university_name)]);
+    years.forEach((year) => {
+      rows.push([
+        String(year),
+        ...allUnis.map((u) => {
+          const pt = (u.intensity_history ?? []).find((h) => h.year === year);
           return String(pt?.value ?? 0);
         }),
       ]);
@@ -177,7 +215,7 @@ export default function ResearchPage() {
         {/* KPI strip */}
         <div className="grid grid-cols-4 gap-3">
           {[
-            { label: "Nile University Rank", value: notRanked ? "#—" : nu?.rank != null ? `#${nu.rank}` : "#—", sub: `of ${data?.competitors.length ?? 0} universities` },
+            { label: "Nile University Rank", value: notRanked ? "#—" : nu?.rank != null ? `#${nu.rank}` : "#—", sub: `of ${(data?.competitors.length ?? 0) + 1} · enrollment-adjusted` },
             { label: "Publications", value: (nu?.publications ?? 0).toLocaleString(), sub: "total papers" },
             { label: "H-Index", value: nu?.h_index ?? 0 },
             { label: "Total Citations", value: (nu?.total_citations ?? 0).toLocaleString() },
@@ -225,11 +263,11 @@ export default function ResearchPage() {
             <div className="mb-4 flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-semibold text-slate-100">
-                  {isLive ? "Publications per Year" : "H-Index Growth Over Time"}
+                  {isLive ? "Research Intensity per Year (enrollment-adjusted)" : "H-Index Growth Over Time"}
                 </h3>
                 <p className="text-xs text-slate-500">
                   {isLive
-                    ? "Annual paper output — Nile University vs. Egyptian peers (OpenAlex)"
+                    ? "Publications per year normalised by student enrollment & faculty count — Nile University vs. Egyptian peers (OpenAlex)"
                     : "Comparing Nile University's H-Index improvement against top Egyptian universities"}
                 </p>
               </div>

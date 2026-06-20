@@ -108,6 +108,12 @@ export interface UniversityResearchMetrics {
   h_index: number;
   total_citations: number;
   h_index_history: { year: number; value: number }[];
+  // Enrollment-adjusted benchmarking
+  total_students?: number | null;
+  faculty_count?: number | null;
+  research_intensity?: number; // RII = publications / students / faculties × 1000
+  publications_history?: { year: number; value: number }[]; // raw papers/year
+  intensity_history?: { year: number; value: number }[]; // enrollment-adjusted papers/year
 }
 
 export interface ResearchIntelligence {
