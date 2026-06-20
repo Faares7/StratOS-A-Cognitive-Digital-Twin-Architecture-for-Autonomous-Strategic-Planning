@@ -206,6 +206,111 @@ export interface ChatMessage {
   timestamp: string;
 }
 
+// ─── Strategy Planner ──────────────────────────────────────────────────────────
+
+export type TowsType      = "SO" | "WO" | "ST" | "WT";
+export type AlignmentType = "indicator" | "pillar_only" | "strategic";
+export type PlanStatus    = "draft" | "final";
+
+export interface StrategyStation {
+  key:    string;
+  label:  string;
+  status: "pending" | "active" | "done";
+  detail: string;
+}
+
+export interface StrategyProgress {
+  stations: StrategyStation[];
+  retries:  number;
+}
+
+export interface SwotSourceItem {
+  item_id:     string;
+  type:        "strength" | "weakness" | "opportunity" | "threat";
+  title:       string | null;
+  description: string;
+  pillar_name: string | null;
+}
+
+// One NAQAAE indicator an objective traces to (an objective may merge several
+// pairs within a pillar → several indicators).
+export interface ObjectiveIndicator {
+  indicator_id:    string | null;
+  grounding_score: number | null;
+  indicator_title: string | null;
+  indicator_text:  string | null;
+}
+
+export interface StrategyObjective {
+  objective_id:          string;
+  goal_id:               string;
+  text:                  string;
+  original_text:         string | null;
+  tows_type:             TowsType;
+  tows_types?:           TowsType[];          // all quadrants represented (pillar-merge)
+  alignment:             AlignmentType;
+  pillar_id:             number | null;
+  grounded_indicator_id: string | null;
+  grounding_score:       number | null;
+  grounded_indicators?:  { indicator_id: string | null; grounding_score: number | null }[];
+  source_swot_ids:       string[];
+  improvement_source:    string | null;
+  position:              number;
+  edited_by_user:        boolean;
+  added_by_user:         boolean;              // true = human-added, false = AI-generated
+  feasibility?:          FeasibilityResult | null;  // persisted HITL verdict (null = unchecked)
+  // enriched by GET /api/strategy/goals/{run_id}
+  source_items:    SwotSourceItem[];
+  indicator_title: string | null;
+  indicator_text:  string | null;
+  indicators?:     ObjectiveIndicator[];      // full list, strongest first
+}
+
+export interface StrategyGoal {
+  goal_id:              string;
+  run_id:               string;
+  title:                string;
+  description:          string | null;
+  original_title:       string | null;
+  original_description: string | null;
+  pillar_ids:           number[];
+  position:             number;
+  edited_by_user:       boolean;
+  added_by_user:        boolean;               // true = human-added, false = AI-generated
+  feasibility?:         FeasibilityResult | null;   // persisted HITL verdict (null = unchecked)
+  objectives:           StrategyObjective[];
+}
+
+export interface StrategyPlan {
+  run_id:            string;
+  plan_status:       PlanStatus;
+  finalized_at:      string | null;
+  validation_errors: string[];     // surfaced from the validate node; blocks approval
+  goals:             StrategyGoal[];
+}
+
+// ─── Feasibility (HITL preview) ────────────────────────────────────────────────
+export type FeasibilityVerdict = "feasible" | "infeasible" | "insufficient_data";
+
+export interface FeasibilityIndicator {
+  indicator_id:    string;
+  indicator_title: string | null;
+  grounding_score: number | null;
+}
+
+export interface FeasibilityResult {
+  verdict:         FeasibilityVerdict;
+  reason:          string;
+  suggestion:      string;
+  timeframe_years: number;
+  checked_at?:     string | null;   // present when persisted on a saved item
+  evidence: {
+    swot_items: SwotSourceItem[];
+    indicators: FeasibilityIndicator[];
+    pillars:    string[];
+  };
+}
+
 // ─── HITL Gap Analysis ─────────────────────────────────────────────────────────
 
 export interface SwotItemDetail {

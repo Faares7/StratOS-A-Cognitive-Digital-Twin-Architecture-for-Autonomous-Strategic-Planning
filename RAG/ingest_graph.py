@@ -272,6 +272,13 @@ def main() -> None:
         raise EnvironmentError(f"Missing environment variables: {', '.join(missing)}")
 
     md_files = sorted(DATA_DIR.glob("**/*.md"))
+    # The 00_*_Index file is a table-of-contents / file map with no indicator
+    # content. Its chunks never sit under an Indicator node and only add noise
+    # to vector retrieval, so we skip it during ingestion.
+    skipped = [f for f in md_files if "index" in f.stem.lower()]
+    md_files = [f for f in md_files if f not in skipped]
+    for f in skipped:
+        print(f"[skip] {f.name} (index / table of contents — not ingested)")
     if not md_files:
         print(f"No .md files found in {DATA_DIR}. Ensure the data directory exists.")
         return

@@ -29,6 +29,7 @@ import {
   ExternalLink,
   X,
 } from "lucide-react";
+import { useRole } from "@/hooks/useRole";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -657,6 +658,7 @@ function SkeletonCard() {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function GapAnalysisPage() {
+  const { canMutate } = useRole();
   // ── State (flat, phase-driven) ──────────────────────────────────────────────
   const [phase, setPhase]       = useState<Phase>("loading");
   const [drafts, setDrafts]     = useState<PillarDraft[]>([]);
@@ -798,7 +800,7 @@ export default function GapAnalysisPage() {
                   draft={d}
                   index={i}
                   onChange={handleFieldChange}
-                  disabled={phase === "calculating"}
+                  disabled={phase === "calculating" || !canMutate}
                 />
               ))}
             </div>
@@ -807,7 +809,7 @@ export default function GapAnalysisPage() {
             <div className="sticky bottom-6 flex justify-end">
               <Button
                 size="lg"
-                disabled={phase === "calculating"}
+                disabled={phase === "calculating" || !canMutate}
                 onClick={handleCalculate}
                 className="shadow-xl shadow-cyan-500/10"
               >

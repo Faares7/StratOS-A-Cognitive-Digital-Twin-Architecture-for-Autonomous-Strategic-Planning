@@ -6,6 +6,7 @@ const config: Config = {
     "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
+    "./src/templates/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {
     extend: {
@@ -39,6 +40,15 @@ const config: Config = {
           DEFAULT: "hsl(var(--destructive))",
           foreground: "hsl(var(--destructive-foreground))",
         },
+        // plan-doc template tokens (scoped under .plan-doc — never leak to dashboard)
+        "plan-bg":       "var(--plan-bg)",
+        "plan-navy":     "var(--plan-navy)",
+        "plan-navy-dark":"var(--plan-navy-dark)",
+        "plan-accent":   "var(--plan-accent)",
+        "plan-muted":    "var(--plan-muted)",
+        "plan-muted-fg": "var(--plan-muted-fg)",
+        "plan-body":     "var(--plan-body)",
+        "plan-heading":  "var(--plan-heading)",
         // StratOS semantic
         strength: {
           DEFAULT: "#10b981",

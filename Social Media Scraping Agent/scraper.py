@@ -1,5 +1,7 @@
 import os
+import sys
 import json
+import re
 import time
 import random
 from datetime import datetime, timedelta
@@ -10,23 +12,32 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import (
-    NoSuchElementException, TimeoutException, StaleElementReferenceException
+    NoSuchElementException, TimeoutException, StaleElementReferenceException,
+    InvalidSessionIdException, WebDriverException,
 )
+from pathlib import Path
 from keywords import is_relevant, get_matched_categories, get_matched_keywords
 
-load_dotenv()
+# Force UTF-8 output so Arabic text does not crash on Windows cp1252 terminals
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
+_HERE = Path(__file__).parent
+# Load .env from this directory first, then fall back to project root
+load_dotenv(_HERE / ".env")
+load_dotenv(_HERE.parent / ".env")
 
 # ── Config ────────────────────────────────────────────────────────────────────
 FB_EMAIL        = os.getenv("FB_EMAIL")
 FB_PASSWORD     = os.getenv("FB_PASSWORD")
 GROUP_URL       = "https://www.facebook.com/groups/1721866421361681"
-MAX_POSTS       = 100
+MAX_POSTS       = 30
 MAX_COMMENTS    = 30
 MONTHS_BACK     = 6
-RAW_DATA_DIR    = "raw_data"
+RAW_DATA_DIR    = str(_HERE / "raw_data")
+SESSION_FILE    = str(_HERE / "fb_session.json")
 CUTOFF_DATE     = datetime.now() - timedelta(days=MONTHS_BACK * 30)
 
-# Strings that indicate a value is a date/time, not a person's name
 DATE_SIGNALS = [
     "hr", "min", "just now", "yesterday",
     "january", "february", "march", "april", "may", "june",
@@ -50,18 +61,11 @@ def slow_scroll(driver, pixels=400):
 
 
 def looks_like_date(text: str) -> bool:
-    """
-    Returns True if the string looks like a date/time rather than a name.
-    Accepts: '2h', '3d', '1w', 'May 3', 'March 15, 2024', 'just now', etc.
-    Rejects: 'Ahmed Mada', 'TurquoiseYuzu5665', etc.
-    """
     t = text.strip().lower()
     if not t:
         return False
-    # Short tokens like "2h", "3d", "1w", "5m"
     if len(t) <= 3 and any(c.isdigit() for c in t):
         return True
-    # Contains a known date signal word
     if any(sig in t for sig in DATE_SIGNALS):
         return True
     return False
@@ -78,17 +82,14 @@ def parse_fb_date(date_str: str) -> datetime | None:
             return now
         if "yesterday" in t:
             return now - timedelta(days=1)
-        # e.g. "3d", "2d"
         if len(t) <= 3 and "d" in t and any(c.isdigit() for c in t):
-            days = int(''.join(filter(str.isdigit, t)))
+            days = int("".join(filter(str.isdigit, t)))
             return now - timedelta(days=days)
-        # e.g. "2w"
         if len(t) <= 3 and "w" in t and any(c.isdigit() for c in t):
-            weeks = int(''.join(filter(str.isdigit, t)))
+            weeks = int("".join(filter(str.isdigit, t)))
             return now - timedelta(weeks=weeks)
-        # e.g. "1y"
         if len(t) <= 3 and "y" in t and any(c.isdigit() for c in t):
-            return None  # older than a year — skip
+            return None
         for fmt in ("%B %d, %Y", "%B %d", "%b %d, %Y", "%b %d"):
             try:
                 parsed = datetime.strptime(date_str, fmt)
@@ -105,7 +106,7 @@ def parse_fb_date(date_str: str) -> datetime | None:
 def is_within_cutoff(date_str: str) -> bool:
     parsed = parse_fb_date(date_str)
     if parsed is None:
-        return True  # unparseable = keep the post
+        return True
     return parsed >= CUTOFF_DATE
 
 
@@ -133,7 +134,6 @@ def build_driver(headless: bool = False) -> webdriver.Chrome:
         options.add_argument("--window-size=1920,1080")
     else:
         options.add_argument("--start-maximized")
-    # Selenium 4.x Selenium Manager handles chromedriver automatically
     driver = webdriver.Chrome(options=options)
     driver.execute_script(
         "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
@@ -141,9 +141,74 @@ def build_driver(headless: bool = False) -> webdriver.Chrome:
     return driver
 
 
+# ── Session helpers ───────────────────────────────────────────────────────────
+def _is_session_valid(driver: webdriver.Chrome) -> bool:
+    """Return True if the current browser state is a logged-in Facebook session."""
+    url = driver.current_url.lower()
+    if "login" in url or "checkpoint" in url or "two_step" in url:
+        return False
+    try:
+        driver.find_element(By.ID, "email")
+        return False
+    except NoSuchElementException:
+        pass
+    return True
+
+
+def _save_session(driver: webdriver.Chrome):
+    """Persist browser cookies to SESSION_FILE."""
+    try:
+        cookies = driver.get_cookies()
+        with open(SESSION_FILE, "w", encoding="utf-8") as f:
+            json.dump(cookies, f, indent=2)
+        print(f"[+] Session cookies saved -> {SESSION_FILE}")
+    except Exception as e:
+        print(f"[!] Could not save session: {e}")
+
+
+def _load_session(driver: webdriver.Chrome) -> bool:
+    """
+    Load cookies from SESSION_FILE and verify the session is still active.
+    Returns True if a valid session was restored, False otherwise.
+    """
+    if not os.path.exists(SESSION_FILE):
+        print("[*] No saved session found.")
+        return False
+    try:
+        with open(SESSION_FILE, encoding="utf-8") as f:
+            cookies = json.load(f)
+        # Navigate to domain before injecting cookies (browser requirement)
+        driver.get("https://www.facebook.com")
+        human_delay(2, 3)
+        for cookie in cookies:
+            try:
+                driver.add_cookie(cookie)
+            except Exception:
+                pass
+        # Reload to apply cookies
+        driver.get("https://www.facebook.com")
+        human_delay(3, 5)
+        if _is_session_valid(driver):
+            print("[+] Session restored from saved cookies — skipping login.")
+            return True
+        print("[!] Saved session has expired — will log in fresh.")
+        return False
+    except Exception as e:
+        print(f"[!] Failed to load session: {e}")
+        return False
+
+
 # ── Login ─────────────────────────────────────────────────────────────────────
-def login(driver: webdriver.Chrome, verification_wait: int = 0):
-    print("[*] Navigating to Facebook...")
+def login(driver: webdriver.Chrome, verification_wait: int = 90):
+    """
+    1. Try to restore a saved session (cookies) — skips login + 2FA entirely.
+    2. If no valid session, do credential login and wait for any 2FA.
+    3. After a successful fresh login, save cookies for future runs.
+    """
+    if _load_session(driver):
+        return  # session restored, nothing else to do
+
+    print("[*] Logging in with credentials from .env ...")
     driver.get("https://www.facebook.com")
     human_delay(3, 5)
 
@@ -157,20 +222,29 @@ def login(driver: webdriver.Chrome, verification_wait: int = 0):
         human_delay(0.5, 1.5)
         driver.find_element(By.ID, "pass").send_keys(Keys.RETURN)
         human_delay(4, 7)
-        print("[+] Login submitted.")
+        print("[+] Credentials submitted.")
     except TimeoutException:
         print("[!] Login form not found — may already be logged in.")
 
+    # Give time to complete any 2FA challenge that Facebook shows
     if verification_wait > 0:
-        print(f"\n[!] If Facebook is asking for verification, complete it now.")
-        print(f"[!] You have {verification_wait} seconds before scraping begins...\n")
+        print(f"\n[!] FIRST-TIME SETUP: If Facebook shows a verification step, complete it now.")
+        print(f"[!] You have {verification_wait} seconds. After this run, cookies are saved")
+        print(f"[!] and future runs will NOT need any manual interaction.\n")
         time.sleep(verification_wait)
+
+    # Save cookies so the next run skips login entirely
+    if _is_session_valid(driver):
+        _save_session(driver)
+        print("[+] Login successful — session saved for future automated runs.")
+    else:
+        print("[!] Warning: session does not appear valid after login wait.")
+
     print("[*] Continuing to group...")
 
 
 # ── Extract post text ─────────────────────────────────────────────────────────
 def extract_post_text(post_el) -> str | None:
-    # Strategy 1: standard Facebook data attributes
     for attr in ["data-ad-comet-preview='message'", "data-ad-preview='message'"]:
         try:
             el = post_el.find_element(By.XPATH, f".//div[@{attr}]")
@@ -180,7 +254,6 @@ def extract_post_text(post_el) -> str | None:
         except (NoSuchElementException, StaleElementReferenceException):
             pass
 
-    # Strategy 2: older Facebook layout
     try:
         el = post_el.find_element(
             By.XPATH, ".//div[contains(@class,'userContent')]"
@@ -191,7 +264,6 @@ def extract_post_text(post_el) -> str | None:
     except (NoSuchElementException, StaleElementReferenceException):
         pass
 
-    # Strategy 3: dir=auto divs (works well for Arabic content)
     try:
         els = post_el.find_elements(By.XPATH, ".//div[@dir='auto']")
         for el in els:
@@ -207,28 +279,88 @@ def extract_post_text(post_el) -> str | None:
 # ── Extract date ──────────────────────────────────────────────────────────────
 def extract_date(post_el) -> str:
     """
-    Try multiple XPath strategies to find a date string.
-    Validates that the result looks like a date, not a person's name.
+    Tries multiple XPath strategies covering old (/posts/) and current
+    (/permalink/) Facebook URL formats. Also checks title and aria-label
+    attributes which often carry the full date even when visible text is relative.
     """
     xpaths = [
         ".//abbr",
+        ".//a[contains(@href,'/permalink/')]//span",
+        ".//a[contains(@href,'/groups/') and contains(@href,'/permalink/')]//span",
+        ".//a[contains(@href,'/permalink/')]",
         ".//a[contains(@href,'/posts/')]//span",
         ".//a[contains(@href,'/groups/') and contains(@href,'/posts/')]//span",
         ".//span[contains(@aria-label,'ago') or contains(@aria-label,'at')]",
+        ".//a[@aria-label]",
     ]
     for xpath in xpaths:
         try:
             candidates = post_el.find_elements(By.XPATH, xpath)
             for el in candidates:
                 try:
-                    candidate = el.text.strip()
-                    if candidate and looks_like_date(candidate):
-                        return candidate
+                    for value in [
+                        el.text.strip(),
+                        el.get_attribute("title") or "",
+                        el.get_attribute("aria-label") or "",
+                    ]:
+                        if value and looks_like_date(value):
+                            return value
                 except StaleElementReferenceException:
                     continue
         except (NoSuchElementException, StaleElementReferenceException):
             pass
     return "unknown"
+
+
+# ── Extract likes / reaction count ───────────────────────────────────────────
+def extract_likes(container) -> int:
+    """
+    Multi-strategy reaction count extraction covering old and new Facebook DOM.
+    Tries element text first, then aria-label attribute.
+    """
+    xpaths = [
+        ".//*[contains(@aria-label,'reacted')]",
+        ".//*[contains(@aria-label,'reaction')]",
+        ".//*[contains(@aria-label,'like') or contains(@aria-label,'Like')]",
+    ]
+    for xpath in xpaths:
+        try:
+            els = container.find_elements(By.XPATH, xpath)
+            for el in els:
+                digits = re.sub(r"[^\d]", "", el.text)
+                if digits:
+                    return int(digits)
+                label = el.get_attribute("aria-label") or ""
+                m = re.search(r"\d[\d,]*", label)
+                if m:
+                    return int(m.group().replace(",", ""))
+        except (NoSuchElementException, StaleElementReferenceException):
+            continue
+    return 0
+
+
+def extract_comment_count(post_el) -> int:
+    """Multi-strategy comment count extraction."""
+    xpaths = [
+        ".//span[contains(@aria-label,'comment')]",
+        ".//div[contains(@aria-label,'comment')]",
+        ".//a[contains(@aria-label,'comment')]",
+        ".//span[contains(text(),'comment') or contains(text(),'Comment')]",
+    ]
+    for xpath in xpaths:
+        try:
+            els = post_el.find_elements(By.XPATH, xpath)
+            for el in els:
+                digits = re.sub(r"[^\d]", "", el.text)
+                if digits:
+                    return int(digits)
+                label = el.get_attribute("aria-label") or ""
+                m = re.search(r"\d[\d,]*", label)
+                if m:
+                    return int(m.group().replace(",", ""))
+        except (NoSuchElementException, StaleElementReferenceException):
+            continue
+    return 0
 
 
 # ── Comment scraper ───────────────────────────────────────────────────────────
@@ -262,8 +394,12 @@ def scrape_comments(driver: webdriver.Chrome) -> list[dict]:
                 text = el.text.strip()
                 if not text or len(text) < 5:
                     continue
+
+                comment_likes = extract_likes(el)
+
                 comments.append({
                     "text":               text,
+                    "likes":              comment_likes,
                     "relevant":           is_relevant(text),
                     "matched_categories": get_matched_categories(text),
                     "matched_keywords":   get_matched_keywords(text),
@@ -289,159 +425,129 @@ def scrape_group(driver: webdriver.Chrome) -> list[dict]:
     seen_texts      = set()
     consecutive_old = 0
     scroll_attempts = 0
-    max_scrolls     = 60
+    max_scrolls     = 30
 
-    print(f"[*] Starting scrape — target: {MAX_POSTS} posts | "
-          f"last {MONTHS_BACK} months\n")
+    print(f"[*] Starting scrape - target: {MAX_POSTS} posts | last {MONTHS_BACK} months\n")
 
-    while len(posts_collected) < MAX_POSTS and scroll_attempts < max_scrolls:
+    try:
+        while len(posts_collected) < MAX_POSTS and scroll_attempts < max_scrolls:
 
-        # Multiple XPath strategies for post containers
-        # We use aria-posinset to target only top-level feed posts,
-        # not comments or nested articles inside posts
-        post_elements = []
-        for xpath in [
-            "//div[@data-pagelet='GroupFeed']//div[@role='article' and @aria-posinset]",
-            "//div[@role='feed']//div[@role='article' and @aria-posinset]",
-            "//div[@role='article' and @aria-posinset]",
-            "//div[@data-pagelet='GroupFeed']//div[@role='article']",
-            "//div[@role='feed']//div[@role='article']",
-        ]:
-            post_elements = driver.find_elements(By.XPATH, xpath)
-            if post_elements:
-                break
+            post_elements = []
+            for xpath in [
+                "//div[@data-pagelet='GroupFeed']//div[@role='article' and @aria-posinset]",
+                "//div[@role='feed']//div[@role='article' and @aria-posinset]",
+                "//div[@role='article' and @aria-posinset]",
+                "//div[@data-pagelet='GroupFeed']//div[@role='article']",
+                "//div[@role='feed']//div[@role='article']",
+            ]:
+                post_elements = driver.find_elements(By.XPATH, xpath)
+                if post_elements:
+                    break
 
-        print(f"[*] Scroll {scroll_attempts:02d} — "
-              f"{len(post_elements)} elements visible | "
-              f"{len(posts_collected)} collected so far")
+            print(f"[*] Scroll {scroll_attempts:02d} - "
+                  f"{len(post_elements)} elements visible | "
+                  f"{len(posts_collected)} collected so far")
 
-        for post_el in post_elements:
-            if len(posts_collected) >= MAX_POSTS:
-                break
-
-            try:
-                # ── Expand truncated posts ─────────────────────────────────
-                try:
-                    see_more = post_el.find_element(
-                        By.XPATH,
-                        ".//div[contains(text(),'See more')] | "
-                        ".//span[contains(text(),'See more')]"
-                    )
-                    driver.execute_script("arguments[0].click();", see_more)
-                    human_delay(0.3, 0.8)
-                except (NoSuchElementException, StaleElementReferenceException):
-                    pass
-
-                # ── Extract text ───────────────────────────────────────────
-                text = extract_post_text(post_el)
-                if not text or len(text) < 10:
-                    continue
-
-                # Deduplicate
-                text_key = text[:80]
-                if text_key in seen_texts:
-                    continue
-                seen_texts.add(text_key)
-
-                # ── Extract date ───────────────────────────────────────────
-                date_str = extract_date(post_el)
-                print(f"    [date] '{date_str}'")
-
-                if date_str != "unknown" and not is_within_cutoff(date_str):
-                    consecutive_old += 1
-                    print(f"    [skip] outside cutoff ({consecutive_old}/5)")
-                    if consecutive_old >= 5:
-                        print("[*] 5 consecutive old posts — stopping.")
-                        return posts_collected
-                    continue
-                else:
-                    consecutive_old = 0
-
-                # ── Engagement ────────────────────────────────────────────
-                likes = 0
-                comment_count = 0
-                try:
-                    reaction_el = post_el.find_element(
-                        By.XPATH, ".//span[contains(@aria-label,'reaction')]"
-                    )
-                    likes = int(
-                        ''.join(filter(str.isdigit, reaction_el.text)) or 0
-                    )
-                except (NoSuchElementException, StaleElementReferenceException):
-                    pass
+            for post_el in post_elements:
+                if len(posts_collected) >= MAX_POSTS:
+                    break
 
                 try:
-                    comment_el = post_el.find_element(
-                        By.XPATH,
-                        ".//span[contains(text(),'comment') or "
-                        "contains(text(),'Comment')]"
-                    )
-                    comment_count = int(
-                        ''.join(filter(str.isdigit, comment_el.text)) or 0
-                    )
-                except (NoSuchElementException, StaleElementReferenceException):
-                    pass
-
-                # DEBUG: print what we extracted so far
-                print(f"    [post] likes={likes} comments={comment_count} text_len={len(text)} text='{text[:60]}'")
-                # No engagement filter — we keep all posts regardless of likes/comments
-
-                # ── Relevance ─────────────────────────────────────────────
-                relevant     = is_relevant(text)
-                matched_cats = get_matched_categories(text)
-                matched_kws  = get_matched_keywords(text)
-
-                # ── Comments ──────────────────────────────────────────────
-                comments = []
-                if relevant:
                     try:
-                        post_link_el = post_el.find_element(
+                        see_more = post_el.find_element(
                             By.XPATH,
-                            ".//a[contains(@href,'/groups/') and "
-                            "contains(@href,'/posts/')]"
+                            ".//div[contains(text(),'See more')] | "
+                            ".//span[contains(text(),'See more')]"
                         )
-                        post_url = post_link_el.get_attribute("href")
-                        driver.execute_script(
-                            f"window.open('{post_url}', '_blank');"
-                        )
-                        driver.switch_to.window(driver.window_handles[-1])
-                        human_delay(3, 5)
-                        comments = scrape_comments(driver)
-                        driver.close()
-                        driver.switch_to.window(driver.window_handles[0])
-                        human_delay(2, 4)
-                    except Exception as e:
-                        print(f"    [!] Could not open post for comments: {e}")
+                        driver.execute_script("arguments[0].click();", see_more)
+                        human_delay(0.3, 0.8)
+                    except (NoSuchElementException, StaleElementReferenceException):
+                        pass
 
-                # ── Record ────────────────────────────────────────────────
-                record = {
-                    "post_text":          text,
-                    "date_str":           date_str,
-                    "likes":              likes,
-                    "comment_count":      comment_count,
-                    "relevant":           relevant,
-                    "matched_categories": matched_cats,
-                    "matched_keywords":   matched_kws,
-                    "comments":           comments,
-                    "source_group":       "Nile University Friends in Egypt",
-                    "source_university":  "Nile University",
-                    "scraped_at":         datetime.now().isoformat(),
-                }
+                    text = extract_post_text(post_el)
+                    if not text or len(text) < 10:
+                        continue
 
-                posts_collected.append(record)
-                status = "RELEVANT  " if relevant else "irrelevant"
-                print(f"  [{len(posts_collected):03d}] {status} | "
-                      f"likes={likes:>3} | comments={len(comments):>2} | "
-                      f"{text[:55]}...")
+                    text_key = text[:80]
+                    if text_key in seen_texts:
+                        continue
+                    seen_texts.add(text_key)
 
-            except StaleElementReferenceException:
-                # Page re-rendered mid-loop — skip this element safely
-                print("    [!] Stale element — skipping post")
-                continue
+                    date_str = extract_date(post_el)
+                    print(f"    [date] '{date_str}'")
 
-        slow_scroll(driver, pixels=600)
-        human_delay(2.5, 5.0)
-        scroll_attempts += 1
+                    if date_str != "unknown" and not is_within_cutoff(date_str):
+                        consecutive_old += 1
+                        print(f"    [skip] outside cutoff ({consecutive_old}/5)")
+                        if consecutive_old >= 5:
+                            print("[*] 5 consecutive old posts - stopping.")
+                            return posts_collected
+                        continue
+                    else:
+                        consecutive_old = 0
+
+                    likes         = extract_likes(post_el)
+                    comment_count = extract_comment_count(post_el)
+
+                    print(f"    [post] likes={likes} comments={comment_count} "
+                          f"text_len={len(text)} text='{text[:60]}'")
+
+                    relevant     = is_relevant(text)
+                    matched_cats = get_matched_categories(text)
+                    matched_kws  = get_matched_keywords(text)
+
+                    comments = []
+                    if relevant:
+                        try:
+                            post_link_el = post_el.find_element(
+                                By.XPATH,
+                                ".//a[contains(@href,'/groups/') and "
+                                "contains(@href,'/posts/')]"
+                            )
+                            post_url = post_link_el.get_attribute("href")
+                            driver.execute_script(
+                                f"window.open('{post_url}', '_blank');"
+                            )
+                            driver.switch_to.window(driver.window_handles[-1])
+                            human_delay(3, 5)
+                            comments = scrape_comments(driver)
+                            driver.close()
+                            driver.switch_to.window(driver.window_handles[0])
+                            human_delay(2, 4)
+                        except Exception as e:
+                            print(f"    [!] Could not open post for comments: {e}")
+
+                    record = {
+                        "post_text":          text,
+                        "date_str":           date_str,
+                        "likes":              likes,
+                        "comment_count":      comment_count,
+                        "relevant":           relevant,
+                        "matched_categories": matched_cats,
+                        "matched_keywords":   matched_kws,
+                        "comments":           comments,
+                        "source_group":       "Nile University Friends in Egypt",
+                        "source_university":  "Nile University",
+                        "scraped_at":         datetime.now().isoformat(),
+                    }
+
+                    posts_collected.append(record)
+                    status = "RELEVANT  " if relevant else "irrelevant"
+                    print(f"  [{len(posts_collected):03d}] {status} | "
+                          f"likes={likes:>3} | comments={len(comments):>2} | "
+                          f"{text[:55]}...")
+
+                except StaleElementReferenceException:
+                    print("    [!] Stale element - skipping post")
+                    continue
+
+            slow_scroll(driver, pixels=600)
+            human_delay(2.5, 5.0)
+            scroll_attempts += 1
+
+    except (InvalidSessionIdException, WebDriverException) as browser_err:
+        print(f"\n[!] Browser disconnected: {browser_err}")
+        print(f"[!] Returning {len(posts_collected)} posts collected before disconnect.")
 
     return posts_collected
 
@@ -454,35 +560,53 @@ def save(posts: list[dict]) -> str:
         json.dump(posts, f, ensure_ascii=False, indent=2)
 
     relevant_count = sum(1 for p in posts if p["relevant"])
-    print(f"\n[+] Saved {len(posts)} posts → {path}")
+    print(f"\n[+] Saved {len(posts)} posts -> {path}")
     print(f"    Relevant : {relevant_count}")
     print(f"    Filtered : {len(posts) - relevant_count}")
     return path
 
 
 # ── Callable entry point ───────────────────────────────────────────────────────
-def run_scrape(headless: bool = False, verification_wait: int = 0) -> str | None:
-    """Run the full scrape pipeline. Returns the path to the saved JSON file."""
+def run_scrape(headless: bool = False, verification_wait: int = 90) -> str | None:
+    """
+    Run the full scrape pipeline.
+
+    On first run (no fb_session.json): opens browser, logs in with .env credentials,
+    waits `verification_wait` seconds for any 2FA, then saves cookies.
+
+    On subsequent runs: restores cookies silently — no manual interaction needed.
+
+    Returns the path to the saved JSON file.
+    """
     driver = build_driver(headless=headless)
     posts  = []
     path   = None
     try:
         login(driver, verification_wait=verification_wait)
         posts = scrape_group(driver)
-        path  = save(posts)
-    except KeyboardInterrupt:
-        print("\n[!] Interrupted — saving what was collected...")
         if posts:
             path = save(posts)
+    except KeyboardInterrupt:
+        print("\n[!] Interrupted - saving what was collected...")
+        if posts:
+            path = save(posts)
+    except Exception as exc:
+        print(f"\n[!] Scrape error: {exc}")
+        if posts:
+            print(f"[!] Saving {len(posts)} posts collected before error...")
+            path = save(posts)
     finally:
-        driver.quit()
+        try:
+            driver.quit()
+        except Exception:
+            pass
         print("[*] Browser closed.")
     return path
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 def main():
-    run_scrape(headless=False, verification_wait=60)
+    run_scrape(headless=False, verification_wait=90)
 
 
 if __name__ == "__main__":

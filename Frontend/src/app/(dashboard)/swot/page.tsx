@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { TrendingUp, TrendingDown, Target, AlertTriangle, FileText, Eye } from "lucide-react";
+import { useRole } from "@/hooks/useRole";
 
 // ── Category config ────────────────────────────────────────────────────────────
 const CAT = {
@@ -207,6 +208,7 @@ export default function SWOTPage() {
     pillarFilter, setPillarFilter, categoryFilter, setCategoryFilter,
     runAgent, agentRunning, agentError,
   } = useSWOT();
+  const { canMutate } = useRole();
 
   const totalInsights = Object.values(byCategory).flat().length;
 
@@ -230,7 +232,7 @@ export default function SWOTPage() {
               <button
                 key={name}
                 onClick={() => runAgent(name)}
-                disabled={agentRunning !== null}
+                disabled={agentRunning !== null || !canMutate}
                 className={cn(
                   "flex items-center gap-2 rounded-lg border px-3 py-2 text-xs transition-all",
                   running

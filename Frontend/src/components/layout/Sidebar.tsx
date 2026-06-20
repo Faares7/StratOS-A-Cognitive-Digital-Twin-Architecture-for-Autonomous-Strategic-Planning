@@ -1,14 +1,16 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useSession, signOut } from "next-auth/react";
 import {
   LayoutDashboard,
   Target,
   BarChart3,
   FileText,
   GraduationCap,
+  Milestone,
   Settings,
   Bell,
   Users,
@@ -17,6 +19,8 @@ import {
   ChevronLeft,
   ClipboardList,
   Gauge,
+  Sparkles,
+  LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -52,10 +56,12 @@ interface NavItem {
 const mainNav: NavItem[] = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Command Center" },
   { href: "/swot", icon: Target, label: "SWOT Analysis" },
-  { href: "/gap-analysis", icon: BarChart3, label: "Gap Analysis" },
+  { href: "/gap-analysis", icon: BarChart3,  label: "Gap Analysis" },
+  { href: "/strategy",     icon: Milestone,  label: "Strategic Goals" },
   { href: "/research", icon: GraduationCap, label: "Research Intelligence" },
   { href: "/meetings", icon: FileText, label: "Meetings" },
   { href: "/surveys", icon: ClipboardList, label: "Survey Generation" },
+  { href: "/plan-generation", icon: Sparkles, label: "Plan Generation" },
   { href: "/kpi-generation", icon: Gauge, label: "KPI Generation" },
 ];
 
@@ -105,9 +111,62 @@ function NavLink({
   );
 }
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function getInitials(name?: string | null) {
+  if (!name) return "?";
+  const parts = name.trim().split(" ");
+  if (parts.length === 1) return parts[0][0].toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function roleBadgeClass(role?: string) {
+  switch (role) {
+    case "Admin":  return "bg-cyan-500/10 text-cyan-400";
+    case "Editor": return "bg-violet-500/10 text-violet-400";
+    case "Viewer": return "bg-slate-400/10 text-slate-400";
+    default:       return "bg-slate-500/10 text-slate-600";
+  }
+}
+
+// ── Sidebar ───────────────────────────────────────────────────────────────────
+
 export function Sidebar() {
-  const [collapsed, setCollapsed] = useState(true);
+  const [collapsed,    setCollapsed]    = useState(true);
+  const [menuOpen,     setMenuOpen]     = useState(false);
+  const [unreadCount,  setUnreadCount]  = useState(0);
   const pathname = usePathname();
+  const { data: session, status } = useSession();
+  const user = session?.user;
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Poll unread notification count every 60 s after the session is ready
+  const fetchUnread = useCallback(async () => {
+    try {
+      const res = await fetch("/api/notifications", { cache: "no-store" });
+      if (!res.ok) return;
+      const rows = (await res.json()) as { read: boolean }[];
+      setUnreadCount(rows.filter((r) => !r.read).length);
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => {
+    if (status !== "authenticated") return;
+    void fetchUnread();
+    const id = setInterval(() => { void fetchUnread(); }, 60_000);
+    return () => clearInterval(id);
+  }, [status, fetchUnread]);
+
+  // Close the user menu when clicking anywhere outside it
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+    if (menuOpen) document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [menuOpen]);
 
   return (
     <aside
@@ -157,9 +216,11 @@ export function Sidebar() {
         >
           <div className="relative">
             <Bell className="h-4.5 w-4.5 shrink-0" />
-            <span className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-cyan-500 text-[9px] font-bold text-slate-950">
-              5
-            </span>
+            {unreadCount > 0 && (
+              <span className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-cyan-500 text-[9px] font-bold text-slate-950">
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            )}
           </div>
           {!collapsed && <span className="truncate">Notifications</span>}
           {collapsed && (
@@ -178,22 +239,97 @@ export function Sidebar() {
           />
         ))}
 
-        {/* User avatar */}
-        <div
-          className={cn(
-            "flex items-center gap-3 rounded-lg px-3 py-2.5",
-            !collapsed && "mt-1"
-          )}
-        >
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 text-xs font-semibold text-white">
-            SC
-          </div>
-          {!collapsed && (
-            <div className="min-w-0">
-              <p className="truncate text-xs font-medium text-slate-300">Dr. Sarah Chen</p>
-              <p className="truncate text-[10px] text-slate-500">Admin</p>
+        {/* User menu */}
+        <div ref={menuRef} className="relative">
+          {/* Popover */}
+          {menuOpen && (
+            <div
+              className={cn(
+                "absolute z-50 w-56 rounded-xl border border-white/10 bg-[#0d1117] shadow-2xl",
+                collapsed
+                  ? "bottom-0 left-full ml-3"
+                  : "bottom-full left-0 mb-2"
+              )}
+            >
+              {/* User info */}
+              <div className="border-b border-white/5 p-4">
+                <div className="mb-2.5 flex items-center gap-3">
+                  {user?.image ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={user.image}
+                      alt=""
+                      className="h-9 w-9 shrink-0 rounded-full"
+                    />
+                  ) : (
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 text-sm font-semibold text-white">
+                      {getInitials(user?.name)}
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-slate-100">
+                      {user?.name ?? "—"}
+                    </p>
+                    <p className="truncate text-xs text-slate-500">
+                      {user?.email ?? "—"}
+                    </p>
+                  </div>
+                </div>
+                <span
+                  className={cn(
+                    "inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                    roleBadgeClass(user?.role)
+                  )}
+                >
+                  {user?.role ?? "None"}
+                </span>
+              </div>
+
+              {/* Actions */}
+              <div className="p-2">
+                <button
+                  onClick={() => signOut({ callbackUrl: "/login" })}
+                  className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-slate-400 transition hover:bg-rose-500/10 hover:text-rose-400"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Sign out
+                </button>
+              </div>
             </div>
           )}
+
+          {/* Avatar trigger */}
+          <button
+            onClick={() => setMenuOpen((v) => !v)}
+            className={cn(
+              "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-white/5",
+              !collapsed && "mt-1",
+              menuOpen && "bg-white/5"
+            )}
+          >
+            {user?.image ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={user.image}
+                alt=""
+                className="h-7 w-7 shrink-0 rounded-full"
+              />
+            ) : (
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 text-xs font-semibold text-white">
+                {getInitials(user?.name)}
+              </div>
+            )}
+            {!collapsed && (
+              <div className="min-w-0 flex-1 text-left">
+                <p className="truncate text-xs font-medium text-slate-300">
+                  {user?.name ?? "—"}
+                </p>
+                <p className="truncate text-[10px] text-slate-500">
+                  {user?.role ?? "None"}
+                </p>
+              </div>
+            )}
+          </button>
         </div>
       </nav>
     </aside>

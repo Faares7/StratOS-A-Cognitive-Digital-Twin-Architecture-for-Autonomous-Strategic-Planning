@@ -59,6 +59,245 @@
   }
 }
 
+/* ── Plan-doc template tokens (scoped — never touch dashboard) ───────────── */
+/* Color tokens defined here; Tailwind classes reference them via tailwind.config */
+.plan-doc {
+  --plan-bg:       #f5f4ef;
+  --plan-navy:     #1e293b;
+  --plan-navy-dark:#0f172a;
+  --plan-accent:   #b8922f;
+  --plan-muted:    #e7e5df;
+  --plan-muted-fg: #78716c;
+  --plan-body:     #334155;
+  --plan-heading:  #0f172a;
+}
+
+/* Arabic font for RTL documents */
+.plan-doc[dir="rtl"] {
+  font-family: 'Cairo', 'Amiri', 'Noto Naskh Arabic', Georgia, serif;
+}
+
+/* Type scale — scoped, never affects dashboard */
+.plan-doc h1 {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 3rem;
+  font-weight: 700;
+  line-height: 1.15;
+  color: var(--plan-heading);
+}
+.plan-doc h2 {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--plan-heading);
+}
+.plan-doc h3 {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--plan-heading);
+}
+.plan-doc h4 {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--plan-heading);
+}
+.plan-doc p,
+.plan-doc li,
+.plan-doc td,
+.plan-doc th {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 1rem;
+  line-height: 1.75;
+  color: var(--plan-body);
+}
+.plan-doc[dir="rtl"] h1,
+.plan-doc[dir="rtl"] h2,
+.plan-doc[dir="rtl"] h3,
+.plan-doc[dir="rtl"] h4,
+.plan-doc[dir="rtl"] p,
+.plan-doc[dir="rtl"] li,
+.plan-doc[dir="rtl"] td,
+.plan-doc[dir="rtl"] th {
+  font-family: 'Cairo', 'Amiri', 'Noto Naskh Arabic', Georgia, serif;
+}
+
+/* Print layout for plan-doc */
+@media print {
+  .plan-doc {
+    /* @page margins reserve space for the running header + footer */
+    /* Applied via an inline <style> in the component for specificity */
+  }
+  .plan-doc .print-page {
+    page-break-after: always;
+    page-break-inside: avoid;
+  }
+  .plan-doc .print-page:last-child {
+    page-break-after: avoid;
+  }
+  .plan-doc .chapter-page {
+    break-before: page;
+  }
+  .plan-doc .no-page-number .plan-page-footer {
+    display: none !important;
+  }
+  /* Status chips and interactive affordances hidden in print */
+  .plan-doc .status-chip,
+  .plan-doc .block-hover-ring {
+    display: none !important;
+  }
+}
+
+/* ── TipTap editor inside plan-doc (WYSIWYG paragraph editing) ───────────── */
+.plan-doc .ProseMirror {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 1rem;
+  line-height: 1.75;
+  color: var(--plan-body);
+  outline: none;
+  min-height: 1.5em;
+}
+.plan-doc .ProseMirror p { margin-bottom: 0.75rem; }
+.plan-doc .ProseMirror p:last-child { margin-bottom: 0; }
+.plan-doc .ProseMirror strong { font-weight: 700; }
+.plan-doc .ProseMirror em { font-style: italic; }
+.plan-doc .ProseMirror a { color: var(--plan-accent); text-decoration: underline; }
+.plan-doc[dir="rtl"] .ProseMirror {
+  font-family: 'Cairo', 'Amiri', 'Noto Naskh Arabic', Georgia, serif;
+}
+/* Edit-mode block affordances — hidden in print */
+@media print {
+  .plan-doc .edit-toolbar,
+  .plan-doc .add-block-affordance,
+  .plan-doc .block-approve-btn { display: none !important; }
+}
+
+/* ── Markdown preview prose ──────────────────────────────────────────────── */
+.md-prose { color: rgb(148 163 184); font-size: 0.875rem; line-height: 1.75; }
+
+.md-prose h1,
+.md-prose h2,
+.md-prose h3,
+.md-prose h4,
+.md-prose h5 {
+  color: rgb(226 232 240);
+  font-weight: 700;
+  line-height: 1.3;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+.md-prose h1 {
+  font-size: 1.5rem;
+  border-bottom: 1px solid rgba(255 255 255 / 0.07);
+  padding-bottom: 0.5rem;
+  margin-top: 0;
+}
+.md-prose h2 { font-size: 1.2rem; }
+.md-prose h3 { font-size: 1.05rem; color: rgb(203 213 225); }
+.md-prose h4 { font-size: 0.95rem; color: rgb(203 213 225); }
+
+.md-prose p { margin-bottom: 0.75rem; }
+.md-prose strong { color: rgb(226 232 240); font-weight: 600; }
+.md-prose em { color: rgb(203 213 225); }
+
+.md-prose ul,
+.md-prose ol { padding-left: 1.5rem; margin-bottom: 0.75rem; }
+.md-prose li { margin-bottom: 0.25rem; }
+
+.md-prose hr {
+  border: none;
+  border-top: 1px solid rgba(255 255 255 / 0.07);
+  margin: 1.5rem 0;
+}
+
+.md-prose table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+  margin-bottom: 1rem;
+}
+.md-prose th {
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid rgba(255 255 255 / 0.1);
+  color: rgb(203 213 225);
+  font-weight: 600;
+}
+.md-prose td {
+  padding: 0.4rem 0.75rem;
+  border-bottom: 1px solid rgba(255 255 255 / 0.05);
+}
+
+.md-prose code {
+  background: rgba(255 255 255 / 0.06);
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+  font-size: 0.8em;
+  font-family: ui-monospace, "Cascadia Code", monospace;
+  color: rgb(125 211 252);
+}
+.md-prose blockquote {
+  border-left: 3px solid rgba(34 211 238 / 0.4);
+  padding-left: 1rem;
+  margin-left: 0;
+  color: rgb(100 116 139);
+  font-style: italic;
+}
+.md-prose img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.5rem;
+  margin: 1rem 0;
+  border: 1px solid rgba(255 255 255 / 0.06);
+}
+
+/* ── Plan editor page — hide floating assistant while editing ──────────────── */
+body.plan-editor-open [class*="bottom-5"][class*="right-5"][class*="fixed"] {
+  display: none !important;
+}
+body.plan-editor-open [class*="bottom-20"][class*="right-5"][class*="fixed"] {
+  display: none !important;
+}
+
+/* ── Print layout ─────────────────────────────────────────────────────────── */
+@media print {
+  /* Hide chrome */
+  aside,
+  header { display: none !important; }
+  .print\:hidden { display: none !important; }
+  .no-print { display: none !important; }
+
+  /* Unclip all layout containers so plan document prints in full */
+  html, body { overflow: visible !important; height: auto !important; }
+  body { background: #f5f4ef !important; }
+  main { width: 100% !important; overflow: visible !important; height: auto !important; max-height: none !important; }
+  /* Tailwind layout classes that clip content */
+  .h-screen { height: auto !important; }
+  .h-full { height: auto !important; }
+  .overflow-hidden { overflow: visible !important; }
+  .overflow-y-auto { overflow: visible !important; }
+
+  /* Prose overrides for white paper */
+  .md-prose { color: #334155; font-size: 0.9rem; }
+  .md-prose h1,
+  .md-prose h2,
+  .md-prose h3,
+  .md-prose h4 { color: #0f172a; }
+  .md-prose h1 { border-bottom-color: #e2e8f0; }
+  .md-prose strong { color: #0f172a; }
+  .md-prose em { color: #334155; }
+  .md-prose hr { border-top-color: #e2e8f0; }
+  .md-prose th { color: #1e293b; border-bottom-color: #cbd5e1; }
+  .md-prose td { border-bottom-color: #e2e8f0; color: #334155; }
+  .md-prose code { background: #f1f5f9; color: #0369a1; }
+  .md-prose blockquote { border-left-color: #0ea5e9; color: #64748b; }
+  .md-prose img { border-color: #e2e8f0; }
+}
+
 @layer utilities {
   .h-4\.5 {
     height: 1.125rem;

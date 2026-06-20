@@ -1,7 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useSession, signIn, signOut } from "next-auth/react";
+import { useRole } from "@/hooks/useRole";
 import {
   Sparkles,
   Loader2,
@@ -14,6 +16,11 @@ import {
   Unlink,
   Link2,
   ExternalLink,
+  Upload,
+  ArrowRight,
+  FileText,
+  AlertCircle,
+  RefreshCw,
 } from "lucide-react";
 import { Header } from "@/components/layout/Header";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +39,7 @@ import { cn } from "@/lib/utils";
 
 type WorkspaceState = "disconnected" | "connected";
 type Phase = "idle" | "generating" | "editing" | "publishing" | "published";
+type TemplateData = Record<string, string[]>;
 
 type AnswerType =
   | "scale-1-5"
@@ -42,14 +50,15 @@ interface Question {
   id: string;
   text: string;
   answerType: AnswerType;
+  pillar?: string;
 }
 
 // ── Answer type config ─────────────────────────────────────────────────────────
 
 const ANSWER_TYPES: { value: AnswerType; label: string; preview: string }[] = [
-  { value: "scale-1-5",              label: "1–5 Scale",               preview: "① ② ③ ④ ⑤" },
-  { value: "strongly-agree-disagree",label: "Strongly Agree – Disagree", preview: "SA  A  N  D  SD" },
-  { value: "open-ended",             label: "Open Ended",              preview: "Free text response" },
+  { value: "scale-1-5",               label: "1–5 Scale",                preview: "① ② ③ ④ ⑤" },
+  { value: "strongly-agree-disagree", label: "Strongly Agree – Disagree", preview: "SA  A  N  D  SD" },
+  { value: "open-ended",              label: "Open Ended",                preview: "Free text response" },
 ];
 
 const answerTypePreview: Record<AnswerType, string> = Object.fromEntries(
@@ -60,10 +69,10 @@ const VALID_ANSWER_TYPE_SET = new Set<string>(ANSWER_TYPES.map((t) => t.value));
 const normalizeAnswerType = (t: string): AnswerType =>
   VALID_ANSWER_TYPE_SET.has(t) ? (t as AnswerType) : "open-ended";
 
-const AUDIENCE_LABELS: Record<string, string> = {
-  "all-undergraduates": "All Undergraduates",
-  "all-postgraduates": "All Postgraduates",
-};
+// ── Template key → display label ──────────────────────────────────────────────
+
+const formatTemplateKey = (key: string): string =>
+  key.split("_").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
 
 // ── Google "G" icon (inline SVG) ───────────────────────────────────────────────
 
@@ -106,10 +115,12 @@ function WorkspaceCard({
   state,
   onToggle,
   isLoading,
+  readOnly,
 }: {
   state: WorkspaceState;
   onToggle: () => void;
   isLoading?: boolean;
+  readOnly?: boolean;
 }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-white/5 bg-[#0d1117] px-5 py-4">
@@ -129,27 +140,31 @@ function WorkspaceCard({
           Checking session…
         </div>
       ) : state === "disconnected" ? (
-        <Button
-          variant="outline"
-          onClick={onToggle}
-          className="gap-2 border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 hover:text-slate-100"
-        >
-          <Link2 className="h-3.5 w-3.5" />
-          Connect Google Workspace
-        </Button>
+        readOnly ? null : (
+          <Button
+            variant="outline"
+            onClick={onToggle}
+            className="gap-2 border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 hover:text-slate-100"
+          >
+            <Link2 className="h-3.5 w-3.5" />
+            Connect Google Workspace
+          </Button>
+        )
       ) : (
         <div className="flex items-center gap-3">
           <Badge variant="live" className="gap-1.5 px-3 py-1 text-xs font-medium">
             <span className="text-base leading-none">✅</span>
             Google Forms Linked
           </Badge>
-          <button
-            onClick={onToggle}
-            className="flex items-center gap-1.5 text-xs text-slate-600 transition-colors hover:text-slate-400"
-          >
-            <Unlink className="h-3 w-3" />
-            Disconnect
-          </button>
+          {!readOnly && (
+            <button
+              onClick={onToggle}
+              className="flex items-center gap-1.5 text-xs text-slate-600 transition-colors hover:text-slate-400"
+            >
+              <Unlink className="h-3 w-3" />
+              Disconnect
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -173,6 +188,8 @@ interface ConfigPanelProps {
   setInstructions: (v: string) => void;
   onGenerate: () => void;
   isGenerating: boolean;
+  templateData: TemplateData;
+  readOnly?: boolean;
 }
 
 function ConfigPanel({
@@ -190,7 +207,11 @@ function ConfigPanel({
   setInstructions,
   onGenerate,
   isGenerating,
+  templateData,
+  readOnly,
 }: ConfigPanelProps) {
+  const templateKeys = Object.keys(templateData);
+
   return (
     <div className="flex flex-col gap-5 rounded-xl border border-white/5 bg-[#0d1117] p-5">
       <div>
@@ -203,31 +224,34 @@ function ConfigPanel({
       {/* Target Audience */}
       <div className="space-y-2">
         <SectionLabel>Target Audience</SectionLabel>
-        <div className="flex gap-2">
-          <Select value={audience} onValueChange={setAudience}>
-            <SelectTrigger className="flex-1">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all-undergraduates">All Undergraduates</SelectItem>
-              <SelectItem value="all-postgraduates">All Postgraduates</SelectItem>
-              {customAudience.trim() && (
-                <SelectItem value="custom">{customAudience}</SelectItem>
-              )}
-            </SelectContent>
-          </Select>
-          <button
-            onClick={() => setShowCustomAudience(!showCustomAudience)}
-            className="flex shrink-0 items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-slate-400 transition-colors hover:bg-white/10 hover:text-slate-200"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            Add Audience
-          </button>
-        </div>
-        {showCustomAudience && (
+        <Select value={audience} onValueChange={setAudience}>
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="Select audience…" />
+          </SelectTrigger>
+          <SelectContent>
+            {templateKeys.length > 0 ? (
+              templateKeys.map((key) => (
+                <SelectItem key={key} value={key}>
+                  {formatTemplateKey(key)}
+                </SelectItem>
+              ))
+            ) : (
+              <>
+                <SelectItem value="academic_programs">Academic Programs</SelectItem>
+                <SelectItem value="faculty_satisfaction">Faculty Satisfaction</SelectItem>
+              </>
+            )}
+            {customAudience.trim() && (
+              <SelectItem value="custom">{customAudience}</SelectItem>
+            )}
+            <SelectItem value="__custom__">+ Add Custom Audience</SelectItem>
+          </SelectContent>
+        </Select>
+
+        {(showCustomAudience || audience === "__custom__") && (
           <Input
             autoFocus
-            placeholder="e.g., MBA students, Year 3 Engineering..."
+            placeholder="e.g., MBA students, Year 3 Engineering…"
             value={customAudience}
             onChange={(e) => setCustomAudience(e.target.value)}
             onKeyDown={(e) => {
@@ -235,7 +259,10 @@ function ConfigPanel({
                 setAudience("custom");
                 setShowCustomAudience(false);
               }
-              if (e.key === "Escape") setShowCustomAudience(false);
+              if (e.key === "Escape") {
+                setShowCustomAudience(false);
+                if (audience === "__custom__") setAudience(templateKeys[0] ?? "academic_programs");
+              }
             }}
             className="mt-1"
           />
@@ -269,19 +296,19 @@ function ConfigPanel({
         </div>
       </div>
 
-      {/* Specific Instructions */}
+      {/* Custom Prompt / Instructions */}
       <div className="space-y-2">
-        <SectionLabel>Specific Instructions</SectionLabel>
+        <SectionLabel>Custom Prompt (optional)</SectionLabel>
         <textarea
           value={instructions}
           onChange={(e) => setInstructions(e.target.value)}
-          placeholder="e.g., Focus specifically on the quality of the new AI labs and the availability of teaching assistants."
+          placeholder="e.g., Focus on the quality of the new AI labs and the availability of teaching assistants. Leave empty to load the standard template."
           rows={5}
           className="w-full resize-none rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-slate-200 placeholder:text-slate-600 transition-colors focus:border-cyan-500/40 focus:outline-none focus:ring-1 focus:ring-cyan-500/20"
         />
       </div>
 
-      <Button onClick={onGenerate} disabled={isGenerating} className="mt-auto w-full gap-2 font-semibold">
+      <Button onClick={onGenerate} disabled={isGenerating || readOnly} className="mt-auto w-full gap-2 font-semibold">
         {isGenerating ? (
           <>
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -290,7 +317,7 @@ function ConfigPanel({
         ) : (
           <>
             <Sparkles className="h-4 w-4" />
-            Generate Survey Draft
+            Generate Survey via AI
           </>
         )}
       </Button>
@@ -298,7 +325,144 @@ function ConfigPanel({
   );
 }
 
-// ── 3 & 4. Editor / Loading / Success Panel ────────────────────────────────────
+// ── 3. Question Row (granular controls + inline tweak) ─────────────────────────
+
+interface QuestionRowProps {
+  q: Question;
+  idx: number;
+  onUpdate: (id: string, text: string) => void;
+  onUpdateType: (id: string, type: AnswerType) => void;
+  onDelete: (id: string) => void;
+  onRegenerate: (id: string, instruction: string) => Promise<void>;
+  readOnly?: boolean;
+}
+
+function QuestionRow({ q, idx, onUpdate, onUpdateType, onDelete, onRegenerate, readOnly }: QuestionRowProps) {
+  const [tweakOpen, setTweakOpen] = useState(false);
+  const [tweakInput, setTweakInput] = useState("");
+  const [tweakLoading, setTweakLoading] = useState(false);
+
+  const handleApply = async () => {
+    if (!tweakInput.trim()) return;
+    setTweakLoading(true);
+    try {
+      await onRegenerate(q.id, tweakInput);
+      setTweakOpen(false);
+      setTweakInput("");
+    } finally {
+      setTweakLoading(false);
+    }
+  };
+
+  return (
+    <div className="relative rounded-xl border border-white/5 bg-white/[0.02] p-3 space-y-2.5">
+      {/* Per-row loading overlay */}
+      {tweakLoading && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-black/60 backdrop-blur-sm">
+          <Loader2 className="h-5 w-5 animate-spin text-cyan-400" />
+        </div>
+      )}
+
+      {/* Question number + pillar badge + bilingual text area + action buttons */}
+      <div className="flex items-start gap-2">
+        <span className="mt-2 w-5 shrink-0 text-right text-[11px] font-bold text-slate-600">
+          {idx + 1}
+        </span>
+        {q.pillar ? (
+          <span className="mt-[7px] shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold leading-none bg-cyan-500/15 text-cyan-400">
+            {q.pillar}
+          </span>
+        ) : (
+          <span className="mt-[7px] w-8 shrink-0" />
+        )}
+        <textarea
+          value={q.text}
+          onChange={(e) => !readOnly && onUpdate(q.id, e.target.value)}
+          readOnly={readOnly}
+          rows={3}
+          placeholder="Enter your question here… (Arabic\nEnglish)"
+          className={cn(
+            "flex-1 resize-none rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 placeholder:text-slate-600 transition-colors focus:outline-none",
+            readOnly
+              ? "cursor-default opacity-75"
+              : "focus:border-cyan-500/40 focus:ring-1 focus:ring-cyan-500/20"
+          )}
+          style={{ whiteSpace: "pre-wrap" }}
+        />
+        {!readOnly && (
+          <div className="flex flex-col gap-1 mt-1">
+            <button
+              onClick={() => onDelete(q.id)}
+              title="Delete question"
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-slate-600 transition-colors hover:bg-rose-500/10 hover:text-rose-400"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+            <button
+              onClick={() => setTweakOpen((prev) => !prev)}
+              title="Tweak with AI"
+              className={cn(
+                "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-colors",
+                tweakOpen
+                  ? "bg-cyan-500/15 text-cyan-400"
+                  : "text-slate-600 hover:bg-cyan-500/10 hover:text-cyan-400"
+              )}
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Answer type selector */}
+      <div className="ml-[52px] flex items-center gap-2.5">
+        <span className="shrink-0 text-[10px] font-medium text-slate-500">Type</span>
+        <Select
+          value={q.answerType}
+          onValueChange={(v) => onUpdateType(q.id, v as AnswerType)}
+          disabled={readOnly}
+        >
+          <SelectTrigger className="h-7 w-48 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {ANSWER_TYPES.map((t) => (
+              <SelectItem key={t.value} value={t.value} className="text-xs">
+                {t.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <span className="truncate font-mono text-[10px] text-slate-600">
+          {answerTypePreview[q.answerType]}
+        </span>
+      </div>
+
+      {/* Inline tweak row */}
+      {tweakOpen && !readOnly && (
+        <div className="ml-[52px] flex gap-2">
+          <input
+            autoFocus
+            value={tweakInput}
+            onChange={(e) => setTweakInput(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") handleApply(); }}
+            placeholder="Tweak this question…"
+            className="flex-1 rounded-lg border border-cyan-500/25 bg-white/5 px-3 py-1.5 text-xs text-slate-200 placeholder:text-slate-600 focus:border-cyan-500/50 focus:outline-none"
+          />
+          <button
+            onClick={handleApply}
+            disabled={!tweakInput.trim() || tweakLoading}
+            className="shrink-0 rounded-lg bg-cyan-500/15 px-3 py-1.5 text-xs font-semibold text-cyan-400 transition-colors hover:bg-cyan-500/25 disabled:opacity-40"
+          >
+            Apply
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── 4. Editor / Loading / Success Panel ───────────────────────────────────────
 
 interface EditorPanelProps {
   phase: Phase;
@@ -310,9 +474,11 @@ interface EditorPanelProps {
   onAddQuestion: () => void;
   onPublish: () => void;
   onCopyLink: () => void;
+  onRegenerateQuestion: (id: string, instruction: string) => Promise<void>;
   copied: boolean;
   formUrl: string;
   publishError: string | null;
+  readOnly?: boolean;
 }
 
 function EditorPanel({
@@ -325,9 +491,11 @@ function EditorPanel({
   onAddQuestion,
   onPublish,
   onCopyLink,
+  onRegenerateQuestion,
   copied,
   formUrl,
   publishError,
+  readOnly,
 }: EditorPanelProps) {
   // ── Idle ───────────────────────────────────────────────────────────────────
   if (phase === "idle") {
@@ -340,9 +508,9 @@ function EditorPanel({
           <div>
             <p className="text-sm font-semibold text-slate-300">Human-in-the-Loop Editor</p>
             <p className="mt-1 text-xs leading-relaxed text-slate-600">
-              Configure your survey parameters and click{" "}
-              <span className="text-slate-500">Generate Survey Draft</span> to
-              produce AI-drafted questions ready for your review.
+              Select an audience to instantly load bilingual template questions, or add a
+              custom prompt and click{" "}
+              <span className="text-slate-500">Generate Survey via AI</span> to draft new ones.
             </p>
           </div>
         </div>
@@ -437,73 +605,37 @@ function EditorPanel({
           <h3 className="text-sm font-semibold text-slate-200">Survey Draft</h3>
           <Badge variant="mock">{questions.length} questions</Badge>
         </div>
-        <p className="text-[10px] text-slate-600">Edit wording and answer type per question</p>
+        <p className="text-[10px] text-slate-600">
+          Edit wording, change type, or tweak any row with AI
+        </p>
       </div>
 
       {/* Question list */}
       <div className="space-y-3">
         {questions.map((q, idx) => (
-          <div
+          <QuestionRow
             key={q.id}
-            className="rounded-xl border border-white/5 bg-white/[0.02] p-3 space-y-2.5"
-          >
-            {/* Question text row */}
-            <div className="flex items-start gap-2.5">
-              <span className="mt-2 w-5 shrink-0 text-right text-[11px] font-bold text-slate-600">
-                {idx + 1}
-              </span>
-              <textarea
-                value={q.text}
-                onChange={(e) => onUpdateQuestion(q.id, e.target.value)}
-                rows={2}
-                placeholder="Enter your question here…"
-                className="flex-1 resize-none rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 placeholder:text-slate-600 transition-colors focus:border-cyan-500/40 focus:outline-none focus:ring-1 focus:ring-cyan-500/20"
-              />
-              <button
-                onClick={() => onDeleteQuestion(q.id)}
-                title="Delete question"
-                className="mt-1.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-slate-600 transition-colors hover:bg-rose-500/10 hover:text-rose-400"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
-            </div>
-
-            {/* Answer type row */}
-            <div className="ml-7 flex items-center gap-2.5">
-              <span className="shrink-0 text-[10px] font-medium text-slate-500">
-                Answer type
-              </span>
-              <Select
-                value={q.answerType}
-                onValueChange={(v) => onUpdateAnswerType(q.id, v as AnswerType)}
-              >
-                <SelectTrigger className="h-7 w-48 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {ANSWER_TYPES.map((t) => (
-                    <SelectItem key={t.value} value={t.value} className="text-xs">
-                      {t.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <span className="truncate font-mono text-[10px] text-slate-600">
-                {answerTypePreview[q.answerType]}
-              </span>
-            </div>
-          </div>
+            q={q}
+            idx={idx}
+            onUpdate={onUpdateQuestion}
+            onUpdateType={onUpdateAnswerType}
+            onDelete={onDeleteQuestion}
+            onRegenerate={onRegenerateQuestion}
+            readOnly={readOnly}
+          />
         ))}
       </div>
 
       {/* Add question */}
-      <button
-        onClick={onAddQuestion}
-        className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-white/10 py-2.5 text-xs font-medium text-slate-500 transition-colors hover:border-cyan-500/25 hover:text-cyan-400"
-      >
-        <Plus className="h-3.5 w-3.5" />
-        Add Question
-      </button>
+      {!readOnly && (
+        <button
+          onClick={onAddQuestion}
+          className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-white/10 py-2.5 text-xs font-medium text-slate-500 transition-colors hover:border-cyan-500/25 hover:text-cyan-400"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          Add Question
+        </button>
+      )}
 
       {/* Publish */}
       <div className="border-t border-white/5 pt-4 space-y-3">
@@ -514,7 +646,7 @@ function EditorPanel({
         )}
         <Button
           onClick={onPublish}
-          disabled={workspace === "disconnected" || isPublishing || questions.length === 0}
+          disabled={workspace === "disconnected" || isPublishing || questions.length === 0 || readOnly}
           className="w-full gap-2 bg-emerald-600 font-semibold text-white hover:bg-emerald-500 disabled:opacity-40"
         >
           {isPublishing ? (
@@ -543,12 +675,42 @@ function EditorPanel({
 
 const BACKEND = "http://localhost:8000";
 
+
+// ── CSV upload types ───────────────────────────────────────────────────────────
+
+type CsvPhase = "idle" | "uploading" | "done" | "error";
+
+interface CsvStats {
+  total_responses: number;
+  insights_extracted: number;
+  strengths_found: number;
+  weaknesses_found: number;
+  message: string;
+}
+
 export default function SurveysPage() {
   const { data: session, status } = useSession();
+  const { canMutate } = useRole();
   const workspace: WorkspaceState = session ? "connected" : "disconnected";
 
+  // ── Template data ──────────────────────────────────────────────────────────
+  const [templateData, setTemplateData] = useState<TemplateData>({});
+
+  useEffect(() => {
+    fetch(`${BACKEND}/api/survey/templates`)
+      .then((r) => r.json())
+      .then((data: TemplateData) => {
+        setTemplateData(data);
+        // Pre-select the first key so the dropdown has a valid default
+        const firstKey = Object.keys(data)[0];
+        if (firstKey) setAudience(firstKey);
+      })
+      .catch(() => {});
+  }, []);
+
+  // ── Survey state ───────────────────────────────────────────────────────────
   const [phase, setPhase] = useState<Phase>("idle");
-  const [audience, setAudience] = useState("all-undergraduates");
+  const [audience, setAudience] = useState("academic_programs");
   const [showCustomAudience, setShowCustomAudience] = useState(false);
   const [customAudience, setCustomAudience] = useState("");
   const [minQ, setMinQ] = useState(5);
@@ -560,56 +722,72 @@ export default function SurveysPage() {
   const [publishError, setPublishError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
+  // ── CSV upload state ───────────────────────────────────────────────────────
+  const csvInputRef = useRef<HTMLInputElement>(null);
+  const [csvPhase, setCsvPhase] = useState<CsvPhase>("idle");
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [csvStats, setCsvStats] = useState<CsvStats | null>(null);
+  const [csvError, setCsvError] = useState<string | null>(null);
+
+  // ── Reactive audience switch — instantly loads template questions ───────────
+  const handleAudienceChange = (value: string) => {
+    if (value === "__custom__") {
+      setShowCustomAudience(true);
+      return;
+    }
+    setAudience(value);
+    if (value !== "custom" && templateData[value]) {
+      const qs: Question[] = templateData[value].map((text, i) => ({
+        id: `tmpl-${value}-${i}`,
+        text,
+        answerType: "strongly-agree-disagree" as AnswerType,
+        pillar: `P${Math.floor(Math.random() * 7) + 1}`,
+      }));
+      setQuestions(qs);
+      if (phase === "idle" || phase === "editing") setPhase("editing");
+    }
+  };
+
   const getAudienceLabel = () =>
     audience === "custom"
       ? customAudience || "Custom Audience"
-      : AUDIENCE_LABELS[audience] ?? audience;
+      : formatTemplateKey(audience);
 
+  // ── Generate via /api/survey/generate-full ─────────────────────────────────
   const handleGenerate = async () => {
     setPhase("generating");
     setGenerateError(null);
 
     try {
-      const runRes = await fetch(`${BACKEND}/api/agents/survey/run`, {
+      const res = await fetch(`${BACKEND}/api/survey/generate-full`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          audience: getAudienceLabel(),
-          min_questions: minQ,
-          max_questions: maxQ,
-          instructions,
-          current_weaknesses: [],
+          audience:     audience === "custom" ? (customAudience || "General audience") : formatTemplateKey(audience),
+          audience_key: audience === "custom" ? "" : audience,
+          custom_prompt: instructions,
         }),
       });
 
-      if (!runRes.ok) throw new Error(`Backend error ${runRes.status} — is the API server running?`);
-      const { job_id } = await runRes.json();
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error((err as { detail?: string }).detail ?? `Backend error ${res.status}`);
+      }
 
-      const poll = async (): Promise<void> => {
-        const jobRes = await fetch(`${BACKEND}/api/jobs/${job_id}`);
-        const job = await jobRes.json();
-
-        if (job.status === "complete") {
-          const qs: Question[] = (
-            job.result.questions as { text: string; answer_type: string }[]
-          ).map((q, i) => ({
-            id: `${Date.now()}-${i}`,
-            text: q.text,
-            answerType: normalizeAnswerType(q.answer_type),
-          }));
-          setQuestions(qs);
-          setPhase("editing");
-        } else if (job.status === "failed") {
-          setGenerateError(job.error ?? "Survey generation failed.");
-          setPhase("idle");
-        } else {
-          await new Promise((r) => setTimeout(r, 1500));
-          await poll();
-        }
-      };
-
-      await new Promise((r) => setTimeout(r, 1500));
-      await poll();
+      type AiQuestion = { text: string; answer_type?: string; pillar?: string };
+      const data = await res.json() as { questions: (AiQuestion | string)[]; source: string };
+      const ts = Date.now();
+      const qs: Question[] = data.questions.map((q, i) => {
+        const isObj = typeof q === "object" && q !== null;
+        return {
+          id: `gen-${ts}-${i}`,
+          text:       isObj ? (q as AiQuestion).text : String(q),
+          answerType: (isObj ? (q as AiQuestion).answer_type : undefined) as AnswerType ?? "strongly-agree-disagree",
+          pillar:     isObj ? (q as AiQuestion).pillar : undefined,
+        };
+      });
+      setQuestions(qs);
+      setPhase("editing");
     } catch (err) {
       setGenerateError(
         err instanceof Error ? err.message : "Unknown error during generation."
@@ -618,6 +796,7 @@ export default function SurveysPage() {
     }
   };
 
+  // ── Publish to Google Forms ────────────────────────────────────────────────
   const handlePublish = async () => {
     setPhase("publishing");
     setPublishError(null);
@@ -633,9 +812,9 @@ export default function SurveysPage() {
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Publish failed.");
+      if (!res.ok) throw new Error((data as { error?: string }).error ?? "Publish failed.");
 
-      setFormUrl(data.formUrl);
+      setFormUrl((data as { formUrl: string }).formUrl);
       setPhase("published");
     } catch (err) {
       setPublishError(
@@ -646,9 +825,7 @@ export default function SurveysPage() {
   };
 
   const handleCopyLink = async () => {
-    if (formUrl) {
-      await navigator.clipboard.writeText(formUrl).catch(() => {});
-    }
+    if (formUrl) await navigator.clipboard.writeText(formUrl).catch(() => {});
     setCopied(true);
     setTimeout(() => setCopied(false), 2200);
   };
@@ -668,6 +845,53 @@ export default function SurveysPage() {
       { id: Date.now().toString(), text: "", answerType: "open-ended" },
     ]);
 
+  // ── Inline AI question regeneration ───────────────────────────────────────
+  const regenerateQuestion = async (id: string, instruction: string) => {
+    const target = questions.find((q) => q.id === id);
+    if (!target) return;
+
+    const res = await fetch(`${BACKEND}/api/survey/regenerate-question`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        original_question: target.text,
+        user_instruction: instruction,
+      }),
+    });
+
+    if (!res.ok) throw new Error(`Regeneration failed (${res.status})`);
+    const data = await res.json() as { question: string };
+    if (data.question) {
+      setQuestions((prev) =>
+        prev.map((q) => (q.id === id ? { ...q, text: data.question } : q))
+      );
+    }
+  };
+
+  // ── CSV upload handler ─────────────────────────────────────────────────────
+  const handleCsvUpload = async () => {
+    if (!csvFile) return;
+    setCsvPhase("uploading");
+    setCsvError(null);
+
+    const formData = new FormData();
+    formData.append("file", csvFile);
+
+    try {
+      const res = await fetch(`${BACKEND}/api/survey/upload-csv`, {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error((data as { detail?: string }).detail ?? "Upload failed.");
+      setCsvStats(data as CsvStats);
+      setCsvPhase("done");
+    } catch (err) {
+      setCsvError(err instanceof Error ? err.message : "Upload failed. Please try again.");
+      setCsvPhase("error");
+    }
+  };
+
   return (
     <div className="flex min-h-full flex-col">
       <Header
@@ -679,6 +903,7 @@ export default function SurveysPage() {
         <WorkspaceCard
           state={workspace}
           isLoading={status === "loading"}
+          readOnly={!canMutate}
           onToggle={() =>
             workspace === "connected"
               ? signOut({ redirect: false })
@@ -697,7 +922,7 @@ export default function SurveysPage() {
           <div className="lg:col-span-2">
             <ConfigPanel
               audience={audience}
-              setAudience={setAudience}
+              setAudience={handleAudienceChange}
               showCustomAudience={showCustomAudience}
               setShowCustomAudience={setShowCustomAudience}
               customAudience={customAudience}
@@ -710,6 +935,8 @@ export default function SurveysPage() {
               setInstructions={setInstructions}
               onGenerate={handleGenerate}
               isGenerating={phase === "generating"}
+              templateData={templateData}
+              readOnly={!canMutate}
             />
           </div>
 
@@ -724,12 +951,171 @@ export default function SurveysPage() {
               onAddQuestion={addQuestion}
               onPublish={handlePublish}
               onCopyLink={handleCopyLink}
+              onRegenerateQuestion={regenerateQuestion}
               copied={copied}
               formUrl={formUrl}
               publishError={publishError}
+              readOnly={!canMutate}
             />
           </div>
         </div>
+
+        {/* ── CSV Upload Section — Editors and Admins only ─────────────────── */}
+        {canMutate && <div className="rounded-xl border border-white/5 bg-[#0d1117] p-5 space-y-4">
+          {/* Header */}
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-cyan-500/10">
+              <Upload className="h-4 w-4 text-cyan-400" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-slate-200">
+                Upload Survey Responses (CSV)
+              </p>
+              <p className="text-xs text-slate-500">
+                Import a Google Forms export to feed responses into the SWOT pipeline.
+              </p>
+            </div>
+          </div>
+
+          {/* ── Idle: file picker ── */}
+          {(csvPhase === "idle" || csvPhase === "error") && (
+            <div className="space-y-3">
+              <input
+                ref={csvInputRef}
+                type="file"
+                accept=".csv"
+                className="sr-only"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) { setCsvFile(f); setCsvPhase("idle"); setCsvError(null); }
+                }}
+              />
+
+              <button
+                onClick={() => csvInputRef.current?.click()}
+                className={cn(
+                  "flex w-full cursor-pointer items-center gap-3 rounded-xl border-2 border-dashed px-4 py-4 text-left transition-all",
+                  csvFile
+                    ? "border-emerald-500/30 bg-emerald-500/5"
+                    : "border-white/10 bg-white/[0.02] hover:border-white/20 hover:bg-white/[0.04]"
+                )}
+              >
+                <FileText
+                  className={cn(
+                    "h-5 w-5 shrink-0",
+                    csvFile ? "text-emerald-400" : "text-slate-500"
+                  )}
+                />
+                {csvFile ? (
+                  <div>
+                    <p className="text-sm font-medium text-slate-200">{csvFile.name}</p>
+                    <p className="text-xs text-slate-500">
+                      {(csvFile.size / 1024).toFixed(1)} KB · CSV
+                    </p>
+                  </div>
+                ) : (
+                  <div>
+                    <p className="text-sm font-medium text-slate-400">
+                      Click to select a CSV file
+                    </p>
+                    <p className="text-xs text-slate-600">
+                      Download from Google Forms → Responses → Export to Sheets → Download as CSV
+                    </p>
+                  </div>
+                )}
+              </button>
+
+              {csvPhase === "error" && csvError && (
+                <div className="flex items-start gap-2.5 rounded-lg border border-rose-500/20 bg-rose-500/10 px-3 py-2.5 text-xs text-rose-400">
+                  <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  <span>{csvError}</span>
+                </div>
+              )}
+
+              <Button
+                onClick={handleCsvUpload}
+                disabled={!csvFile}
+                className="w-full gap-2 font-semibold"
+              >
+                <Upload className="h-4 w-4" />
+                Analyse Responses &amp; Push to SWOT
+              </Button>
+            </div>
+          )}
+
+          {/* ── Uploading / processing ── */}
+          {csvPhase === "uploading" && (
+            <div className="flex flex-col items-center gap-4 py-6">
+              <Loader2 className="h-8 w-8 animate-spin text-cyan-400" />
+              <div className="text-center">
+                <p className="text-sm font-semibold text-slate-200">
+                  Analysing {csvFile?.name ?? "responses"}…
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  Running sentiment clustering via local LLM. This may take a few minutes.
+                </p>
+              </div>
+              <div className="w-full max-w-sm space-y-2">
+                {[80, 65, 72].map((w, i) => (
+                  <div
+                    key={i}
+                    className="skeleton h-2.5 rounded-full"
+                    style={{ width: `${w}%`, animationDelay: `${i * 0.2}s` }}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ── Success ── */}
+          {csvPhase === "done" && csvStats && (
+            <div className="flex flex-col items-center gap-5 py-4 text-center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-full border border-emerald-500/20 bg-emerald-500/10">
+                <CheckCircle2 className="h-7 w-7 text-emerald-400" />
+              </div>
+              <div>
+                <p className="text-base font-bold text-slate-100">✅ Analysis Complete!</p>
+                <p className="mt-1 text-sm text-slate-400">{csvStats.message}</p>
+              </div>
+
+              <div className="flex gap-6">
+                {[
+                  { label: "Responses", value: csvStats.total_responses },
+                  { label: "Insights",  value: csvStats.insights_extracted },
+                  { label: "Strengths", value: csvStats.strengths_found },
+                  { label: "Weaknesses",value: csvStats.weaknesses_found },
+                ].map(({ label, value }) => (
+                  <div key={label} className="text-center">
+                    <p className="text-lg font-bold text-slate-100">{value}</p>
+                    <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">
+                      {label}
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex gap-3">
+                <Link
+                  href="/swot"
+                  className="flex items-center gap-2 rounded-lg bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 transition-colors hover:bg-cyan-400"
+                >
+                  View SWOT Dashboard
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+                <button
+                  onClick={() => {
+                    setCsvPhase("idle");
+                    setCsvFile(null);
+                    setCsvStats(null);
+                  }}
+                  className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-slate-400 transition-colors hover:bg-white/10 hover:text-slate-200"
+                >
+                  Upload Another
+                </button>
+              </div>
+            </div>
+          )}
+        </div>}
       </div>
     </div>
   );

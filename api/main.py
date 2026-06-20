@@ -40,7 +40,7 @@ from pydantic import BaseModel
 
 # ── Resolve project root and load the unified .env ───────────────────────────
 ROOT_DIR: Path = Path(__file__).parent.parent.resolve()
-load_dotenv(ROOT_DIR / ".env")
+load_dotenv(ROOT_DIR / ".env", override=True)
 
 AGENTS_DIR: Path = ROOT_DIR / "Agents"
 GAP_ANALYSIS_AGENT_PATH: Path = AGENTS_DIR / "Gap analysis" / "gap_analysis_agent.py"
@@ -73,16 +73,18 @@ def _get_db_conn():
     dsn = os.getenv("DB_CONNECTION_STRING", "")
     if not dsn:
         return None
+    # Bounded connect: a slow/unreachable Supabase (e.g. free-tier auto-pause) must
+    # not hang startup forever — fail fast so the server still comes online.
     try:
         if _db_conn is None or _db_conn.closed:
-            _db_conn = psycopg2.connect(dsn)
+            _db_conn = psycopg2.connect(dsn, connect_timeout=10)
             _db_conn.autocommit = True
         # lightweight ping to detect stale pooler connections
         _db_conn.cursor().execute("SELECT 1")
         return _db_conn
     except Exception:
         try:
-            _db_conn = psycopg2.connect(dsn)
+            _db_conn = psycopg2.connect(dsn, connect_timeout=10)
             _db_conn.autocommit = True
             return _db_conn
         except Exception as exc:
@@ -396,6 +398,29 @@ def google_auth_status():
     return {"connected": True, "email": tok.get("email", "")}
 
 
+class _TokenHandoff(BaseModel):
+    access_token:  str
+    refresh_token: str | None = None
+    email:         str | None = None
+
+
+@app.post("/api/auth/google/handoff")
+def google_auth_handoff(body: _TokenHandoff):
+    """
+    Accept the Google access+refresh token from the NextAuth session
+    (set during onboarding) so the meetings agent can use it without
+    a separate OAuth popup.
+    """
+    _google_tokens["primary"] = {
+        "access_token":  body.access_token,
+        "refresh_token": body.refresh_token or "",
+        "email":         body.email or "",
+        "expires_at":    time.time() + 3500,   # ~1 h; refresh logic handles expiry
+    }
+    _db_save_tokens(_google_tokens["primary"])
+    return {"ok": True, "email": body.email}
+
+
 def _get_valid_access_token() -> str | None:
     """Return a valid access token, refreshing via refresh_token if expired."""
     tok = _google_tokens.get("primary")
@@ -435,17 +460,22 @@ def _find_scheduled_meeting(fathom_data: dict, raw_payload: dict | None = None) 
 
     Strategy (in order):
       1. scheduled_start_time from raw payload vs meeting.date (≤ 10 min) — most reliable.
-      2. Title (meeting_title) + recording start time within 3 hours — fallback.
+      2. recording_start_time vs meeting.date within 3 hours — handles Fathom labelling
+         calendar events as "Impromptu" (title is unreliable; time is not).
+         Picks the closest unprocessed meeting when multiple exist.
+      3. meeting_title + recording time within 3 hours — last resort when time alone
+         is ambiguous (e.g. two back-to-back meetings in the same window).
 
     Fathom's `title` field is auto-generated ("Impromptu Google Meet Meeting") and
-    unreliable; `meeting_title` is the Google Calendar event name and is used for #2.
+    must NOT be used for matching. `meeting_title` is the Google Calendar event name.
     """
     unprocessed = {mid: m for mid, m in _meetings.items() if not m.get("fathom_call_id")}
     if not unprocessed:
         return None
 
-    # ── Strategy 1: scheduled_start_time exact match ─────────────────────────
     raw = raw_payload or {}
+
+    # ── Strategy 1: scheduled_start_time exact match ─────────────────────────
     sched_str = raw.get("scheduled_start_time", "")
     if sched_str:
         try:
@@ -461,8 +491,31 @@ def _find_scheduled_meeting(fathom_data: dict, raw_payload: dict | None = None) 
         except Exception:
             pass
 
-    # ── Strategy 2: meeting_title + recording time within 3 hours ────────────
-    title    = _as_str(raw.get("meeting_title") or fathom_data.get("title"), "").strip().lower()
+    # ── Strategy 2: recording_start_time proximity (title-independent) ────────
+    # Fathom calls calendar-booked meetings "Impromptu" when it auto-joins, so
+    # we cannot rely on the title. Matching by time is sufficient in practice.
+    rec_str = raw.get("recording_start_time") or fathom_data.get("date", "")
+    if rec_str:
+        try:
+            rec_dt = datetime.fromisoformat(rec_str.replace("Z", "+00:00"))
+            best_mid, best_delta = None, float("inf")
+            for mid, m in unprocessed.items():
+                try:
+                    m_dt = datetime.fromisoformat(m.get("date", "").replace("Z", "+00:00"))
+                    delta = abs((rec_dt - m_dt).total_seconds())
+                    if delta < 10_800 and delta < best_delta:  # within 3 h, pick closest
+                        best_delta = delta
+                        best_mid = mid
+                except Exception:
+                    pass
+            if best_mid:
+                print(f"[meetings] Matched by recording_start_time proximity → {best_mid}")
+                return best_mid
+        except Exception:
+            pass
+
+    # ── Strategy 3: meeting_title + recording time within 3 hours ────────────
+    title    = str(raw.get("meeting_title") or fathom_data.get("title") or "").strip().lower()
     date_str = fathom_data.get("date", "")
     if title and date_str:
         try:
@@ -490,6 +543,7 @@ class ScheduleMeetingRequest(BaseModel):
     attendee_emails: list[str] = []
     meeting_type: str = "Board Meeting"
     description: str = ""
+    access_token: str = ""  # user's own Google token from NextAuth session
 
 
 @app.post("/api/meetings/schedule", status_code=201)
@@ -499,9 +553,12 @@ def schedule_meeting(req: ScheduleMeetingRequest):
     Calendar event with a Google Meet link and invites all attendees.
     """
     meeting_id = f"cal-{uuid.uuid4().hex[:10]}"
-    access_token = _get_valid_access_token()
 
     meet_link = calendar_event_id = html_link = ""
+
+    # Prefer the user's own Google token (forwarded from NextAuth session);
+    # fall back to the shared admin token for backward compatibility.
+    access_token = req.access_token or _get_valid_access_token()
 
     if access_token:
         try:
@@ -1017,6 +1074,12 @@ async def run_sentiment(background_tasks: BackgroundTasks):
 
 def _task_social_media(job_id: str) -> None:
     try:
+        # Evict cached modules so every run picks up the latest code and
+        # so a previously failed selenium import doesn't stay frozen in cache.
+        sys.modules.pop("nlp_pipeline", None)
+        sys.modules.pop("scraper", None)
+        sys.modules.pop("keywords", None)
+
         mod = _load_module(
             "nlp_pipeline",
             SOCIAL_AGENT_DIR / "nlp_pipeline.py",
@@ -1032,10 +1095,14 @@ def _task_social_media(job_id: str) -> None:
             ins["source_agent"] = "social_media"
         _apply_pillar_tags(sm_insights)
         _finish(job_id, {
-            "insights": sm_insights,
-            "opportunities": result.get("opportunities", 0),
-            "threats": result.get("threats", 0),
+            "insights":             sm_insights,
+            "strengths":            result.get("strengths", 0),
+            "weaknesses":           result.get("weaknesses", 0),
+            "opportunities":        result.get("opportunities", 0),
+            "threats":              result.get("threats", 0),
             "total_posts_analyzed": result.get("total_posts_analyzed", 0),
+            "scrape_status":        result.get("scrape_status", "unknown"),
+            "scrape_error":         result.get("scrape_error", ""),
         })
     except Exception as exc:
         _fail(job_id, str(exc))
@@ -1057,12 +1124,10 @@ def run_social(background_tasks: BackgroundTasks):
 
 class SurveyRequest(BaseModel):
     audience: str = "All students"
+    audience_key: str = ""
     min_questions: int = 5
     max_questions: int = 10
     instructions: str = ""
-    # Optional: pass current weaknesses from the live graph state so the agent
-    # can tailor questions to known institutional gaps.
-    current_weaknesses: list[str] = []
 
 
 def _task_survey(job_id: str, req: SurveyRequest) -> None:
@@ -1071,14 +1136,15 @@ def _task_survey(job_id: str, req: SurveyRequest) -> None:
             "survey_agent",
             AGENTS_DIR / "Survey generation" / "survey_agent.py",
         )
-        state_snapshot = {"current_weaknesses": req.current_weaknesses}
         user_request = {
-            "audience": req.audience,
+            "audience":      req.audience,
+            "audience_key":  req.audience_key,
             "min_questions": req.min_questions,
             "max_questions": req.max_questions,
-            "instructions": req.instructions,
+            "instructions":  req.instructions,
         }
-        result: dict = mod.compile_and_run(state_snapshot, user_request)
+        # state_snapshot is empty — the agent auto-loads SWOT from the DB
+        result: dict = mod.compile_and_run({}, user_request)
         _finish(job_id, result)
     except Exception as exc:
         _fail(job_id, str(exc))
@@ -1089,6 +1155,185 @@ def run_survey(req: SurveyRequest, background_tasks: BackgroundTasks):
     """Trigger the Survey Agent (LangGraph → local LLM → structured SurveyDraft)."""
     job_id = _new_job()
     background_tasks.add_task(_task_survey, job_id, req)
+    return {"job_id": job_id}
+
+
+# ── Survey UI convenience routes (synchronous, used by the Surveys page) ──────
+
+_SURVEY_TEMPLATES_PATH = ROOT_DIR / "Data" / "survey_templates.json"
+
+def _load_survey_templates() -> dict:
+    try:
+        with open(_SURVEY_TEMPLATES_PATH, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"[survey] could not load templates from {_SURVEY_TEMPLATES_PATH}: {e}")
+        return {}
+
+
+@app.get("/api/survey/templates")
+def survey_templates():
+    """Return the bilingual template question sets keyed by audience (loaded from Data/survey_templates.json)."""
+    return _load_survey_templates()
+
+
+class SurveyGenerateRequest(BaseModel):
+    audience: str = "mixed"
+    audience_key: str = ""
+    custom_prompt: str = ""
+
+
+@app.post("/api/survey/generate-full")
+def survey_generate_full(req: SurveyGenerateRequest):
+    """
+    Synchronously generate a survey via the LLM.
+
+    Returns {questions: list[str], source: "ai"} on success.
+    Raises HTTP 502 if the LLM call fails.
+    """
+    try:
+        mod = _load_module(
+            "survey_agent",
+            AGENTS_DIR / "Survey generation" / "survey_agent.py",
+        )
+        result: dict = mod.compile_and_run(
+            state_snapshot={},
+            user_request={
+                "audience":     req.audience,
+                "audience_key": req.audience_key,
+                "min_questions": 5,
+                "max_questions": 10,
+                "instructions": req.custom_prompt,
+            },
+        )
+        if result.get("error"):
+            raise HTTPException(status_code=502, detail=result["error"])
+
+        raw_questions = result.get("questions", [])
+        # return full dicts {text, answer_type, pillar} so the frontend can use all fields
+        question_objects = [
+            q if isinstance(q, dict) else {"text": str(q), "answer_type": "strongly-agree-disagree", "pillar": ""}
+            for q in raw_questions
+        ]
+        return {"questions": question_objects, "source": "ai"}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+class RegenerateQuestionRequest(BaseModel):
+    original_question: str
+    user_instruction: str
+
+
+@app.post("/api/survey/regenerate-question")
+def survey_regenerate_question(req: RegenerateQuestionRequest):
+    """
+    Tweak a single survey question using the LLM.
+
+    Returns {question: str} with the rewritten question text.
+    """
+    try:
+        from core.llm import local_brain
+        from langchain_core.messages import HumanMessage, SystemMessage
+
+        prompt = (
+            f"Original question: {req.original_question}\n\n"
+            f"Instruction: {req.user_instruction}\n\n"
+            "Rewrite the question following the instruction. "
+            "Keep it concise (≤15 words), unambiguous, and suitable for a university survey. "
+            "Return ONLY the rewritten question text — no explanation, no quotes."
+        )
+        response = local_brain.invoke(
+            [
+                SystemMessage(content="You are an expert university survey designer."),
+                HumanMessage(content=prompt),
+            ]
+        )
+        text = response.content.strip().strip('"').strip("'")
+        return {"question": text}
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  KPI GENERATION AGENT
+#  Planning Phase: maps measurable KPIs to the 7 NAQAAE Programmatic Standards.
+#  Uses Nile University's KPI style (عدد/نسبة/وجود prefixes, internal entities).
+#  Does NOT assign data sources — that is handled by a separate agent downstream.
+# ══════════════════════════════════════════════════════════════════════════════
+
+KPI_AGENT_PATH: Path = AGENTS_DIR / "kpi_generation" / "agent.py"
+
+
+class KPIRequest(BaseModel):
+    program_name: str = "علوم الحاسب"
+    college_name: str = "كلية تكنولوجيا المعلومات وعلوم الحاسب"
+    university_name: str = "جامعة النيل الأهلية"
+    # Year range that sets the planning horizon and default timeframe label.
+    planning_horizon: str = "2025-2028"
+    # KPIs generated per NAQAAE standard (1–7 recommended; 3 is a good default).
+    kpis_per_standard: int = 3
+
+
+def _task_kpi(job_id: str, req: KPIRequest) -> None:
+    try:
+        if str(ROOT_DIR) not in sys.path:
+            sys.path.insert(0, str(ROOT_DIR))
+
+        sys.modules.pop("kpi_agent", None)
+
+        if not KPI_AGENT_PATH.exists():
+            raise FileNotFoundError(f"KPI agent not found: {KPI_AGENT_PATH}")
+
+        mod = _load_module("kpi_agent", KPI_AGENT_PATH)
+
+        result: dict = mod.compile_and_run(
+            program_name=req.program_name,
+            college_name=req.college_name,
+            university_name=req.university_name,
+            planning_horizon=req.planning_horizon,
+            kpis_per_standard=req.kpis_per_standard,
+        )
+
+        if result.get("error"):
+            _fail(job_id, result["error"])
+            return
+
+        _finish(job_id, result)
+    except Exception as exc:
+        _fail(job_id, str(exc))
+
+
+@app.post("/api/agents/kpi/run", status_code=202)
+def run_kpi(req: KPIRequest, background_tasks: BackgroundTasks):
+    """
+    Trigger the KPI Generation Agent.
+
+    Generates measurable KPIs for each of the 7 NAQAAE Programmatic Standards
+    in the style of Nile University's strategic plan. This is the Planning Phase
+    only — KPIs are text/target drafts without data-source assignments.
+
+    Poll GET /api/jobs/{job_id} for the result:
+        {
+          "kpis": [
+            {
+              "standard_id":        "1"–"7",
+              "kpi_name":           "<Arabic name starting with عدد/نسبة/وجود/مدى>",
+              "target_description": "<specific quantified target in Arabic>",
+              "responsible_entity": "<internal NU role in Arabic>",
+              "timeframe":          "<Arabic timeframe>"
+            },
+            ...
+          ],
+          "metadata": { "program", "college", "university",
+                        "planning_horizon", "kpis_per_standard",
+                        "total_kpis", "standards_covered" }
+        }
+    """
+    job_id = _new_job()
+    background_tasks.add_task(_task_kpi, job_id, req)
     return {"job_id": job_id}
 
 
@@ -1890,3 +2135,849 @@ def submit_gap_feedback(req: FeedbackRequest):
         gap_identified=req.gap_identified,
     )
     return {"status": "saved"}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  GOALS PLANNER (routes)
+#  POST /api/agents/strategy/run               — run the full 5-station pipeline
+#  GET  /api/strategy/goals/{run_id}           — fetch goals + provenance
+#  POST /api/strategy/{run_id}/approve         — mark plan final
+#  POST /api/strategy/goals/{run_id}           — add a goal
+#  DELETE /api/strategy/goals/{goal_id}        — delete a goal
+#  PATCH /api/strategy/goals/reorder           — reorder goals
+#  PATCH /api/strategy/goals/{goal_id}         — edit / reset a goal
+#  POST /api/strategy/objectives/{goal_id}     — add an objective
+#  DELETE /api/strategy/objectives/{obj_id}    — delete an objective
+#  PATCH /api/strategy/objectives/reorder      — reorder objectives
+#  PATCH /api/strategy/objectives/{obj_id}     — edit / reset an objective
+# ══════════════════════════════════════════════════════════════════════════════
+
+# ── DB helpers ────────────────────────────────────────────────────────────────
+
+def _fetch_swot_items(
+    conn, swot_run_id: str | None
+) -> tuple[list[dict], str | None]:
+    """
+    Pull SWOT rows from the DB and return (items, swot_day_iso).
+    When swot_run_id is None, selects all items from the MOST RECENT day
+    that has any rows (UTC date of MAX created_at).
+    """
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        if swot_run_id:
+            cur.execute(
+                "SELECT * FROM swot_items WHERE run_id = %s ORDER BY created_at",
+                (swot_run_id,),
+            )
+        else:
+            # Take the most recent run_id for each agent independently.
+            # e.g. tech ran 2 weeks ago, workforce ran yesterday → both are included.
+            cur.execute(
+                """
+                WITH latest_runs AS (
+                    SELECT DISTINCT ON (agent_id) agent_id, run_id
+                    FROM swot_items
+                    ORDER BY agent_id, created_at DESC
+                )
+                SELECT si.*
+                FROM swot_items si
+                JOIN latest_runs lr ON si.run_id = lr.run_id
+                ORDER BY si.created_at
+                """
+            )
+        items = [dict(r) for r in cur.fetchall()]
+
+    swot_day: str | None = None
+    if items:
+        ts = items[0].get("created_at")
+        if hasattr(ts, "date"):
+            swot_day = ts.date().isoformat()
+        else:
+            swot_day = str(ts)[:10]
+
+    return items, swot_day
+
+
+def _create_strategy_run_entry(
+    conn, swot_count: int, swot_day: str | None
+) -> str:
+    """Insert a placeholder agent_runs row so strategic_goals FK is satisfied."""
+    strategy_run_id = str(uuid.uuid4())
+    meta = json.dumps({
+        "swot_day":        swot_day,
+        "swot_count":      swot_count,
+        "goals_count":     0,
+        "objectives_count": 0,
+        "validated":       False,
+        "plan_status":     "draft",
+        "finalized_at":    None,
+    })
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO agent_runs
+                (run_id, agent_id, run_timestamp, status, errors, structured_data, raw_envelope)
+            VALUES (%s, 'goals_planner', NOW(), 'running',
+                    '[]'::jsonb, %s::jsonb, '{}'::jsonb)
+            """,
+            (strategy_run_id, meta),
+        )
+    return strategy_run_id
+
+
+def _finish_strategy_run_entry(
+    conn,
+    strategy_run_id: str,
+    status: str,
+    goals_count: int,
+    objectives_count: int,
+    validated: bool,
+    errors: list[str] | None = None,
+) -> None:
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute(
+            "SELECT structured_data FROM agent_runs WHERE run_id = %s",
+            (strategy_run_id,),
+        )
+        row  = cur.fetchone()
+        meta = dict(row["structured_data"]) if row else {}
+
+    meta.update({
+        "goals_count":       goals_count,
+        "objectives_count":  objectives_count,
+        "validated":         validated,
+        # Surfaced to the UI and used to gate approval (HITL).
+        "validation_errors": list(errors or []),
+    })
+
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE agent_runs
+               SET status = %s, structured_data = %s::jsonb
+             WHERE run_id = %s
+            """,
+            (status, json.dumps(meta), strategy_run_id),
+        )
+
+
+# ── Background task (streaming with live progress) ────────────────────────────
+
+def _task_strategy(job_id: str, swot_run_id: str | None) -> None:
+    try:
+        if str(ROOT_DIR) not in sys.path:
+            sys.path.insert(0, str(ROOT_DIR))
+        if str(AGENTS_DIR) not in sys.path:
+            sys.path.insert(0, str(AGENTS_DIR))
+
+        # Connect — surface the real psycopg2 error in the UI if it fails
+        _dsn = os.getenv("DB_CONNECTION_STRING", "")
+        if not _dsn:
+            _fail(job_id, "DB_CONNECTION_STRING is not set in .env.")
+            return
+        try:
+            conn = psycopg2.connect(_dsn)
+            conn.autocommit = True
+        except Exception as _db_exc:
+            _fail(job_id, f"Cannot connect to DB: {_db_exc}")
+            return
+
+        swot_items, swot_day = _fetch_swot_items(conn, swot_run_id)
+        if not swot_items:
+            _fail(
+                job_id,
+                "No SWOT items found. Run one or more agents first so there is "
+                "data to plan from."
+                if not swot_run_id else
+                "No SWOT items found for the specified run_id.",
+            )
+            return
+
+        strategy_run_id = _create_strategy_run_entry(conn, len(swot_items), swot_day)
+
+        # ── Initial progress — pair station is active right away ──────────────
+        stations: list[dict] = [
+            {"key": "pair",     "label": "Pair TOWS",             "status": "active",  "detail": ""},
+            {"key": "ground",   "label": "Ground in NAQAAE graph", "status": "pending", "detail": ""},
+            {"key": "cluster",  "label": "Cluster into goals",     "status": "pending", "detail": ""},
+            {"key": "draft",    "label": "Draft goals (LLM)",      "status": "pending", "detail": ""},
+            {"key": "validate", "label": "Validate",               "status": "pending", "detail": ""},
+        ]
+        progress: dict = {"stations": stations, "retries": 0}
+        _jobs[job_id]["progress"] = progress
+
+        def _done(key: str, detail: str) -> None:
+            for s in stations:
+                if s["key"] == key:
+                    s["status"] = "done"
+                    s["detail"] = detail
+
+        def _active(key: str) -> None:
+            for s in stations:
+                if s["key"] == key:
+                    s["status"] = "active"
+                    s["detail"] = ""
+
+        # ── Force clean re-import ─────────────────────────────────────────────
+        for mod_name in list(sys.modules.keys()):
+            if mod_name.startswith("goals_planner"):
+                del sys.modules[mod_name]
+
+        from goals_planner import (  # noqa: PLC0415
+            RUN_CONFIG, build_initial_state, get_graph,
+        )
+
+        graph   = get_graph()
+        initial = build_initial_state(swot_items, strategy_run_id)
+        accumulated: dict = dict(initial)
+
+        # ── Stream node-by-node ───────────────────────────────────────────────
+        import time as _time
+        _t_prev = _time.monotonic()
+        for chunk in graph.stream(initial, config=RUN_CONFIG, stream_mode="updates"):
+            for node_name, node_update in (chunk or {}).items():
+                _now = _time.monotonic()
+                print(f"[strategy timing] {node_name}: {_now - _t_prev:.1f}s", flush=True)
+                _t_prev = _now
+                accumulated.update(node_update or {})
+
+                if node_name == "pair_tows":
+                    n = len(node_update.get("pairs") or [])
+                    _done("pair", f"{n} pair{'s' if n != 1 else ''} built")
+                    _active("ground")
+
+                elif node_name == "ground_in_graph":
+                    pairs = node_update.get("pairs") or []
+                    n_ind = sum(1 for p in pairs if p.get("alignment") == "indicator")
+                    n_pil = sum(1 for p in pairs if p.get("alignment") == "pillar_only")
+                    n_str = sum(1 for p in pairs if p.get("alignment") == "strategic")
+                    _done("ground", f"{n_ind} indicator · {n_pil} pillar · {n_str} strategic")
+                    _active("cluster")
+
+                elif node_name == "cluster_into_goals":
+                    n = len(node_update.get("clusters") or [])
+                    _done("cluster", f"{n} goal{'s' if n != 1 else ''}")
+                    _active("draft")
+
+                elif node_name == "draft_goals":
+                    draft  = node_update.get("draft") or []
+                    n_obj  = sum(len(g.get("objectives", [])) for g in draft)
+                    _done("draft", f"{len(draft)} goals · {n_obj} objectives")
+                    _active("validate")
+
+                elif node_name == "validate":
+                    errors    = node_update.get("errors") or []
+                    validated = node_update.get("validated", False)
+                    retries   = accumulated.get("retries", 0)
+                    if validated:
+                        detail = "passed"
+                    elif retries >= 2:
+                        detail = f"{len(errors)} issue(s) — saving best effort"
+                    else:
+                        detail = f"{len(errors)} issue(s) — retrying"
+                    _done("validate", detail)
+
+                elif node_name == "increment_retries":
+                    retries = accumulated.get("retries", 0)
+                    progress["retries"] = retries
+                    # reset draft + validate for the retry lap
+                    _active("draft")
+                    for s in stations:
+                        if s["key"] == "validate":
+                            s["status"] = "pending"
+                            s["detail"] = ""
+
+            _jobs[job_id]["progress"] = progress
+
+        goals     = accumulated.get("draft", [])
+        errors    = accumulated.get("errors", [])
+        validated = accumulated.get("validated", False)
+        n_obj_total = sum(len(g.get("objectives", [])) for g in goals)
+        status    = "success" if validated else "partial"
+
+        _finish_strategy_run_entry(
+            conn, strategy_run_id, status,
+            len(goals), n_obj_total, validated, errors,
+        )
+
+        _finish(job_id, {
+            "strategy_run_id": strategy_run_id,
+            "goals_count":     len(goals),
+            "validated":       validated,
+            "errors":          errors,
+        })
+
+    except Exception as exc:
+        _fail(job_id, str(exc))
+
+
+# ── Trigger route ─────────────────────────────────────────────────────────────
+
+class StrategyRunRequest(BaseModel):
+    swot_run_id: str | None = None  # override: restrict to one run; None = latest day
+
+
+@app.post("/api/agents/strategy/run", status_code=202)
+def run_strategy(req: StrategyRunRequest, background_tasks: BackgroundTasks):
+    """
+    Trigger the strategy-planner pipeline.
+    Selects SWOT items from the most recent day in the DB (or the specified run).
+    Returns a job_id; poll GET /api/jobs/{job_id} for live progress + result.
+    Job result carries `strategy_run_id` for use with GET /api/strategy/goals/{run_id}.
+    """
+    job_id = _new_job()
+    background_tasks.add_task(_task_strategy, job_id, req.swot_run_id)
+    return {"job_id": job_id}
+
+
+# ── Read goals (with provenance enrichment) ───────────────────────────────────
+
+def _parse_uuid_array(value) -> list[str]:
+    """Normalize a Postgres uuid[] column value to a list of uuid strings.
+
+    psycopg2 has no uuid typecaster registered, so it returns uuid[] as the
+    raw array literal string '{u1,u2}' (and '{}' when empty) rather than a
+    Python list. Iterating that string character-by-character is what produced
+    the malformed ANY('{b,9,{,...}') query. Accept an already-parsed list too,
+    in case a typecaster is registered later.
+    """
+    if not value:
+        return []
+    if isinstance(value, (list, tuple)):
+        return [str(u) for u in value if u]
+    inner = str(value).strip().strip("{}")
+    if not inner:
+        return []
+    return [u.strip().strip('"') for u in inner.split(",") if u.strip()]
+
+
+@app.get("/api/strategy/goals/{run_id}")
+def get_strategy_goals(run_id: str):
+    """
+    Return goals + nested objectives for the human editing phase.
+    Each objective is enriched with:
+      source_items  — the SWOT item texts behind source_swot_ids
+      indicator_title / indicator_text — raw NAQAAE text from Neo4j (if grounded)
+    Also returns plan_status / finalized_at from agent_runs.
+    """
+    conn = _get_db_conn()
+    if conn is None:
+        raise HTTPException(status_code=503, detail="Database unavailable.")
+
+    # ── Plan lifecycle metadata ───────────────────────────────────────────────
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute(
+            "SELECT structured_data FROM agent_runs WHERE run_id = %s",
+            (run_id,),
+        )
+        row      = cur.fetchone()
+        run_meta = dict(row["structured_data"]) if row else {}
+
+    plan_status  = run_meta.get("plan_status", "draft")
+    finalized_at = run_meta.get("finalized_at")
+
+    # ── Goals + objectives ────────────────────────────────────────────────────
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute(
+            "SELECT * FROM strategic_goals WHERE run_id = %s ORDER BY position",
+            (run_id,),
+        )
+        goals = [dict(r) for r in cur.fetchall()]
+
+        for goal in goals:
+            goal["goal_id"] = str(goal["goal_id"])
+            goal["run_id"]  = str(goal["run_id"])
+            goal["added_by_user"] = bool(goal.get("added_by_user", False))
+            goal["feasibility"]   = _shape_feasibility(goal)
+            cur.execute(
+                "SELECT * FROM strategic_objectives WHERE goal_id = %s ORDER BY position",
+                (goal["goal_id"],),
+            )
+            objectives = []
+            for row in cur.fetchall():
+                obj = dict(row)
+                obj["objective_id"] = str(obj["objective_id"])
+                obj["goal_id"]      = str(obj["goal_id"])
+                obj["source_swot_ids"] = _parse_uuid_array(obj.get("source_swot_ids"))
+                obj["added_by_user"]   = bool(obj.get("added_by_user", False))
+                obj["feasibility"]     = _shape_feasibility(obj)
+                objectives.append(obj)
+            goal["objectives"] = objectives
+
+    # ── Batch-resolve SWOT provenance ─────────────────────────────────────────
+    all_swot_ids: set[str] = set()
+    for goal in goals:
+        for obj in goal["objectives"]:
+            all_swot_ids.update(obj.get("source_swot_ids") or [])
+
+    swot_map: dict[str, dict] = {}
+    if all_swot_ids:
+        id_arr = "{" + ",".join(all_swot_ids) + "}"
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT item_id, type, title, description, pillar_name
+                FROM swot_items
+                WHERE item_id = ANY(%s::uuid[])
+                """,
+                (id_arr,),
+            )
+            for row in cur.fetchall():
+                swot_map[str(row["item_id"])] = dict(row)
+
+    # ── Batch-resolve Neo4j indicator text ────────────────────────────────────
+    # An objective may trace to several indicators (pillar-merge): collect ids from
+    # both the primary column and the grounded_indicators array (migration 002).
+    all_indicator_ids: set[str] = set()
+    for goal in goals:
+        for obj in goal["objectives"]:
+            if obj.get("grounded_indicator_id"):
+                all_indicator_ids.add(obj["grounded_indicator_id"])
+            for ind in (obj.get("grounded_indicators") or []):
+                if isinstance(ind, dict) and ind.get("indicator_id"):
+                    all_indicator_ids.add(ind["indicator_id"])
+    indicator_map: dict[str, dict] = {}
+    if all_indicator_ids:
+        driver = _get_neo4j_driver()
+        if driver:
+            try:
+                with driver.session() as session:
+                    result = session.run(
+                        """
+                        MATCH (ind:Indicator)
+                        WHERE ind.indicator_id IN $ids
+                        OPTIONAL MATCH (ind)-[:HAS_CHUNK]->(ch:Chunk)
+                        RETURN ind.indicator_id AS id,
+                               ind.title        AS title,
+                               collect(ch.content) AS chunks
+                        """,
+                        ids=list(all_indicator_ids),
+                    )
+                    for row in result:
+                        raw_chunks = row["chunks"] or []
+                        chunk_text = (raw_chunks[0] or "")[:600] if raw_chunks else ""
+                        indicator_map[row["id"]] = {
+                            "indicator_title": row["title"],
+                            "indicator_text":  chunk_text,
+                        }
+            except Exception as exc:
+                print(f"[strategy] Neo4j provenance enrichment failed: {exc}")
+
+    # ── Attach provenance to objectives ───────────────────────────────────────
+    for goal in goals:
+        for obj in goal["objectives"]:
+            obj["source_items"] = [
+                swot_map[sid]
+                for sid in (obj.get("source_swot_ids") or [])
+                if sid in swot_map
+            ]
+            # Primary (strongest) indicator — kept for backward compatibility.
+            ind_id = obj.get("grounded_indicator_id")
+            ind    = indicator_map.get(ind_id) if ind_id else None
+            obj["indicator_title"] = ind["indicator_title"] if ind else None
+            obj["indicator_text"]  = ind["indicator_text"]  if ind else None
+
+            # Full list — every indicator this (possibly merged) objective traces to,
+            # strongest first, enriched with title/text from Neo4j.
+            raw = obj.get("grounded_indicators") or []
+            if not raw and ind_id:                       # legacy rows: single indicator
+                raw = [{"indicator_id": ind_id, "grounding_score": obj.get("grounding_score")}]
+            enriched_inds = []
+            for item in raw:
+                if not isinstance(item, dict):
+                    continue
+                iid = item.get("indicator_id")
+                meta = indicator_map.get(iid, {})
+                enriched_inds.append({
+                    "indicator_id":    iid,
+                    "grounding_score": item.get("grounding_score"),
+                    "indicator_title": meta.get("indicator_title"),
+                    "indicator_text":  meta.get("indicator_text"),
+                })
+            enriched_inds.sort(key=lambda d: (d.get("grounding_score") or 0.0), reverse=True)
+            obj["indicators"] = enriched_inds
+
+    return {
+        "run_id":            run_id,
+        "plan_status":       plan_status,
+        "finalized_at":      finalized_at,
+        "validation_errors": run_meta.get("validation_errors", []),
+        "goals":             goals,
+    }
+
+
+# ── Approve ───────────────────────────────────────────────────────────────────
+
+@app.post("/api/strategy/{run_id}/approve")
+def approve_strategy(run_id: str, force: bool = False):
+    """Flip plan_status → final and stamp finalized_at in agent_runs.structured_data.
+
+    Blocked while validation issues remain (HITL: the human must resolve them) —
+    pass ?force=true to approve anyway.
+    """
+    conn = _get_db_conn()
+    if conn is None:
+        raise HTTPException(status_code=503, detail="Database unavailable.")
+
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute(
+            "SELECT structured_data FROM agent_runs WHERE run_id = %s",
+            (run_id,),
+        )
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Strategy run not found.")
+        meta = dict(row["structured_data"])
+
+    val_errors = meta.get("validation_errors") or []
+    if val_errors and not force:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": f"{len(val_errors)} validation issue(s) must be resolved "
+                           f"before approval (or approve with force=true).",
+                "validation_errors": val_errors,
+            },
+        )
+
+    finalized_at = datetime.now(timezone.utc).isoformat()
+    meta["plan_status"]  = "final"
+    meta["finalized_at"] = finalized_at
+
+    with conn.cursor() as cur:
+        cur.execute(
+            "UPDATE agent_runs SET structured_data = %s::jsonb WHERE run_id = %s",
+            (json.dumps(meta), run_id),
+        )
+
+    return {"plan_status": "final", "finalized_at": finalized_at}
+
+
+# ── Feasibility (HITL) ────────────────────────────────────────────────────────
+
+def _shape_feasibility(row: dict) -> dict | None:
+    """Build the nested `feasibility` object the frontend reads, or None if the
+    item has never been checked. Resilient to the feasibility columns (migration 002) not being applied."""
+    verdict = row.get("feasibility_verdict")
+    if not verdict:
+        return None
+    ev = row.get("feasibility_evidence")
+    checked = row.get("feasibility_checked_at")
+    return {
+        "verdict":         verdict,
+        "reason":          row.get("feasibility_reason"),
+        "suggestion":      row.get("feasibility_suggestion"),
+        "timeframe_years": row.get("feasibility_timeframe_years"),
+        "evidence":        ev if isinstance(ev, dict) else None,
+        "checked_at":      checked.isoformat() if hasattr(checked, "isoformat") else checked,
+    }
+
+
+def _clear_feasibility(cur, table: str, id_col: str, id_val: str) -> None:
+    """Wipe a stored feasibility verdict (called when the text is edited/reset).
+    No-op if the feasibility columns (migration 002) aren't present."""
+    try:
+        cur.execute(
+            f"""
+            UPDATE {table} SET
+                feasibility_verdict = NULL, feasibility_reason = NULL,
+                feasibility_suggestion = NULL, feasibility_timeframe_years = NULL,
+                feasibility_evidence = NULL, feasibility_checked_at = NULL
+            WHERE {id_col} = %s
+            """,
+            (id_val,),
+        )
+    except Exception as exc:
+        print(f"[feasibility] clear skipped ({exc})")
+
+
+class FeasibilityRequest(BaseModel):
+    run_id:       str
+    text:         str
+    goal_id:      str | None = None
+    objective_id: str | None = None
+
+
+@app.post("/api/strategy/feasibility/{kind}")
+def check_feasibility(kind: str, req: FeasibilityRequest):
+    """Judge the feasibility of a goal/objective against the run's SWOT baseline
+    within the plan horizon (<= PLAN_HORIZON_YEARS). Returns the verdict + evidence.
+
+    Works as a pure PREVIEW on raw `text` (no id). If a goal_id/objective_id is
+    supplied (a saved item), the verdict + evidence are also PERSISTED on that row,
+    so it survives refresh and the Action Plan stage can read it. Advisory only.
+    """
+    if kind not in ("goal", "objective"):
+        raise HTTPException(status_code=400, detail="kind must be 'goal' or 'objective'.")
+    if not (req.text or "").strip():
+        raise HTTPException(status_code=400, detail="text is required.")
+
+    conn = _get_db_conn()
+    if conn is None:
+        raise HTTPException(status_code=503, detail="Database unavailable.")
+
+    swot_items, _ = _fetch_swot_items(conn, None)
+    if not swot_items:
+        raise HTTPException(status_code=400, detail="No SWOT data to assess against.")
+
+    if str(AGENTS_DIR) not in sys.path:
+        sys.path.insert(0, str(AGENTS_DIR))
+    try:
+        from goals_planner.feasibility import evaluate  # noqa: PLC0415
+        result = evaluate(req.text, kind, swot_items)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Feasibility check failed: {exc}")
+
+    # Persist on a saved item (no-op for pure preview / un-migrated DB).
+    target_id = req.goal_id if kind == "goal" else req.objective_id
+    if target_id:
+        table  = "strategic_goals" if kind == "goal" else "strategic_objectives"
+        id_col = "goal_id" if kind == "goal" else "objective_id"
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"""
+                    UPDATE {table} SET
+                        feasibility_verdict         = %s,
+                        feasibility_reason          = %s,
+                        feasibility_suggestion      = %s,
+                        feasibility_timeframe_years = %s,
+                        feasibility_evidence        = %s::jsonb,
+                        feasibility_checked_at      = NOW()
+                    WHERE {id_col} = %s
+                    """,
+                    (result["verdict"], result["reason"], result["suggestion"],
+                     result["timeframe_years"], json.dumps(result["evidence"]), target_id),
+                )
+        except Exception as exc:
+            print(f"[feasibility] could not persist verdict ({exc}); returning preview only.")
+
+    return result
+
+
+# ── Goal CRUD ─────────────────────────────────────────────────────────────────
+
+class GoalCreate(BaseModel):
+    title: str
+    description: str = ""
+
+
+@app.post("/api/strategy/goals/{run_id}", status_code=201)
+def create_goal(run_id: str, req: GoalCreate):
+    """Add a new (user-authored) goal to an existing strategy run."""
+    conn = _get_db_conn()
+    if conn is None:
+        raise HTTPException(status_code=503, detail="Database unavailable.")
+
+    goal_id = str(uuid.uuid4())
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute(
+            "SELECT COALESCE(MAX(position), -1) AS mx FROM strategic_goals WHERE run_id = %s",
+            (run_id,),
+        )
+        pos = (cur.fetchone() or {}).get("mx", -1) + 1
+        cur.execute(
+            """
+            INSERT INTO strategic_goals
+                (goal_id, run_id, title, description,
+                 original_title, original_description,
+                 pillar_ids, position, edited_by_user)
+            VALUES (%s, %s, %s, %s, %s, %s, '{}', %s, true)
+            """,
+            (goal_id, run_id, req.title, req.description,
+             req.title, req.description, pos),
+        )
+        try:  # mark human-added (no-op if added_by_user column absent)
+            cur.execute(
+                "UPDATE strategic_goals SET added_by_user = true WHERE goal_id = %s",
+                (goal_id,),
+            )
+        except Exception as exc:
+            print(f"[strategy] added_by_user skipped ({exc})")
+    return {"goal_id": goal_id, "position": pos}
+
+
+@app.delete("/api/strategy/goals/{goal_id}", status_code=204)
+def delete_goal(goal_id: str):
+    """Delete a goal and cascade-delete its objectives."""
+    conn = _get_db_conn()
+    if conn is None:
+        raise HTTPException(status_code=503, detail="Database unavailable.")
+    with conn.cursor() as cur:
+        cur.execute("DELETE FROM strategic_goals WHERE goal_id = %s", (goal_id,))
+
+
+# IMPORTANT: /reorder must be declared BEFORE /{goal_id} so FastAPI matches it first.
+class ReorderRequest(BaseModel):
+    ordered_ids: list[str]
+
+
+@app.patch("/api/strategy/goals/reorder")
+def reorder_goals(req: ReorderRequest):
+    """Update position for each goal according to the supplied ordered id list."""
+    conn = _get_db_conn()
+    if conn is None:
+        raise HTTPException(status_code=503, detail="Database unavailable.")
+    with conn.cursor() as cur:
+        for pos, gid in enumerate(req.ordered_ids):
+            cur.execute(
+                "UPDATE strategic_goals SET position = %s WHERE goal_id = %s",
+                (pos, gid),
+            )
+    return {"status": "reordered"}
+
+
+class GoalPatch(BaseModel):
+    title:       str | None = None
+    description: str | None = None
+    reset:       bool = False   # when True, restore original_* values
+
+
+@app.patch("/api/strategy/goals/{goal_id}")
+def patch_goal(goal_id: str, req: GoalPatch):
+    """Edit or reset a goal's title / description."""
+    conn = _get_db_conn()
+    if conn is None:
+        raise HTTPException(status_code=503, detail="Database unavailable.")
+
+    if req.reset:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE strategic_goals
+                   SET title = original_title,
+                       description = original_description,
+                       edited_by_user = false
+                 WHERE goal_id = %s
+                """,
+                (goal_id,),
+            )
+            _clear_feasibility(cur, "strategic_goals", "goal_id", goal_id)
+        return {"status": "reset", "goal_id": goal_id}
+
+    fields, values = [], []
+    if req.title is not None:
+        fields.append("title = %s")
+        values.append(req.title)
+    if req.description is not None:
+        fields.append("description = %s")
+        values.append(req.description)
+    if not fields:
+        raise HTTPException(status_code=400, detail="Nothing to update.")
+
+    fields.append("edited_by_user = true")
+    values.append(goal_id)
+    with conn.cursor() as cur:
+        cur.execute(
+            f"UPDATE strategic_goals SET {', '.join(fields)} WHERE goal_id = %s",
+            values,
+        )
+        _clear_feasibility(cur, "strategic_goals", "goal_id", goal_id)
+    return {"status": "updated", "goal_id": goal_id}
+
+
+# ── Objective CRUD ────────────────────────────────────────────────────────────
+
+class ObjectiveCreate(BaseModel):
+    text: str
+
+
+@app.post("/api/strategy/objectives/{goal_id}", status_code=201)
+def create_objective(goal_id: str, req: ObjectiveCreate):
+    """Add a new (user-authored) objective to a goal."""
+    conn = _get_db_conn()
+    if conn is None:
+        raise HTTPException(status_code=503, detail="Database unavailable.")
+
+    obj_id = str(uuid.uuid4())
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute(
+            "SELECT COALESCE(MAX(position), -1) AS mx FROM strategic_objectives WHERE goal_id = %s",
+            (goal_id,),
+        )
+        pos = (cur.fetchone() or {}).get("mx", -1) + 1
+        cur.execute(
+            """
+            INSERT INTO strategic_objectives
+                (objective_id, goal_id, text, original_text,
+                 tows_type, alignment,
+                 pillar_id, grounded_indicator_id, grounding_score,
+                 source_swot_ids, improvement_source, position, edited_by_user)
+            VALUES (%s, %s, %s, %s, 'SO', 'strategic',
+                    NULL, NULL, NULL, '{}', NULL, %s, true)
+            """,
+            (obj_id, goal_id, req.text, req.text, pos),
+        )
+        try:  # mark human-added (no-op if added_by_user column absent)
+            cur.execute(
+                "UPDATE strategic_objectives SET added_by_user = true WHERE objective_id = %s",
+                (obj_id,),
+            )
+        except Exception as exc:
+            print(f"[strategy] added_by_user skipped ({exc})")
+    return {"objective_id": obj_id, "position": pos}
+
+
+@app.delete("/api/strategy/objectives/{objective_id}", status_code=204)
+def delete_objective(objective_id: str):
+    """Delete a single objective."""
+    conn = _get_db_conn()
+    if conn is None:
+        raise HTTPException(status_code=503, detail="Database unavailable.")
+    with conn.cursor() as cur:
+        cur.execute(
+            "DELETE FROM strategic_objectives WHERE objective_id = %s",
+            (objective_id,),
+        )
+
+
+# IMPORTANT: /reorder must be declared BEFORE /{objective_id}.
+@app.patch("/api/strategy/objectives/reorder")
+def reorder_objectives(req: ReorderRequest):
+    """Update position for each objective according to the supplied ordered id list."""
+    conn = _get_db_conn()
+    if conn is None:
+        raise HTTPException(status_code=503, detail="Database unavailable.")
+    with conn.cursor() as cur:
+        for pos, oid in enumerate(req.ordered_ids):
+            cur.execute(
+                "UPDATE strategic_objectives SET position = %s WHERE objective_id = %s",
+                (pos, oid),
+            )
+    return {"status": "reordered"}
+
+
+class ObjectivePatch(BaseModel):
+    text:  str | None = None
+    reset: bool = False   # when True, restore original_text
+
+
+@app.patch("/api/strategy/objectives/{objective_id}")
+def patch_objective(objective_id: str, req: ObjectivePatch):
+    """Edit or reset an objective's text."""
+    conn = _get_db_conn()
+    if conn is None:
+        raise HTTPException(status_code=503, detail="Database unavailable.")
+
+    if req.reset:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE strategic_objectives
+                   SET text = original_text, edited_by_user = false
+                 WHERE objective_id = %s
+                """,
+                (objective_id,),
+            )
+            _clear_feasibility(cur, "strategic_objectives", "objective_id", objective_id)
+        return {"status": "reset", "objective_id": objective_id}
+
+    if req.text is None:
+        raise HTTPException(status_code=400, detail="Nothing to update.")
+
+    with conn.cursor() as cur:
+        cur.execute(
+            "UPDATE strategic_objectives SET text = %s, edited_by_user = true WHERE objective_id = %s",
+            (req.text, objective_id),
+        )
+        _clear_feasibility(cur, "strategic_objectives", "objective_id", objective_id)
+    return {"status": "updated", "objective_id": objective_id}

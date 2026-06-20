@@ -61,6 +61,14 @@ export async function POST(request: Request) {
     );
   }
 
+  const role = session.user.role;
+  if (role !== "Admin" && role !== "Editor") {
+    return NextResponse.json(
+      { error: "Forbidden: only Editors and Admins can publish surveys." },
+      { status: 403 }
+    );
+  }
+
   const accessToken = (session as typeof session & { accessToken?: string })
     .accessToken;
   if (!accessToken) {
@@ -110,10 +118,12 @@ export async function POST(request: Request) {
   const formId = form.formId;
 
   // ── Step 2: Add all questions in a single batchUpdate ────────────────────
+  // Google Forms API rejects newlines in item titles. Bilingual questions use
+  // "\n" to separate Arabic and English — collapse to " | " for the form title.
   const batchRequests = questions.map((q, i) => ({
     createItem: {
       item: {
-        title: q.text,
+        title: q.text.replace(/\r?\n/g, " | "),
         questionItem: { question: buildQuestion(q.answerType) },
       },
       location: { index: i },
