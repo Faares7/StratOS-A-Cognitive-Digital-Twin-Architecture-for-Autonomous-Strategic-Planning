@@ -1,0 +1,143 @@
+{
+  "_meta": {
+    "description": "Operational expense reference catalog for the StratOS Action Plan agent. Each activity the LLM generates is classified into exactly one archetype; Python (not the LLM) looks up the base cost and computes the inflated figure. Numbers are deliberately round and seeded from the historical NU ITCS 2020-2024 plan thresholds (30k / 50k / 75k / 100k / 200k / 1M / 1.5M EGP).",
+    "base_year": 2026,
+    "currency": "EGP",
+    "cost_driver_meaning": {
+      "local": "Cost rises with domestic CPI inflation.",
+      "usd_linked": "Cost rises with EGP/USD depreciation (imported hardware, licenses, international travel)."
+    },
+    "funding_source_meaning": {
+      "faculty_opex": "Charged against the faculty's strategic operating envelope (counts toward the 5% ceiling).",
+      "central_capex": "Funded centrally by the university (excluded from the faculty 5% envelope; real cost still recorded)."
+    }
+  },
+  "archetypes": {
+    "faculty_training_workshop": {
+      "label": "Faculty / staff training workshop",
+      "base_cost_egp": 50000,
+      "cost_driver": "local",
+      "funding_source": "faculty_opex",
+      "description": "Internal training, CPD sessions, pedagogy or skills workshops for faculty and teaching assistants."
+    },
+    "student_outreach_campaign": {
+      "label": "Student outreach / recruitment campaign",
+      "base_cost_egp": 75000,
+      "cost_driver": "local",
+      "funding_source": "faculty_opex",
+      "description": "School visits, open days, orientation, advising drives, and student-facing awareness activities."
+    },
+    "scholarship_financial_aid": {
+      "label": "Scholarship / financial aid initiative",
+      "base_cost_egp": 200000,
+      "cost_driver": "local",
+      "funding_source": "faculty_opex",
+      "description": "Merit or need-based tuition support, prizes, and grants awarded to students."
+    },
+    "academic_event_conference": {
+      "label": "Academic event / conference / seminar",
+      "base_cost_egp": 100000,
+      "cost_driver": "local",
+      "funding_source": "faculty_opex",
+      "description": "Hosting conferences, symposia, competitions, hackathons, or guest-lecture series."
+    },
+    "international_mou_partnership": {
+      "label": "International MoU / partnership",
+      "base_cost_egp": 150000,
+      "cost_driver": "usd_linked",
+      "funding_source": "faculty_opex",
+      "description": "Establishing or operating exchange agreements, dual degrees, and cross-border collaborations (travel and hosting are dollar-sensitive)."
+    },
+    "marketing_branding": {
+      "label": "Marketing / branding / visibility",
+      "base_cost_egp": 80000,
+      "cost_driver": "local",
+      "funding_source": "faculty_opex",
+      "description": "Advertising, website/social media, promotional material, and competitive-feature visibility for programs."
+    },
+    "accreditation_quality_prep": {
+      "label": "Accreditation / quality-assurance preparation",
+      "base_cost_egp": 120000,
+      "cost_driver": "local",
+      "funding_source": "faculty_opex",
+      "description": "Self-study preparation, NAQAAE documentation, program/course specification updates, internal audits and reviews."
+    },
+    "software_license_tier_1": {
+      "label": "Software license (small / single-tool)",
+      "base_cost_egp": 150000,
+      "cost_driver": "usd_linked",
+      "funding_source": "faculty_opex",
+      "description": "A single licensed platform, LMS module, or specialised software subscription."
+    },
+    "software_license_tier_2": {
+      "label": "Software license (large / suite or campus-wide)",
+      "base_cost_egp": 400000,
+      "cost_driver": "usd_linked",
+      "funding_source": "faculty_opex",
+      "description": "A suite of licensed tools, virtual labs, or a campus-scale software deployment."
+    },
+    "lab_hardware_upgrade": {
+      "label": "Lab hardware upgrade",
+      "base_cost_egp": 1200000,
+      "cost_driver": "usd_linked",
+      "funding_source": "central_capex",
+      "description": "Servers, GPUs, lab equipment, and major imported hardware procurement (capital expenditure, funded centrally)."
+    },
+    "infrastructure_facility": {
+      "label": "Infrastructure / facility build or renovation",
+      "base_cost_egp": 1000000,
+      "cost_driver": "local",
+      "funding_source": "central_capex",
+      "description": "Construction, renovation, new classrooms/labs/clinics, or major physical-space works (capital expenditure, funded centrally)."
+    },
+    "curriculum_program_development": {
+      "label": "Curriculum / program development",
+      "base_cost_egp": 120000,
+      "cost_driver": "local",
+      "funding_source": "faculty_opex",
+      "description": "Designing, developing, or substantially revising a curriculum, degree track, academic program, or operational framework — including drafting a new program/policy/framework PRIOR to its approval."
+    },
+    "survey_assessment_study": {
+      "label": "Survey / assessment / evaluation study",
+      "base_cost_egp": 40000,
+      "cost_driver": "local",
+      "funding_source": "faculty_opex",
+      "description": "Conducting surveys, focus groups, satisfaction or graduate-tracer studies, benchmarking, data analysis, or program-effectiveness evaluation, plus the reporting built on them."
+    },
+    "faculty_recruitment": {
+      "label": "Faculty / staff recruitment",
+      "base_cost_egp": 100000,
+      "cost_driver": "local",
+      "funding_source": "faculty_opex",
+      "description": "Recruiting or hiring faculty and supporting staff — national/international search and hiring campaigns and onboarding. NOT student recruitment (use student_outreach_campaign)."
+    },
+    "student_support_service": {
+      "label": "Student academic-support service",
+      "base_cost_egp": 90000,
+      "cost_driver": "local",
+      "funding_source": "faculty_opex",
+      "description": "Support services for ENROLLED students — tutoring, mentoring, academic advising, language support, learning clubs, remediation. NOT faculty training, NOT recruitment."
+    },
+    "it_system_deployment": {
+      "label": "IT system deployment / integration",
+      "base_cost_egp": 120000,
+      "cost_driver": "local",
+      "funding_source": "faculty_opex",
+      "description": "Implementing, migrating, integrating, configuring, or upgrading a data/IT SYSTEM or platform (e.g., alumni-tracking, LMS setup) — the deployment labor, DISTINCT from purchasing a license (software_license_*)."
+    },
+    "administrative_routine": {
+      "label": "Routine administrative task",
+      "base_cost_egp": 0,
+      "cost_driver": "local",
+      "funding_source": "central_capex",
+      "description": "STRICT, zero-budget governance ONLY: convening a committee/board, formally approving or ratifying an ALREADY-DESIGNED policy/document, enforcing an existing rule, or routine record-keeping. Do NOT use for designing, developing, drafting, studying, surveying, analyzing, evaluating, building, recruiting, or training — those consume real effort and belong to a specific archetype. If the activity PRODUCES something new, it is not administrative_routine."
+    },
+    "general_initiative": {
+      "label": "General initiative (last-resort fallback)",
+      "base_cost_egp": 60000,
+      "cost_driver": "local",
+      "funding_source": "faculty_opex",
+      "description": "LAST-RESORT FALLBACK — use ONLY after rejecting every other archetype. Re-check first: is it training, outreach, scholarship, event, MoU, marketing, accreditation/QA, software, hardware, infrastructure, curriculum/program development, a survey/assessment study, faculty recruitment, a student-support service, an IT-system deployment, or routine governance? If any fits even loosely, choose THAT. Never use this as a default for borderline items."
+    }
+  }
+}

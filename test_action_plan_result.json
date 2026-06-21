@@ -1,0 +1,44 @@
+{
+  "run_id": "a23dd6b9-fc73-41a0-af09-bbb91349a295",
+  "objectives_processed": 12,
+  "actions_created": 36,
+  "actions_replaced": 38,
+  "budget": {
+    "per_year": [
+      {
+        "year": 2026,
+        "faculty_opex_spend_egp": 6930000.0,
+        "ceiling_egp": 10500000,
+        "within_envelope": true
+      },
+      {
+        "year": 2027,
+        "faculty_opex_spend_egp": 46000.0,
+        "ceiling_egp": 12075000,
+        "within_envelope": true
+      },
+      {
+        "year": 2028,
+        "faculty_opex_spend_egp": 198000.0,
+        "ceiling_egp": 13886000,
+        "within_envelope": true
+      },
+      {
+        "year": 2029,
+        "faculty_opex_spend_egp": 0.0,
+        "ceiling_egp": 15969000,
+        "within_envelope": true
+      }
+    ],
+    "central_capex_total_egp": 1200000.0,
+    "faculty_opex_total_egp": 7174000.0,
+    "warnings": []
+  },
+  "horizon": "Q1 2026 – Q4 2029",
+  "assumptions": {
+    "local_cpi_rate": 0.15,
+    "usd_fx_rate": 0.1,
+    "strategic_ceiling_pct": 0.05,
+    "total_revenue_egp": 210000000.0
+  }
+}
