@@ -1,0 +1,1455 @@
+{
+  "document": "Executive Plan Evaluation Report 2021-2022",
+  "document_type": "follow_up_evaluation_report",
+  "period": {
+    "from": 2021,
+    "to": 2022
+  },
+  "status_legend": {
+    "achieved": "Content of the 'Achieved' column — what was actually accomplished (a value or description)",
+    "in_progress": "Content of the 'In Progress' column — what is currently underway",
+    "reasons_and_corrective_actions": "Content of the 'Reasons for Non-Achievement and Corrective Actions' column — populated only when an item was not completed, including the reason and the corrective action taken",
+    "timeframe": "The date/period associated with the item"
+  },
+  "goals": [
+    {
+      "number": 1,
+      "title": "Producing distinguished graduates qualified to compete locally and internationally",
+      "objectives": [
+        {
+          "number": 1,
+          "title": "Attracting outstanding students",
+          "activities": [
+            {
+              "activity": "Introducing students to the Faculty",
+              "indicators": [
+                {
+                  "indicator": "Intensity of social-media advertising campaigns / application timing",
+                  "achieved": "Intensive media campaigns via the Faculty page and funded ads via the university's official page",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "Months 8 and 9"
+                },
+                {
+                  "indicator": "Engagement on social media",
+                  "achieved": "A preliminary plan was set and is being implemented",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "Months 8 and 9"
+                },
+                {
+                  "indicator": "Intensity of posting Faculty news and student activities on social media",
+                  "achieved": "A monthly plan was created for posting Faculty and student news",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                },
+                {
+                  "indicator": "Number of field visits to schools",
+                  "achieved": "6",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "Month 9"
+                },
+                {
+                  "indicator": "Number of open days held",
+                  "achieved": "Agreements were set with a number of schools to organize exchange visits",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "Over the semester"
+                },
+                {
+                  "indicator": "Number of students and parents attending the open days",
+                  "achieved": "250",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "Month 9"
+                }
+              ]
+            },
+            {
+              "activity": "Providing scholarships for capable students to attract and motivate them",
+              "indicators": [
+                {
+                  "indicator": "Announcing the scholarships offered",
+                  "achieved": "Intensive media campaigns via the Faculty page and ads via the university's official page",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "Month 9"
+                },
+                {
+                  "indicator": "Announcing the application mechanism",
+                  "achieved": "Via the university's official page",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "Months 8, 9"
+                },
+                {
+                  "indicator": "Number of students who received scholarships and financial assistance",
+                  "achieved": "462",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "The academic year"
+                }
+              ]
+            },
+            {
+              "activity": "Integration between scientific research and education",
+              "indicators": [
+                {
+                  "indicator": "Alignment of courses with specialized international reference frameworks",
+                  "achieved": "Regulations were set drawing on international universities",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                },
+                {
+                  "indicator": "Encouraging undergraduate students to engage in scientific research activities",
+                  "achieved": "Student engagement at the Faculty's research centers",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "Months 8 and 9 / Month 2"
+                },
+                {
+                  "indicator": "Participation in international competitions",
+                  "achieved": "Rafiqi",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "During the year"
+                }
+              ]
+            },
+            {
+              "activity": "Providing logistical needs",
+              "indicators": [
+                {
+                  "indicator": "Providing subscriptions to transportation (university buses)",
+                  "achieved": "10 means of transport",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "During the year"
+                },
+                {
+                  "indicator": "Maintaining students' security and safety",
+                  "achieved": "A safe means of crossing the corridor; a medical clinic in every building",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "During the year"
+                },
+                {
+                  "indicator": "Providing food and beverage outlets under university oversight",
+                  "achieved": "4",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "During the year"
+                },
+                {
+                  "indicator": "Helping students secure housing near the university",
+                  "achieved": "Provided at the start of each semester",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "Month 9"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "number": 2,
+          "title": "Continuous development of programs",
+          "activities": [
+            {
+              "activity": "Updating program regulations to meet industry needs and technological developments",
+              "indicators": [
+                {
+                  "indicator": "Identifying the update required for each set of regulations and implementing it",
+                  "achieved": "AI, BMD",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "Month 9"
+                },
+                {
+                  "indicator": "Conducting internal and external review of programs and courses",
+                  "achieved": "CS, BMD Master",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "Month 11"
+                },
+                {
+                  "indicator": "Preparing annual reports on programs and courses",
+                  "achieved": "Program reports",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "End of each semester"
+                },
+                {
+                  "indicator": "Number of new programs approved by the university / launched",
+                  "achieved": "A diploma in drug discovery and development computing was introduced",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "Second semester"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "number": 3,
+          "title": "Providing a suitable environment for educational, cultural, and sports activities",
+          "activities": [
+            {
+              "activity": "Supporting and enhancing the university's digital transformation",
+              "indicators": [
+                {
+                  "indicator": "Using learning-management and student-information systems with an international reputation",
+                  "achieved": "ASRP (Academic System Resource Planning) activated; Power Campus",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "First semester"
+                },
+                {
+                  "indicator": "Providing electronic communication systems",
+                  "achieved": "Moodle, Teams, Outlook",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "First semester"
+                },
+                {
+                  "indicator": "Percentage of students and faculty members using the system",
+                  "achieved": "100%",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "First semester"
+                }
+              ]
+            },
+            {
+              "activity": "Training faculty members, supporting staff, and administrators on information management systems",
+              "indicators": [
+                {
+                  "indicator": "Faculty members and supporting staff trained",
+                  "achieved": "Everyone",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "All year"
+                },
+                {
+                  "indicator": "Administrators trained",
+                  "achieved": "5",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "All year"
+                },
+                {
+                  "indicator": "Percentage of users of these systems after training",
+                  "achieved": "100%",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                }
+              ]
+            },
+            {
+              "activity": "Developing infrastructure suitable for educational, cultural, and sports activities",
+              "indicators": [
+                {
+                  "indicator": "Availability of equipped halls",
+                  "achieved": "All halls are fully equipped with devices and tools; maintenance is performed before each semester; specialized engineers are available at all times",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                },
+                {
+                  "indicator": "Provision of updated labs",
+                  "achieved": "RAM in computer labs B52 and B53 was upgraded from 8GB to 16GB",
+                  "in_progress": "Increasing the number and capacity of labs",
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "Beginning of the first semester"
+                },
+                {
+                  "indicator": "Signed and active maintenance contracts for vital facilities",
+                  "achieved": "Attachment 1, 2, 3 in the maintenance file",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "All year"
+                },
+                {
+                  "indicator": "New and modern equipment",
+                  "achieved": "SSD storage was added in computer labs G17 and G18",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "Beginning of the first semester"
+                },
+                {
+                  "indicator": "Availability of diverse sports fields",
+                  "achieved": "Added a football field; gym",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                },
+                {
+                  "indicator": "Upgrading halls to allow remote learning",
+                  "achieved": null,
+                  "in_progress": "Permanently equipping a set of halls; equipping a hall when needed, e.g. creating new lecture-recording rooms with internet, computer, and remote-learning software",
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "All year"
+                }
+              ]
+            },
+            {
+              "activity": "Developing scientific mechanisms and methods for crisis, risk, and disaster management",
+              "indicators": [
+                {
+                  "indicator": "Existence of a crisis-response plan",
+                  "achieved": "Attachment 1 and 3 in the Safety and Emergency Guide",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "All year"
+                },
+                {
+                  "indicator": "Spreading a culture of crisis management among students, staff, and faculty",
+                  "achieved": "Attachment 4 in the Safety and Emergency Guide",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "All year"
+                },
+                {
+                  "indicator": "Completing security and safety equipment at the Faculty",
+                  "achieved": "Attachment 2 in the Safety and Emergency Guide",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "All year"
+                },
+                {
+                  "indicator": "Training on crisis response",
+                  "achieved": "Attachment 4 in the Safety and Emergency Guide",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "All year"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "number": 4,
+          "title": "Enhancing graduates' competitive capabilities",
+          "activities": [
+            {
+              "activity": "Building students' leadership character and involving them in decision-making",
+              "indicators": [
+                {
+                  "indicator": "Students engaged as research assistants and teaching assistants",
+                  "achieved": "55 students",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "Summer"
+                },
+                {
+                  "indicator": "Involvement of student representatives in quality committees",
+                  "achieved": "18",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "All year"
+                },
+                {
+                  "indicator": "Student involvement in organizing scientific events",
+                  "achieved": "IEEE Activities; UGRF organizing; NILES organizing",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "All year"
+                },
+                {
+                  "indicator": "Existence of numerous scientific and cultural clubs",
+                  "achieved": "25",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "All year"
+                }
+              ]
+            },
+            {
+              "activity": "Encouraging the Student Union to play an active role in Faculty activities",
+              "indicators": [
+                {
+                  "indicator": "Number of students seeking to join the Student Union",
+                  "achieved": "56",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "Start of the academic year"
+                },
+                {
+                  "indicator": "Periodic meetings with the Student Union",
+                  "achieved": "Meetings held to discuss requirements at the Faculty and university level",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "All year"
+                }
+              ]
+            },
+            {
+              "activity": "Providing an environment that encourages debate and free discussion",
+              "indicators": [
+                {
+                  "indicator": "Organizing numerous cultural, scientific, and social events",
+                  "achieved": "More than 50 events including introductory and educational seminars and lectures, plus events such as UGRF, Hackathons, Clubs, IEEE young prof., NILES",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "All year"
+                },
+                {
+                  "indicator": "Percentage of student participation in various events",
+                  "achieved": "65%",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "All year"
+                },
+                {
+                  "indicator": "Number of students participating in opinion surveys",
+                  "achieved": "30%",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "All year"
+                },
+                {
+                  "indicator": "Discussing students' feedback and responding to it",
+                  "achieved": "Meetings/lectures between program directors and students",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "End of the semester"
+                }
+              ]
+            },
+            {
+              "activity": "Giving students the opportunity to study humanities courses encouraging thought, creativity, and critique",
+              "indicators": [
+                {
+                  "indicator": "Including elective courses such as critical thinking",
+                  "achieved": "Done as per the regulations",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                },
+                {
+                  "indicator": "Including elective courses to develop artistic sense",
+                  "achieved": "Done as per the regulations",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                },
+                {
+                  "indicator": "Existence of debate-simulation activities and analysis",
+                  "achieved": "Clubs: GDSC, ICPC",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "All year"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "number": 5,
+          "title": "Linking education to scientific research",
+          "activities": [
+            {
+              "activity": "Adopting an educational policy based on applied student projects through coursework",
+              "indicators": [
+                {
+                  "indicator": "Courses include applied projects as part of assessment",
+                  "achieved": "Most courses",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                },
+                {
+                  "indicator": "Student engagement in research forums through these projects",
+                  "achieved": "334 (UGRF)",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "All year"
+                }
+              ]
+            },
+            {
+              "activity": "Encouraging undergraduate students toward scientific publishing",
+              "indicators": [
+                {
+                  "indicator": "Number of students participating in research",
+                  "achieved": "33",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "All year"
+                },
+                {
+                  "indicator": "Number of peer-reviewed papers published",
+                  "achieved": "6",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "All year"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "number": 6,
+          "title": "Qualifying students for student-exchange programs and international research labs",
+          "activities": [
+            {
+              "activity": "Ensuring internal regulations align with international regulations to activate student-exchange programs",
+              "indicators": [
+                {
+                  "indicator": "Number of active student-exchange agreements",
+                  "achieved": "Austria–GCU",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "All year"
+                },
+                {
+                  "indicator": "Number of dual-program agreements",
+                  "achieved": null,
+                  "in_progress": "In progress",
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                }
+              ]
+            },
+            {
+              "activity": "Raising student awareness of student exchange and offering available opportunities",
+              "indicators": [
+                {
+                  "indicator": "Number of students benefiting from available opportunities",
+                  "achieved": "3",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "All year"
+                },
+                {
+                  "indicator": "Number of seminars held and attending students",
+                  "achieved": "2 – 60",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "All year"
+                },
+                {
+                  "indicator": "Number of announced student-exchange programs",
+                  "achieved": "2",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "All year"
+                }
+              ]
+            },
+            {
+              "activity": "Nominating students, following up with them, and evaluating their experiences",
+              "indicators": [
+                {
+                  "indicator": "Number of personal interviews with students to assess suitability",
+                  "achieved": "4",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "All year"
+                },
+                {
+                  "indicator": "Assessment of student benefit, program importance, and continuation feasibility",
+                  "achieved": "Done",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "number": 2,
+      "title": "A faculty member and supporting staff member distinguished scientifically, in research, and in quality",
+      "objectives": [
+        {
+          "number": 1,
+          "title": "Creating a flexible work environment that motivates teaching and scientific research",
+          "activities": [
+            {
+              "activity": "Establishing and updating specialized labs at the Faculty",
+              "indicators": [
+                {
+                  "indicator": "Specialized labs established",
+                  "achieved": "VR",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "First semester"
+                },
+                {
+                  "indicator": "Labs updated",
+                  "achieved": "All labs",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "First semester"
+                }
+              ]
+            },
+            {
+              "activity": "Updating library content according to teaching and research requirements",
+              "indicators": [
+                {
+                  "indicator": "Diversity of services offered by the library",
+                  "achieved": "Attachment",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                },
+                {
+                  "indicator": "Response rate to faculty members' requests for books and references",
+                  "achieved": "Responses are provided according to requirements",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "All year"
+                }
+              ]
+            },
+            {
+              "activity": "Measuring the satisfaction of faculty members and supporting staff",
+              "indicators": [
+                {
+                  "indicator": "Number of surveys of faculty members, supporting staff, and administrators",
+                  "achieved": null,
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "Each academic year / all year"
+                },
+                {
+                  "indicator": "Procedures followed to address dissatisfaction points from the surveys",
+                  "achieved": "Discussed in program councils, with improvement proposals set",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                }
+              ]
+            },
+            {
+              "activity": "Motivating and supporting faculty members to apply for research projects internally and externally",
+              "indicators": [
+                {
+                  "indicator": "Number of awareness seminars offered annually",
+                  "achieved": "27",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "All year"
+                },
+                {
+                  "indicator": "Following up on calls for research proposals and funding bodies",
+                  "achieved": "Newsletter",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "Weekly / all year"
+                },
+                {
+                  "indicator": "Number of projects submitted by faculty members",
+                  "achieved": "7",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "All year"
+                },
+                {
+                  "indicator": "Number of funded projects",
+                  "achieved": "3",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "All year"
+                },
+                {
+                  "indicator": "Procedures followed to support faculty members",
+                  "achieved": "Follow-up Office",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "All year"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "number": 2,
+          "title": "Implementing a clear system for appointment and evaluation, defining responsibilities, and updating the organizational structure",
+          "activities": [
+            {
+              "activity": "Organizing institutional work and setting measurable criteria",
+              "indicators": [
+                {
+                  "indicator": "Setting and announcing job descriptions",
+                  "achieved": "Faculty manual",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                },
+                {
+                  "indicator": "Announcing the organizational structure",
+                  "achieved": "Updated",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                }
+              ]
+            },
+            {
+              "activity": "Activating administrative and faculty performance-evaluation system",
+              "indicators": [
+                {
+                  "indicator": "Setting an approved accountability document",
+                  "achieved": "Self assessment",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "End of academic year"
+                },
+                {
+                  "indicator": "Availability of performance evaluation reports",
+                  "achieved": "Done",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "End of academic year"
+                }
+              ]
+            },
+            {
+              "activity": "Appointing new, qualified members",
+              "indicators": [
+                {
+                  "indicator": "Announcing required positions",
+                  "achieved": "Faculty website, LinkedIn",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "Each semester"
+                },
+                {
+                  "indicator": "Number of applicants",
+                  "achieved": "16",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                },
+                {
+                  "indicator": "Number of personal interviews",
+                  "achieved": "15",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                },
+                {
+                  "indicator": "Number of new qualified members appointed",
+                  "achieved": "5",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                }
+              ]
+            },
+            {
+              "activity": "Promotion systems, evaluation criteria, and performance follow-up",
+              "indicators": [
+                {
+                  "indicator": "Announcing the evaluation mechanism and criteria",
+                  "achieved": "Faculty manual",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                },
+                {
+                  "indicator": "Performance-evaluation committees",
+                  "achieved": "A committee of professors",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                },
+                {
+                  "indicator": "Setting a clear promotion system per the Supreme Council of Universities rules",
+                  "achieved": "Circulation",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                },
+                {
+                  "indicator": "Setting a clear promotion system for administrators",
+                  "achieved": "Faculty Council",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                },
+                {
+                  "indicator": "Setting and announcing a grievance mechanism",
+                  "achieved": "Faculty manual",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                }
+              ]
+            },
+            {
+              "activity": "Insurance and pension systems",
+              "indicators": [
+                {
+                  "indicator": "Announcing policies for dealing with retired faculty members",
+                  "achieved": "Faculty manual",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                },
+                {
+                  "indicator": "Contracting with an internationally reputable health-insurance company",
+                  "achieved": "Done; some suppliers were changed",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "All year"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "number": 3,
+          "title": "Raising the efficiency of faculty members, supporting staff, administrators, and Faculty staff",
+          "activities": [
+            {
+              "activity": "Identifying training tracks and target groups",
+              "indicators": [
+                {
+                  "indicator": "Conducting surveys to identify required courses per target group",
+                  "achieved": null,
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "Annually"
+                },
+                {
+                  "indicator": "Setting the annual training plan",
+                  "achieved": "Done",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                },
+                {
+                  "indicator": "Diversifying training directions (scientific – administrative – quality)",
+                  "achieved": null,
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                }
+              ]
+            },
+            {
+              "activity": "Implementing and following up on training courses",
+              "indicators": [
+                {
+                  "indicator": "Number of training courses held annually",
+                  "achieved": "6",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                },
+                {
+                  "indicator": "Participation rate in the courses",
+                  "achieved": "100%",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "number": 3,
+      "title": "Impactful scientific research and engagement with leading universities and scientists locally and internationally",
+      "objectives": [
+        {
+          "number": 1,
+          "title": "Encouraging faculty members toward scientific research and innovation",
+          "activities": [
+            {
+              "activity": "Forming distinguished research groups to support innovation",
+              "indicators": [
+                {
+                  "indicator": "Existence of active research groups",
+                  "achieved": "6",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "All academic year"
+                },
+                {
+                  "indicator": "Publication of joint scientific papers",
+                  "achieved": "100",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "All academic year"
+                },
+                {
+                  "indicator": "Existence of joint research projects",
+                  "achieved": "2",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                }
+              ]
+            },
+            {
+              "activity": "Providing appropriate material and scientific resources for research requirements",
+              "indicators": [
+                {
+                  "indicator": "Support for internal research projects",
+                  "achieved": "2 (included in salary)",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                },
+                {
+                  "indicator": "Granting rewards to encourage publishing scientific papers",
+                  "achieved": null,
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                },
+                {
+                  "indicator": "Offering partial scholarships between 10% and 30% for graduate students",
+                  "achieved": "17",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "Each academic year"
+                },
+                {
+                  "indicator": "Annual full scholarship named after Mohamed Sami, plus a monthly salary for research assistants",
+                  "achieved": "Won by Abdelrahman Al-Gabaly",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "Each academic year"
+                },
+                {
+                  "indicator": "Providing strong network infrastructure for information services",
+                  "achieved": null,
+                  "in_progress": "Strengthening coverage for all university buildings via internet devices; setting up a dedicated internet network for faculty members and researchers",
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                }
+              ]
+            },
+            {
+              "activity": "Encouraging and supporting scientific research activities",
+              "indicators": [
+                {
+                  "indicator": "The Faculty includes a specialized research center",
+                  "achieved": "CIS",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                },
+                {
+                  "indicator": "Periodic workshops for professors and graduate students",
+                  "achieved": "PGRF, UGRF",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                },
+                {
+                  "indicator": "Supporting students to participate in forums appropriately",
+                  "achieved": "Funding poster printing",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                },
+                {
+                  "indicator": "Making forum outputs available for general benefit",
+                  "achieved": "PGRF, UGRF books, link",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                }
+              ]
+            },
+            {
+              "activity": "Supporting publication and participation in international journals and conferences",
+              "indicators": [
+                {
+                  "indicator": "Organizing a mechanism to announce conferences and research activities",
+                  "achieved": "Weekly newsletter",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                },
+                {
+                  "indicator": "Number of international conferences participated in",
+                  "achieved": "NILES",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                },
+                {
+                  "indicator": "Number of papers presented at conferences",
+                  "achieved": "100",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                },
+                {
+                  "indicator": "Existence of a clear policy on cash support for publishing scientific papers",
+                  "achieved": "Weekly newsletter",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                },
+                {
+                  "indicator": "Number of forums organized",
+                  "achieved": "PGRF, UGRF, Hackathons",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                },
+                {
+                  "indicator": "Number of participants",
+                  "achieved": "80",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "number": 2,
+          "title": "Strengthening partnership programs with distinguished international and local universities",
+          "activities": [
+            {
+              "activity": "Signing cooperation protocols with distinguished universities",
+              "indicators": [
+                {
+                  "indicator": "Establishing and supporting an International Relations Committee",
+                  "achieved": "Done",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "All year"
+                },
+                {
+                  "indicator": "Number of cooperation protocols",
+                  "achieved": "2",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "All year"
+                },
+                {
+                  "indicator": "Number of beneficiaries",
+                  "achieved": "2",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                }
+              ]
+            },
+            {
+              "activity": "Applying for joint research projects",
+              "indicators": [
+                {
+                  "indicator": "Number of joint research projects",
+                  "achieved": "2",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "All year"
+                },
+                {
+                  "indicator": "Number of faculty members and supporting staff participating",
+                  "achieved": "3",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "number": 3,
+          "title": "Attracting our expatriate scientists",
+          "activities": [
+            {
+              "activity": "Inviting our expatriate scientists to participate in the Faculty's scientific activities",
+              "indicators": [
+                {
+                  "indicator": "Number of conferences and forums our expatriate scientists participate in",
+                  "achieved": "NILES",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                },
+                {
+                  "indicator": "Number of expatriate scientists invited to organizing committees and public lectures",
+                  "achieved": "4",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                }
+              ]
+            },
+            {
+              "activity": "Engaging our expatriate scientists in research projects",
+              "indicators": [
+                {
+                  "indicator": "Number of contributions to submitted projects",
+                  "achieved": "1",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                },
+                {
+                  "indicator": "Number of ongoing projects",
+                  "achieved": "Fall'21 MSc/BDDS courses: CIT650:47, CIT652:13, CIT690:25, MSc CIT622:9 — Spring'22: CIT650, CIT652, CIT690, MSc CIT690:30",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                }
+              ]
+            },
+            {
+              "activity": "Engaging our expatriate scientists in teaching graduate courses",
+              "indicators": [
+                {
+                  "indicator": "Number of courses taught by our expatriate scientists",
+                  "achieved": null,
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                },
+                {
+                  "indicator": "Number of students enrolled in such courses",
+                  "achieved": "156",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                },
+                {
+                  "indicator": "Student evaluation of the courses",
+                  "achieved": "Excellent",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "End of semester"
+                }
+              ]
+            },
+            {
+              "activity": "Inviting our expatriate scientists to supervise and evaluate theses",
+              "indicators": [
+                {
+                  "indicator": "Number of contributions to thesis supervision",
+                  "achieved": "1",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "All year"
+                },
+                {
+                  "indicator": "Number of contributions to thesis examination committees",
+                  "achieved": "4",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "number": 4,
+      "title": "Supporting the information-technology industry and contributing to solving local and international problems through community engagement",
+      "objectives": [
+        {
+          "number": 1,
+          "title": "Effective participation in national projects",
+          "activities": [
+            {
+              "activity": "Activating joint research projects with relevant bodies",
+              "indicators": [
+                {
+                  "indicator": "Number of research projects submitted serving national projects",
+                  "achieved": "5",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                },
+                {
+                  "indicator": "Percentage of submitted projects linked to Egypt's Vision 2030",
+                  "achieved": "100%",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                },
+                {
+                  "indicator": "Number of funded research projects",
+                  "achieved": "4",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                }
+              ]
+            },
+            {
+              "activity": "Directing scientific research to serve national projects",
+              "indicators": [
+                {
+                  "indicator": "Number of research papers submitted serving national projects",
+                  "achieved": "100",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                },
+                {
+                  "indicator": "Percentage of submitted research linked to Egypt's Vision 2030",
+                  "achieved": "95%",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "number": 2,
+          "title": "Participating in community development in IT",
+          "activities": [
+            {
+              "activity": "Inviting relevant community parties to the Faculty's Advisory Board",
+              "indicators": [
+                {
+                  "indicator": "Number of community and industry parties represented on the Advisory Board",
+                  "achieved": "13",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                }
+              ]
+            },
+            {
+              "activity": "Offering professional diplomas to raise staff competency",
+              "indicators": [
+                {
+                  "indicator": "Number of professional diplomas",
+                  "achieved": "3",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                },
+                {
+                  "indicator": "Number of enrolled students",
+                  "achieved": "260",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                }
+              ]
+            },
+            {
+              "activity": "Spreading an information-technology culture",
+              "indicators": [
+                {
+                  "indicator": "Number of hackathon events",
+                  "achieved": "3",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                },
+                {
+                  "indicator": "Number of seminars held",
+                  "achieved": "50",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                },
+                {
+                  "indicator": "Summer activities and programming courses",
+                  "achieved": "6",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "number": 3,
+          "title": "Cooperation with the IT industry sector",
+          "activities": [
+            {
+              "activity": "Cooperating with companies to solve industry problems through scientific research",
+              "indicators": [
+                {
+                  "indicator": "Number of companies collaborated with on research",
+                  "achieved": "1",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                },
+                {
+                  "indicator": "Number of companies collaborated with on graduation projects",
+                  "achieved": "1",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                }
+              ]
+            },
+            {
+              "activity": "Solving industry problems through theses and graduation projects",
+              "indicators": [
+                {
+                  "indicator": "Number of graduation projects relevant to the community",
+                  "achieved": "90%",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "number": 5,
+      "title": "Supporting innovation and entrepreneurship",
+      "objectives": [
+        {
+          "number": 1,
+          "title": "Spreading the concept of entrepreneurship and self-employment culture",
+          "activities": [
+            {
+              "activity": "Raising awareness of entrepreneurship and its components",
+              "indicators": [
+                {
+                  "indicator": "Number of training programs and workshops offered",
+                  "achieved": "4 workshops and 2 training courses",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "Each semester"
+                },
+                {
+                  "indicator": "Number of students participating in training programs and workshops",
+                  "achieved": "128",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "All academic year"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "number": 2,
+          "title": "Supporting the formation of startups",
+          "activities": [
+            {
+              "activity": "Preparing students to form startups via the university's entrepreneurship incubators",
+              "indicators": [
+                {
+                  "indicator": "Number of projects submitted by students",
+                  "achieved": "3",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "All academic year"
+                },
+                {
+                  "indicator": "Number of incubators that produced startups",
+                  "achieved": "3",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                }
+              ]
+            },
+            {
+              "activity": "Building an effective network of relationships with funding bodies",
+              "indicators": [
+                {
+                  "indicator": "Number of active cooperation agreements",
+                  "achieved": "3",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "All academic year"
+                }
+              ]
+            },
+            {
+              "activity": "Supporting startups",
+              "indicators": [
+                {
+                  "indicator": "Number of projects that received support",
+                  "achieved": "4",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "All academic year"
+                },
+                {
+                  "indicator": "Number of projects that resulted in startups",
+                  "achieved": "3",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                },
+                {
+                  "indicator": "Methods of support provided",
+                  "achieved": null,
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "number": 3,
+          "title": "Encouraging conversion of research outputs into prototypes and supporting production and development",
+          "activities": [
+            {
+              "activity": "Spreading a culture of intellectual property",
+              "indicators": [
+                {
+                  "indicator": "Number of awareness seminars held",
+                  "achieved": "2",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": "Each semester"
+                }
+              ]
+            },
+            {
+              "activity": "Supporting the acquisition of patents",
+              "indicators": [
+                {
+                  "indicator": "Number of patent applications submitted",
+                  "achieved": "1",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                }
+              ]
+            },
+            {
+              "activity": "Supporting applications to grant-making bodies for access to prototypes",
+              "indicators": [
+                {
+                  "indicator": "Number of projects submitted to grant-making bodies",
+                  "achieved": "1",
+                  "in_progress": null,
+                  "reasons_and_corrective_actions": null,
+                  "timeframe": null
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

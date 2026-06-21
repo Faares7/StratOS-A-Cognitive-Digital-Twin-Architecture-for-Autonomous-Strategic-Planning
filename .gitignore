@@ -54,3 +54,6 @@ env/
 
 Test-KPI-Agent.ps1
 
+
+# SWOT consolidation: cached previous-plan normalization (runtime artifact)
+Agents/swot_consolidation/.prev_plan_cache.json

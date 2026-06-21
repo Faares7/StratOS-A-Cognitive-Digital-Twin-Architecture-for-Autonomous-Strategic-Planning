@@ -21,6 +21,7 @@ import {
   Gauge,
   Sparkles,
   LogOut,
+  ListChecks,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -63,6 +64,7 @@ const mainNav: NavItem[] = [
   { href: "/surveys", icon: ClipboardList, label: "Survey Generation" },
   { href: "/plan-generation", icon: Sparkles, label: "Plan Generation" },
   { href: "/kpi-generation", icon: Gauge, label: "KPI Generation" },
+  { href: "/action-plan", icon: ListChecks, label: "Action Plan" },
 ];
 
 const bottomNav: NavItem[] = [

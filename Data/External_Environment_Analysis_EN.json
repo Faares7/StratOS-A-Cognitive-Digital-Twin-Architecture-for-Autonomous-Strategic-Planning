@@ -1,0 +1,28 @@
+{
+  "document": "Second: External Environment Analysis of the Faculty",
+  "document_type": "external_environment_analysis",
+  "institution": "Nile University — Faculty of Information Technology and Computer Science",
+  "source_unit": "Quality Assurance Unit",
+  "methodology_note": "The work team conducted the analysis by applying the PESTEL methodology (Political, Economic, Social, Technological, Environmental & Legal), which is considered one of the most well-known methods for analyzing external-environment factors affecting an institution's performance. This method classifies these factors into: political, economic, social, technological, environmental, and legal factors. PESTEL analysis helps provide a clear picture of the external factors surrounding the institution, which can be used in selecting the most suitable strategic options.",
+  "opportunities": [
+    "Recognition by international institutions of the high quality of the Faculty's academic standards, which gives its graduates a strong international reputation",
+    "The rapid development in computing and the underlying infrastructure for information technology, and securing it",
+    "The increasing number of multidisciplinary local and international projects relying on information-technology techniques and digital transformation",
+    "The close link between the growth and development of various sectors and the information-technology industry",
+    "The growing need for highly qualified information-technology specialists",
+    "The existence of numerous local and foreign funding bodies",
+    "The existence of a Quality Assurance and Accreditation Authority that supports accreditation efforts",
+    "The proximity of the geographic location to multiple information-technology and knowledge centers, such as the Smart Village",
+    "The diversity of emerging information-technology specializations that enjoy strong support locally, regionally, and internationally",
+    "The increasing demand for education and scientific research in the information-technology, computer-science, and artificial-intelligence sector"
+  ],
+  "threats": [
+    "Existence of international, regional, and local competition at both the academic level and the information-technology industry level to employ better-qualified young people",
+    "Increased competition in attracting distinguished students due to the establishment of a number of faculties with similar specializations at other universities",
+    "The strong pull of international institutions on our expatriate scientists, which affects the availability of qualified faculty members and researchers",
+    "The risk of losing talented faculty members due to available opportunities at competing universities",
+    "Changing labor-market needs due to the rapid development in the field of information technology",
+    "The university's location on a highway, which puts students at risk",
+    "A growing trend among a segment of parents and students toward studying abroad"
+  ]
+}
