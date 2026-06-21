@@ -1,0 +1,103 @@
+[
+  {
+    "post_text": "لا بس مينفعش تتخرج لو اقل من اتنين",
+    "date_str": "unknown",
+    "likes": 1,
+    "comment_count": 0,
+    "relevant": true,
+    "matched_categories": [
+      "education_nouns"
+    ],
+    "matched_keywords": [
+      "تخرج"
+    ],
+    "comments": [
+      {
+        "text": "لا بس مينفعش تتخرج لو اقل من اتنين",
+        "likes": 0,
+        "relevant": true,
+        "matched_categories": [
+          "education_nouns"
+        ],
+        "matched_keywords": [
+          "تخرج"
+        ]
+      },
+      {
+        "text": "يا جماعه مفيش الهبل دا ولا حد بينفصل ولا حاجه انا اختي قعده ٣ سنين لل gpa تحت ال ١ و متفصلتش",
+        "likes": 0,
+        "relevant": false,
+        "matched_categories": [],
+        "matched_keywords": []
+      }
+    ],
+    "source_group": "Nile University Friends in Egypt",
+    "source_university": "Nile University",
+    "scraped_at": "2026-06-19T06:14:34.669963"
+  },
+  {
+    "post_text": "انا بشوف عجب في الجامعه دي",
+    "date_str": "unknown",
+    "likes": 0,
+    "comment_count": 0,
+    "relevant": false,
+    "matched_categories": [],
+    "matched_keywords": [],
+    "comments": [],
+    "source_group": "Nile University Friends in Egypt",
+    "source_university": "Nile University",
+    "scraped_at": "2026-06-19T06:14:34.818866"
+  },
+  {
+    "post_text": "التلاته جامعات قوية كدراسة وسوق عمل المهم التقدير والخبره بعد ما تخلص",
+    "date_str": "unknown",
+    "likes": 1,
+    "comment_count": 0,
+    "relevant": false,
+    "matched_categories": [],
+    "matched_keywords": [],
+    "comments": [],
+    "source_group": "Nile University Friends in Egypt",
+    "source_university": "Nile University",
+    "scraped_at": "2026-06-19T06:14:40.740757"
+  },
+  {
+    "post_text": "الأكاديمية علشان،شهاده دوليه",
+    "date_str": "unknown",
+    "likes": 0,
+    "comment_count": 0,
+    "relevant": false,
+    "matched_categories": [],
+    "matched_keywords": [],
+    "comments": [],
+    "source_group": "Nile University Friends in Egypt",
+    "source_university": "Nile University",
+    "scraped_at": "2026-06-19T06:14:40.874322"
+  },
+  {
+    "post_text": "هو حضرتك هاتحول من الاكاديمية ليه؟",
+    "date_str": "unknown",
+    "likes": 0,
+    "comment_count": 0,
+    "relevant": false,
+    "matched_categories": [],
+    "matched_keywords": [],
+    "comments": [],
+    "source_group": "Nile University Friends in Egypt",
+    "source_university": "Nile University",
+    "scraped_at": "2026-06-19T06:14:41.015807"
+  },
+  {
+    "post_text": "اه فيه في كليه حاسبات قسم ذكاء اصطناعي و لو علي المطلوب للتحويل اسأل في الجامعه اضمن عند ال admission",
+    "date_str": "unknown",
+    "likes": 0,
+    "comment_count": 0,
+    "relevant": false,
+    "matched_categories": [],
+    "matched_keywords": [],
+    "comments": [],
+    "source_group": "Nile University Friends in Egypt",
+    "source_university": "Nile University",
+    "scraped_at": "2026-06-19T06:14:41.178162"
+  }
+]

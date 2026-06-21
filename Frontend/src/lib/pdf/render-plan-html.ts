@@ -289,6 +289,18 @@ function subchapterSection(sub: Subchapter, chNum: number, idx: number): string 
 </div>`
 }
 
+function prefaceSection(sub: Subchapter): string {
+  const align = sub.textAlign ?? 'start'
+  return `
+<div id="${esc(sub.id)}" style="margin-bottom:2.5rem;text-align:${align}">
+  <div style="margin-bottom:1.25rem">
+    <h3 style="margin:0;font-family:Georgia,serif;font-size:1.4rem;font-weight:600;color:#0f172a">${esc(sub.heading)}</h3>
+  </div>
+  <div style="height:1px;background:linear-gradient(to right,#b8922f,transparent);margin-bottom:1.5rem"></div>
+  ${renderBlocks(sub.blocks)}
+</div>`
+}
+
 function chapterContent(ch: Chapter): string {
   const intro = ch.intro && ch.intro.length > 0
     ? `<div style="margin-bottom:2rem">${renderBlocks(ch.intro)}</div>`
@@ -394,6 +406,11 @@ export function renderPlanHtml(
     .map(ch => chapterCover(ch) + chapterContent(ch))
     .join('\n')
 
+  // Preface sections (before chapter 1): rendered in the body, but NOT in the TOC.
+  const prefaceHtml = doc.preface && doc.preface.length > 0
+    ? `<div class="pdf-content-block">${doc.preface.map(prefaceSection).join('')}</div>`
+    : ''
+
   return `<!DOCTYPE html>
 <html lang="${esc(doc.language)}" dir="${esc(doc.dir)}">
 <head>
@@ -406,6 +423,7 @@ ${arabicFont}
 <body>
 ${coverPage(doc.meta)}
 ${tocPage(doc, pageNumbers)}
+${prefaceHtml}
 ${chapters}
 </body>
 </html>`

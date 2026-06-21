@@ -25,7 +25,9 @@ export type RichText = ProseMirrorNode;
 
 export interface AgentProvenance {
   kind:        "agent_signal";
-  agent:       "tech" | "sentiment" | "workforce" | "benchmark" | "social" | "meetings";
+  agent:       "tech" | "sentiment" | "workforce" | "benchmark" | "social" | "meetings"
+             | "swot_runner" | "goals_planner" | "gap_analysis" | "operational_audit"
+             | "chief_editor" | (string & {});
   category?:   "strength" | "weakness" | "opportunity" | "threat";
   source:      string;
   finding:     string;
@@ -108,11 +110,13 @@ export type Block = ParagraphBlock | ListBlock | TableBlock | ImageBlock;
 export interface Subchapter {
   id:           string;
   canonicalKey: string | null;
-  heading:      string;         // rendered as "X.Y  Heading"
-  order:        number;         // position within its chapter
+  heading:      string;         // rendered as "X.Y  Heading" (or plain heading for preface)
+  order:        number;         // position within its chapter or preface
   status:       "auto" | "edited" | "verified";
   generation:   "pending" | "streaming" | "complete";
   userAdded:    boolean;
+  needsReview?: boolean;        // carryover sections flagged for human review
+  textAlign?:   "left" | "center" | "right"; // used by preface dean_message
   blocks:       Block[];
 }
 
@@ -134,6 +138,7 @@ export interface PlanMeta {
   orgName:         string;
   orgLogoUrl:      string | null;
   periodLabel:     string;
+  approvalDate?:   string;       // e.g. "June 2026" — set fresh by the Chief Editor
   partnerLogoUrls: string[];
 }
 
@@ -146,6 +151,7 @@ export interface PlanDocument {
   templateId: string;
   language:   Language;
   dir:        Direction;        // derived: ar → rtl, en → ltr
+  preface?:   Subchapter[];    // sections before Chapter 1 — no chapter cover, no number
   chapters:   Chapter[];
   docStatus:  "generating" | "draft" | "final";
   createdAt:  string;

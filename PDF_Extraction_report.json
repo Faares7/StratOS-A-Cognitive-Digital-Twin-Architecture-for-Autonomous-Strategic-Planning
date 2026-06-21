@@ -1,0 +1,453 @@
+{
+  "pdf_path": "Data\\NU_strategic_plan_2020-2024.pdf",
+  "n_pages": 73,
+  "page_labels": null,
+  "toc_pages_1based": [
+    6
+  ],
+  "number_side": "right",
+  "settings": {
+    "TOC_SEARCH_PAGES": 15,
+    "TOC_MIN_NUMBER_LINES": 5,
+    "MIN_LEADER_RUN": 3,
+    "MONOTONIC_MIN": 0.6
+  },
+  "per_page_signals": [
+    {
+      "page": 1,
+      "keyword_hit": false,
+      "number_line_count": 3,
+      "dot_leader_count": 0,
+      "monotonic_ratio": 0.5,
+      "score": 0.75,
+      "qualifies": false,
+      "chosen": false
+    },
+    {
+      "page": 2,
+      "keyword_hit": false,
+      "number_line_count": 1,
+      "dot_leader_count": 0,
+      "monotonic_ratio": 0.0,
+      "score": 0.0,
+      "qualifies": false,
+      "chosen": false
+    },
+    {
+      "page": 3,
+      "keyword_hit": false,
+      "number_line_count": 1,
+      "dot_leader_count": 0,
+      "monotonic_ratio": 0.0,
+      "score": 0.0,
+      "qualifies": false,
+      "chosen": false
+    },
+    {
+      "page": 4,
+      "keyword_hit": false,
+      "number_line_count": 1,
+      "dot_leader_count": 0,
+      "monotonic_ratio": 0.0,
+      "score": 0.0,
+      "qualifies": false,
+      "chosen": false
+    },
+    {
+      "page": 5,
+      "keyword_hit": false,
+      "number_line_count": 1,
+      "dot_leader_count": 0,
+      "monotonic_ratio": 0.0,
+      "score": 0.0,
+      "qualifies": false,
+      "chosen": false
+    },
+    {
+      "page": 6,
+      "keyword_hit": false,
+      "number_line_count": 27,
+      "dot_leader_count": 0,
+      "monotonic_ratio": 0.962,
+      "score": 24.96,
+      "qualifies": true,
+      "chosen": true
+    },
+    {
+      "page": 7,
+      "keyword_hit": false,
+      "number_line_count": 1,
+      "dot_leader_count": 0,
+      "monotonic_ratio": 0.0,
+      "score": 0.0,
+      "qualifies": false,
+      "chosen": false
+    },
+    {
+      "page": 8,
+      "keyword_hit": false,
+      "number_line_count": 1,
+      "dot_leader_count": 0,
+      "monotonic_ratio": 0.0,
+      "score": 0.0,
+      "qualifies": false,
+      "chosen": false
+    },
+    {
+      "page": 9,
+      "keyword_hit": false,
+      "number_line_count": 1,
+      "dot_leader_count": 0,
+      "monotonic_ratio": 0.0,
+      "score": 0.0,
+      "qualifies": false,
+      "chosen": false
+    },
+    {
+      "page": 10,
+      "keyword_hit": false,
+      "number_line_count": 1,
+      "dot_leader_count": 0,
+      "monotonic_ratio": 0.0,
+      "score": 0.0,
+      "qualifies": false,
+      "chosen": false
+    },
+    {
+      "page": 11,
+      "keyword_hit": false,
+      "number_line_count": 6,
+      "dot_leader_count": 0,
+      "monotonic_ratio": 0.6,
+      "score": 2.16,
+      "qualifies": true,
+      "chosen": false
+    },
+    {
+      "page": 12,
+      "keyword_hit": false,
+      "number_line_count": 3,
+      "dot_leader_count": 0,
+      "monotonic_ratio": 1.0,
+      "score": 3.0,
+      "qualifies": false,
+      "chosen": false
+    },
+    {
+      "page": 13,
+      "keyword_hit": false,
+      "number_line_count": 14,
+      "dot_leader_count": 0,
+      "monotonic_ratio": 0.308,
+      "score": 1.33,
+      "qualifies": false,
+      "chosen": false
+    },
+    {
+      "page": 14,
+      "keyword_hit": false,
+      "number_line_count": 19,
+      "dot_leader_count": 0,
+      "monotonic_ratio": 0.222,
+      "score": 0.94,
+      "qualifies": false,
+      "chosen": false
+    },
+    {
+      "page": 15,
+      "keyword_hit": false,
+      "number_line_count": 25,
+      "dot_leader_count": 0,
+      "monotonic_ratio": 0.542,
+      "score": 7.34,
+      "qualifies": false,
+      "chosen": false
+    }
+  ],
+  "toc_entries": [
+    {
+      "heading": "المو ضوع إعداد و",
+      "heading_raw": "المو ضوع إعداد و",
+      "heading_norm": "المو ضوع اعداد و",
+      "was_reversed": false,
+      "page_number": 4,
+      "level": 5,
+      "source": "table",
+      "raw_line": "المو ضوع إعداد و",
+      "flagged": false
+    },
+    {
+      "heading": "مقدمة الخطة",
+      "heading_raw": "مقدمة الخطة",
+      "heading_norm": "مقدمه الخطه",
+      "was_reversed": false,
+      "page_number": 8,
+      "level": 11,
+      "source": "table",
+      "raw_line": "مقدمة الخطة",
+      "flagged": false
+    },
+    {
+      "heading": ":اال",
+      "heading_raw": ":اال",
+      "heading_norm": ":اال",
+      "was_reversed": false,
+      "page_number": 10,
+      "level": 12,
+      "source": "table",
+      "raw_line": ":اال",
+      "flagged": true
+    },
+    {
+      "heading": "كلية – جامعة النيل جامعة النيل – ن",
+      "heading_raw": "كلية – جامعة النيل جامعة النيل – ن",
+      "heading_norm": "كليه – جامعه النيل جامعه النيل – ن",
+      "was_reversed": false,
+      "page_number": 11,
+      "level": 14,
+      "source": "table",
+      "raw_line": "كلية – جامعة النيل جامعة النيل – ن",
+      "flagged": false
+    },
+    {
+      "heading": "البيانات الوصفية للكلية",
+      "heading_raw": "البيانات الوصفية للكلية",
+      "heading_norm": "البيانات الوصفيه للكليه",
+      "was_reversed": false,
+      "page_number": 11,
+      "level": 7,
+      "source": "table",
+      "raw_line": "البيانات الوصفية للكلية",
+      "flagged": false
+    },
+    {
+      "heading": "الهيكل التنظيمي للكلية",
+      "heading_raw": "الهيكل التنظيمي للكلية",
+      "heading_norm": "الهيكل التنظيمي للكليه",
+      "was_reversed": false,
+      "page_number": 18,
+      "level": 7,
+      "source": "table",
+      "raw_line": "الهيكل التنظيمي للكلية",
+      "flagged": false
+    },
+    {
+      "heading": "الموارد المالية والبنية الأساسية",
+      "heading_raw": "الموارد المالية والبنية الأساسية",
+      "heading_norm": "الموارد الماليه والبنيه الاساسيه",
+      "was_reversed": false,
+      "page_number": 19,
+      "level": 5,
+      "source": "table",
+      "raw_line": "الموارد المالية والبنية الأساسية",
+      "flagged": false
+    },
+    {
+      "heading": "سمات التميز للكلية",
+      "heading_raw": "سمات التميز للكلية",
+      "heading_norm": "سمات التميز للكليه",
+      "was_reversed": false,
+      "page_number": 20,
+      "level": 8,
+      "source": "table",
+      "raw_line": "سمات التميز للكلية",
+      "flagged": false
+    },
+    {
+      "heading": "الباب الثاني:",
+      "heading_raw": "الباب الثاني:",
+      "heading_norm": "الباب الثاني:",
+      "was_reversed": false,
+      "page_number": 22,
+      "level": 11,
+      "source": "table",
+      "raw_line": "الباب الثاني:",
+      "flagged": false
+    },
+    {
+      "heading": "ا لإطار الفكري للخطة الإستراتيجية فلسفة الكلية في التخطيط الاستراتيجي",
+      "heading_raw": "ا لإطار الفكري للخطة الإستراتيجية فلسفة الكلية في التخطيط الاستراتيجي",
+      "heading_norm": "ا لاطار الفكري للخطه الاستراتيجيه فلسفه الكليه في التخطيط الاستراتيجي",
+      "was_reversed": false,
+      "page_number": 23,
+      "level": 3,
+      "source": "table",
+      "raw_line": "ا لإطار الفكري للخطة الإستراتيجية فلسفة الكلية في التخطيط الاستراتيجي",
+      "flagged": false
+    },
+    {
+      "heading": "فلسفة الكلية فى ضمان جودة العمل",
+      "heading_raw": "فلسفة الكلية فى ضمان جودة العمل",
+      "heading_norm": "فلسفه الكليه في ضمان جوده العمل",
+      "was_reversed": false,
+      "page_number": 23,
+      "level": 3,
+      "source": "table",
+      "raw_line": "فلسفة الكلية فى ضمان جودة العمل",
+      "flagged": false
+    },
+    {
+      "heading": "منهجية اعداد الخطة الاستراتيجية",
+      "heading_raw": "منهجية اعداد الخطة الاستراتيجية",
+      "heading_norm": "منهجيه اعداد الخطه الاستراتيجيه",
+      "was_reversed": false,
+      "page_number": 23,
+      "level": 4,
+      "source": "table",
+      "raw_line": "منهجية اعداد الخطة الاستراتيجية",
+      "flagged": false
+    },
+    {
+      "heading": "الاطار الفكرى لاعداد الخطة الاستراتيجية",
+      "heading_raw": "الاطار الفكرى لاعداد الخطة الاستراتيجية",
+      "heading_norm": "الاطار الفكري لاعداد الخطه الاستراتيجيه",
+      "was_reversed": false,
+      "page_number": 24,
+      "level": 2,
+      "source": "table",
+      "raw_line": "الاطار الفكرى لاعداد الخطة الاستراتيجية",
+      "flagged": false
+    },
+    {
+      "heading": "تحديد الاحتياجتا ت",
+      "heading_raw": "تحديد الاحتياجتا ت",
+      "heading_norm": "تحديد الاحتياجتا ت",
+      "was_reversed": false,
+      "page_number": 24,
+      "level": 9,
+      "source": "table",
+      "raw_line": "تحديد الاحتياجتا ت",
+      "flagged": false
+    },
+    {
+      "heading": "خطوات إعداد الخطة الإستراتيجية",
+      "heading_raw": "خطوات إعداد الخطة الإستراتيجية",
+      "heading_norm": "خطوات اعداد الخطه الاستراتيجيه",
+      "was_reversed": false,
+      "page_number": 25,
+      "level": 13,
+      "source": "table",
+      "raw_line": "خطوات إعداد الخطة الإستراتيجية",
+      "flagged": false
+    },
+    {
+      "heading": "تقييم المخاطر",
+      "heading_raw": "تقييم المخاطر",
+      "heading_norm": "تقييم المخاطر",
+      "was_reversed": false,
+      "page_number": 26,
+      "level": 10,
+      "source": "table",
+      "raw_line": "تقييم المخاطر",
+      "flagged": false
+    },
+    {
+      "heading": "ا:لباب الثالث:",
+      "heading_raw": "ا:لباب الثالث:",
+      "heading_norm": "ا:لباب الثالث:",
+      "was_reversed": false,
+      "page_number": 28,
+      "level": 12,
+      "source": "table",
+      "raw_line": "ا:لباب الثالث:",
+      "flagged": false
+    },
+    {
+      "heading": "التحليل البيئي تحليل ال رباعى",
+      "heading_raw": "التحليل البيئي تحليل ال رباعى",
+      "heading_norm": "التحليل البيئي تحليل ال رباعي",
+      "was_reversed": false,
+      "page_number": 29,
+      "level": 10,
+      "source": "table",
+      "raw_line": "التحليل البيئي تحليل ال رباعى",
+      "flagged": false
+    },
+    {
+      "heading": "ت حليل الفجوة",
+      "heading_raw": "ت حليل الفجوة",
+      "heading_norm": "ت حليل الفجوه",
+      "was_reversed": false,
+      "page_number": 36,
+      "level": 11,
+      "source": "table",
+      "raw_line": "ت حليل الفجوة",
+      "flagged": false
+    },
+    {
+      "heading": "الرؤية والرسالة والقيم الحاكمة والغايات الاستراتيجية منهجية اعداد الرؤية والرسالة",
+      "heading_raw": "الرؤية والرسالة والقيم الحاكمة والغايات الاستراتيجية منهجية اعداد الرؤية والرسالة",
+      "heading_norm": "الرؤيه والرساله والقيم الحاكمه والغايات الاستراتيجيه منهجيه اعداد الرؤيه والرساله",
+      "was_reversed": false,
+      "page_number": 49,
+      "level": 1,
+      "source": "table",
+      "raw_line": "الرؤية والرسالة والقيم الحاكمة والغايات الاستراتيجية منهجية اعداد الرؤية والرسالة",
+      "flagged": false
+    },
+    {
+      "heading": "رؤية ورسالة الكلية",
+      "heading_raw": "رؤية ورسالة الكلية",
+      "heading_norm": "رؤيه ورساله الكليه",
+      "was_reversed": false,
+      "page_number": 49,
+      "level": 8,
+      "source": "table",
+      "raw_line": "رؤية ورسالة الكلية",
+      "flagged": false
+    },
+    {
+      "heading": "الغايات والأهداف الإستراتيجية",
+      "heading_raw": "الغايات والأهداف الإستراتيجية",
+      "heading_norm": "الغايات والاهداف الاستراتيجيه",
+      "was_reversed": false,
+      "page_number": 53,
+      "level": 5,
+      "source": "table",
+      "raw_line": "الغايات والأهداف الإستراتيجية",
+      "flagged": false
+    },
+    {
+      "heading": "السياسات العامة للملكية",
+      "heading_raw": "السياسات العامة للملكية",
+      "heading_norm": "السياسات العامه للملكيه",
+      "was_reversed": false,
+      "page_number": 56,
+      "level": 6,
+      "source": "table",
+      "raw_line": "السياسات العامة للملكية",
+      "flagged": false
+    },
+    {
+      "heading": "الباب السادس: الخطة التنفيذية",
+      "heading_raw": "الباب السادس: الخطة التنفيذية",
+      "heading_norm": "الباب السادس: الخطه التنفيذيه",
+      "was_reversed": false,
+      "page_number": 58,
+      "level": 10,
+      "source": "table",
+      "raw_line": "الباب السادس: الخطة التنفيذية",
+      "flagged": false
+    }
+  ],
+  "skipped_lines": [
+    {
+      "raw_line": ":",
+      "norm_line": ":",
+      "reason": "punctuation-only heading"
+    },
+    {
+      "raw_line": ":",
+      "norm_line": ":",
+      "reason": "punctuation-only heading"
+    }
+  ],
+  "summary": {
+    "entries_found": 24,
+    "skipped_lines": 2,
+    "monotonic_ratio": 1.0,
+    "anomalies": 1,
+    "headings_reversed": 0,
+    "verdict": "SUFFICIENT"
+  }
+}

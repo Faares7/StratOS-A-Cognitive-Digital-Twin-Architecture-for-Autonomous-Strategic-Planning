@@ -134,31 +134,52 @@ function StatusChip({ status }: { status: 'auto' | 'edited' | 'verified' }) {
 
 // ─── RichText renderer ─────────────────────────────────────────────────────────
 
-function RT({ node, print }: { node: RichText; print?: boolean }): React.ReactElement | null {
+function RT({ node, print, compact }: { node: RichText; print?: boolean; compact?: boolean }): React.ReactElement | null {
   if (!node) return null
   if (node.type === 'doc') {
-    return <>{node.content?.map((c, i) => <RT key={i} node={c} print={print} />)}</>
+    return <>{node.content?.map((c, i) => <RT key={i} node={c} print={print} compact={compact} />)}</>
   }
   if (node.type === 'paragraph') {
     return (
-      <p className="mb-3 last:mb-0">
-        {node.content?.map((c, i) => <RT key={i} node={c} print={print} />)}
+      <p className={compact ? 'leading-snug' : 'mb-3 last:mb-0'}>
+        {node.content?.map((c, i) => <RT key={i} node={c} print={print} compact={compact} />)}
       </p>
     )
   }
   if (node.type === 'text') {
     let el: React.ReactNode = node.text ?? ''
     for (const mark of node.marks ?? []) {
-      if (mark.type === 'bold')   el = <strong key="b">{el}</strong>
-      if (mark.type === 'italic') el = <em key="i">{el}</em>
+      if (mark.type === 'bold')   el = <strong>{el}</strong>
+      if (mark.type === 'italic') el = <em>{el}</em>
       if (mark.type === 'link' && !print) {
         const href = (mark.attrs?.href as string) ?? '#'
-        el = <a key="a" href={href} target="_blank" rel="noreferrer" className="underline text-plan-accent">{el}</a>
+        el = <a href={href} target="_blank" rel="noreferrer" className="underline text-plan-accent">{el}</a>
       }
     }
     return <>{el}</>
   }
-  return <>{node.content?.map((c, i) => <RT key={i} node={c} print={print} />)}</>
+  if (node.type === 'bulletList') {
+    return (
+      <ul className="list-disc list-outside space-y-0.5 ps-4 text-plan-body">
+        {node.content?.map((c, i) => <RT key={i} node={c} print={print} compact />)}
+      </ul>
+    )
+  }
+  if (node.type === 'orderedList') {
+    return (
+      <ol className="list-decimal list-outside space-y-0.5 ps-4 text-plan-body">
+        {node.content?.map((c, i) => <RT key={i} node={c} print={print} compact />)}
+      </ol>
+    )
+  }
+  if (node.type === 'listItem') {
+    return (
+      <li className="leading-snug">
+        {node.content?.map((c, i) => <RT key={i} node={c} print={print} compact />)}
+      </li>
+    )
+  }
+  return <>{node.content?.map((c, i) => <RT key={i} node={c} print={print} compact={compact} />)}</>
 }
 
 // ─── BlockWrap — view/edit/print affordances ───────────────────────────────────
@@ -253,13 +274,13 @@ function TBlock({ block, mode, onSelectBlock }: { block: TableBlock; mode: 'view
         />
       ) : (
         <>
-          <div className="my-4 overflow-hidden rounded-lg border border-plan-accent/30">
-            <table className="w-full text-sm">
+          <div className="my-4 overflow-x-auto rounded-lg border border-plan-accent/30">
+            <table className="w-full text-xs" style={{ tableLayout: 'fixed', minWidth: '36rem', wordBreak: 'break-word' }}>
               {block.header && (
                 <thead style={{ background: 'var(--plan-navy)' }}>
                   <tr>
                     {block.header.map((h, i) => (
-                      <th key={i} className="px-6 py-4 text-start font-semibold text-white">{h}</th>
+                      <th key={i} className="px-3 py-2 text-start font-semibold text-white" style={{ whiteSpace: 'normal' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -268,7 +289,7 @@ function TBlock({ block, mode, onSelectBlock }: { block: TableBlock; mode: 'view
                 {block.rows.map((row, ri) => (
                   <tr key={ri} className="border-b border-plan-accent/20 last:border-b-0">
                     {row.map((cell, ci) => (
-                      <td key={ci} className="px-6 py-4 text-plan-body">
+                      <td key={ci} className="px-3 py-2 text-plan-body align-top" style={{ whiteSpace: 'normal', wordBreak: 'break-word' }}>
                         <RT node={cell} print={mode === 'print'} />
                       </td>
                     ))}
@@ -381,7 +402,7 @@ function RunningHeader({
         position: isPrint ? 'fixed' : 'sticky',
         top: 0,
         ...(isPrint ? { insetInlineStart: 0, insetInlineEnd: 0 } : {}),
-        height: '1.35in', zIndex: 50,
+        height: '0.65in', zIndex: 50,
         background: 'var(--plan-bg)',
         borderBottom: '1px solid rgba(184,146,47,0.35)',
         display: 'flex', alignItems: 'center',
@@ -430,7 +451,7 @@ function RunningHeader({
         <div style={{ position: 'absolute', left: padX, top: 0, height: '100%', display: 'flex', alignItems: 'center' }}>
           {meta.orgLogoUrl && (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={meta.orgLogoUrl} alt={meta.orgName} style={{ height: '6rem', width: 'auto', maxWidth: '22rem', objectFit: 'contain' }} />
+            <img src={meta.orgLogoUrl} alt={meta.orgName} style={{ height: '2.5rem', width: 'auto', maxWidth: '14rem', objectFit: 'contain' }} />
           )}
         </div>
 
@@ -438,7 +459,7 @@ function RunningHeader({
         <div style={{ position: 'absolute', right: padX, top: 0, height: '100%', display: 'flex', alignItems: 'center', gap: '1rem' }}>
           {meta.partnerLogoUrls.map((url, i) => (
             // eslint-disable-next-line @next/next/no-img-element
-            <img key={i} src={url} alt={`Partner ${i + 1}`} style={{ height: '6rem', width: 'auto', objectFit: 'contain' }} />
+            <img key={i} src={url} alt={`Partner ${i + 1}`} style={{ height: '2.5rem', width: 'auto', objectFit: 'contain' }} />
           ))}
         </div>
       </div>
@@ -483,7 +504,7 @@ function CoverPage({ meta, mode }: { meta: PlanDocument['meta']; mode: 'view' | 
   }
 
   return (
-    <div className="print-page no-page-number" style={{ minHeight: '100vh', background: '#f5f4ef', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden', paddingTop: mode === 'print' ? 0 : '1.5in' }}>
+    <div className="print-page no-page-number" style={{ minHeight: '100vh', background: '#f5f4ef', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden', paddingTop: mode === 'print' ? 0 : '0.65in' }}>
       <div style={{ position: 'absolute', top: 32, insetInlineStart: 48, fontSize: '5rem', color: 'var(--plan-accent)', opacity: 0.05, fontFamily: 'Georgia,serif' }}>◆</div>
       <div style={{ position: 'absolute', bottom: 64, insetInlineEnd: 48, fontSize: '5rem', color: 'var(--plan-accent)', opacity: 0.05, fontFamily: 'Georgia,serif' }}>◆</div>
       <div style={{ maxWidth: '36rem', textAlign: 'center', position: 'relative', zIndex: 10, display: 'flex', flexDirection: 'column', gap: '3rem', alignItems: 'center' }}>
@@ -590,6 +611,12 @@ function CoverPage({ meta, mode }: { meta: PlanDocument['meta']; mode: 'view' | 
           )}
         </div>
 
+        {meta.approvalDate && (
+          <p style={{ margin: 0, fontFamily: 'Georgia,serif', fontSize: '0.9rem', color: 'var(--plan-muted-fg)', letterSpacing: '0.04em' }}>
+            Approved: {meta.approvalDate}
+          </p>
+        )}
+
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', width: '100%', justifyContent: 'center' }}>
           <div style={{ height: '2px', width: '4rem', background: 'linear-gradient(to right,var(--plan-accent),transparent)' }} />
           <span style={{ fontSize: '1.5rem', color: 'var(--plan-accent)' }}>◆</span>
@@ -603,7 +630,12 @@ function CoverPage({ meta, mode }: { meta: PlanDocument['meta']; mode: 'view' | 
 
 // ─── TOC page ──────────────────────────────────────────────────────────────────
 
-function TocPage({ chapters, pageNumbers, lang, mode }: { chapters: Chapter[]; pageNumbers: Record<string, number>; lang: 'en' | 'ar'; mode: 'view' | 'edit' | 'print' }) {
+function TocPage({ chapters, pageNumbers, lang, mode }: {
+  chapters: Chapter[]
+  pageNumbers: Record<string, number>
+  lang: 'en' | 'ar'
+  mode: 'view' | 'edit' | 'print'
+}) {
   return (
     <div className="print-page no-page-number" style={{ minHeight: '100vh', background: '#f5f4ef', padding: mode === 'print' ? '0 1in 1in' : '1.5in 1in 1in', position: 'relative', overflow: 'hidden' }}>
       <div style={{ position: 'absolute', top: 0, insetInlineEnd: 0, width: '10rem', height: '10rem', borderInlineEnd: '2px solid var(--plan-accent)', borderTop: '2px solid var(--plan-accent)', opacity: 0.1 }} />
@@ -616,6 +648,8 @@ function TocPage({ chapters, pageNumbers, lang, mode }: { chapters: Chapter[]; p
           </div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          {/* Preface is intentionally excluded from the TOC (still rendered in the body & export) */}
+          {/* Numbered chapters */}
           {chapters.map(ch => (
             <div key={ch.id}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: '1rem' }}>
@@ -641,6 +675,92 @@ function TocPage({ chapters, pageNumbers, lang, mode }: { chapters: Chapter[]; p
     </div>
   )
 }
+
+// ─── Preface section renderer (no chapter number, dean card, alignment) ────────
+
+function PrefaceSection({
+  sub, mode, onSelectBlock,
+}: {
+  sub: Subchapter
+  mode: 'view' | 'edit' | 'print'
+  onSelectBlock?: (id: string) => void
+}) {
+  const { editorApi } = useContext(EditCtx)
+  const [align, setAlign] = React.useState<'left' | 'center' | 'right'>(
+    (sub.textAlign as 'left' | 'center' | 'right') ?? 'left'
+  )
+  const isDeanMsg = sub.canonicalKey === 'dean_message'
+
+  if (isDeanMsg) {
+    return (
+      <div id={sub.id} style={{ marginBottom: '3.5rem' }}>
+        {/* Alignment toggle — edit mode only */}
+        {mode === 'edit' && (
+          <div style={{ display: 'flex', gap: '0.35rem', marginBottom: '0.75rem', justifyContent: align === 'center' ? 'center' : align === 'right' ? 'flex-end' : 'flex-start' }}>
+            {(['left', 'center', 'right'] as const).map(a => (
+              <button
+                key={a}
+                onClick={() => setAlign(a)}
+                title={`Align ${a}`}
+                style={{
+                  padding: '0.2rem 0.55rem', fontSize: '0.65rem', borderRadius: 4,
+                  border: '1px solid var(--plan-accent)',
+                  background: align === a ? 'var(--plan-accent)' : 'transparent',
+                  color: align === a ? '#0b0e1a' : 'var(--plan-accent)',
+                  cursor: 'pointer', fontWeight: 700, letterSpacing: '0.03em',
+                }}
+              >
+                {a === 'left' ? '← L' : a === 'center' ? '↔ C' : 'R →'}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Letter heading */}
+        <div style={{ textAlign: align, marginBottom: '0.5rem' }}>
+          <h2 style={{ margin: 0, fontFamily: 'Georgia,serif', fontSize: '1.65rem', fontWeight: 700, color: 'var(--plan-heading)', display: 'inline-block' }}>
+            {sub.heading}
+          </h2>
+          <div style={{ height: '3px', width: '3.5rem', background: 'var(--plan-accent)', marginTop: '0.4rem', marginLeft: align === 'center' ? 'auto' : undefined, marginRight: align === 'center' ? 'auto' : undefined, marginInlineStart: align === 'right' ? 'auto' : undefined }} />
+        </div>
+
+        {/* Letter body — aligned, with max-width in center mode */}
+        <div style={{ textAlign: align, maxWidth: align === 'center' ? '44rem' : '100%', margin: align === 'center' ? '0 auto' : undefined }}>
+          <EditCtx.Provider value={{ editorApi, chapterId: 'preface', subId: sub.id }}>
+            <Blocks blocks={sub.blocks} mode={mode} onSelectBlock={onSelectBlock} />
+          </EditCtx.Provider>
+        </div>
+      </div>
+    )
+  }
+
+  // Prep team / Introduction: plain heading, no chapter number
+  return (
+    <EditCtx.Provider value={{ editorApi, chapterId: 'preface', subId: sub.id }}>
+      <div id={sub.id} style={{ marginBottom: '2.5rem' }}>
+        <div className="group/sub" style={{ marginBottom: '1.25rem', display: 'flex', alignItems: 'baseline', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <h3 style={{ margin: 0, fontFamily: 'Georgia,serif', fontSize: '1.4rem', fontWeight: 600, color: 'var(--plan-heading)' }}>
+            {sub.heading}
+          </h3>
+          {mode !== 'print' && sub.needsReview && (
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: '0.25rem',
+              background: 'rgba(245,158,11,0.12)', color: '#b45309',
+              border: '1px solid rgba(245,158,11,0.35)', borderRadius: '9999px',
+              padding: '0.15rem 0.6rem', fontSize: '0.7rem', fontWeight: 600,
+            }}>
+              ⚠ Needs review
+            </span>
+          )}
+          {mode !== 'print' && sub.blocks.length > 0 && <SourceBadge blocks={sub.blocks} />}
+        </div>
+        <div style={{ height: '1px', background: 'linear-gradient(to right,var(--plan-accent),transparent)', marginBottom: '1.5rem' }} />
+        <Blocks blocks={sub.blocks} mode={mode} onSelectBlock={onSelectBlock} />
+      </div>
+    </EditCtx.Provider>
+  )
+}
+
 
 // ─── Chapter cover ─────────────────────────────────────────────────────────────
 
@@ -705,6 +825,20 @@ function SubchapterSection({ chapter, sub, idx, mode, onSelectBlock }: {
               <span style={{ color: 'var(--plan-accent)', marginInlineEnd: '0.5rem' }}>{displayNum}</span>
               {sub.heading}
             </h3>
+            {mode !== 'print' && sub.needsReview && (
+              <span
+                title="This section contains content that may need updating before publication"
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: '0.25rem',
+                  background: 'rgba(245,158,11,0.12)', color: '#b45309',
+                  border: '1px solid rgba(245,158,11,0.35)', borderRadius: '9999px',
+                  padding: '0.15rem 0.6rem', fontSize: '0.7rem', fontWeight: 600,
+                  letterSpacing: '0.03em', flexShrink: 0,
+                }}
+              >
+                ⚠ Needs review
+              </span>
+            )}
             {mode !== 'print' && sub.blocks.length > 0 && (
               <SourceBadge blocks={sub.blocks} />
             )}
@@ -754,7 +888,7 @@ function ChapterContent({ chapter, mode, onSelectBlock, marginPreset }: {
   const padX = marginPreset === 'narrow' ? '0.5in' : '0.85in'
 
   return (
-    <div style={{ maxWidth: '8.5in', margin: '0 auto', padding: `${mode === 'print' ? 0 : '1.35in'} ${padX} 0.8in` }}>
+    <div style={{ maxWidth: '8.5in', margin: '0 auto', padding: `${mode === 'print' ? 0 : '0.65in'} ${padX} 0.8in` }}>
       {chapter.intro && chapter.intro.length > 0 && (
         <EditCtx.Provider value={{ editorApi, chapterId: chapter.id, subId: null }}>
           <div style={{ marginBottom: '2rem' }}>
@@ -772,6 +906,8 @@ function ChapterContent({ chapter, mode, onSelectBlock, marginPreset }: {
 // ─── Main Template ─────────────────────────────────────────────────────────────
 
 export function Template({ doc, mode = 'view', onSelectBlock, pageNumbers = {}, editorApi, marginPreset = 'normal' }: TemplateProps) {
+  const padX = marginPreset === 'narrow' ? '0.5in' : '0.85in'
+
   return (
     <EditCtx.Provider value={{ editorApi: editorApi ?? null, chapterId: '', subId: null }}>
       {doc.dir === 'rtl' && (
@@ -782,11 +918,14 @@ export function Template({ doc, mode = 'view', onSelectBlock, pageNumbers = {}, 
           -webkit-print-color-adjust: exact;
           print-color-adjust: exact;
         }
+        .plan-doc { font-size: 0.875rem; }
         @media print {
           @page { margin: 0; size: A4; }
           html, body { background: #f0ede5 !important; margin: 0 !important; overflow: visible !important; }
-          .plan-running-header { height: 1.35in !important; }
+          .plan-running-header { height: 0.65in !important; }
           .plan-doc a { color: inherit !important; text-decoration: none !important; }
+          .plan-doc table { font-size: 6.5pt !important; }
+          .plan-doc th, .plan-doc td { padding: 3px 5px !important; }
         }
       `}</style>
 
@@ -800,7 +939,25 @@ export function Template({ doc, mode = 'view', onSelectBlock, pageNumbers = {}, 
       >
         <RunningHeader meta={doc.meta} mode={mode} marginPreset={marginPreset} />
         <CoverPage meta={doc.meta} mode={mode} />
-        <TocPage chapters={doc.chapters} pageNumbers={pageNumbers} lang={doc.language} mode={mode} />
+        <TocPage
+          chapters={doc.chapters}
+          pageNumbers={pageNumbers}
+          lang={doc.language}
+          mode={mode}
+        />
+
+        {/* Preface sections — no chapter cover, no chapter number */}
+        {doc.preface && doc.preface.length > 0 && (
+          <div className="print-page" style={{ background: '#f5f4ef', minHeight: '100vh' }}>
+            <div style={{ maxWidth: '8.5in', margin: '0 auto', padding: `${mode === 'print' ? '0.6in' : '0.65in'} ${padX} 0.8in` }}>
+              {doc.preface.map(sub => (
+                <PrefaceSection key={sub.id} sub={sub} mode={mode} onSelectBlock={onSelectBlock} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Numbered chapters */}
         {doc.chapters.map(ch => (
           <div key={ch.id} id={ch.id}>
             <ChapterCover chapter={ch} rolledStatus={chapterRolledStatus(ch)} mode={mode} />

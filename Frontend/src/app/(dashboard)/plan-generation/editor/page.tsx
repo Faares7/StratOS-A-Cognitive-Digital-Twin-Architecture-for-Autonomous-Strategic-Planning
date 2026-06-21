@@ -22,6 +22,8 @@ import type {
   HumanProvenance, PlanMeta,
 } from "@/types/plan-document";
 import type { EditorApi } from "@/components/plan/EditorApi";
+import { blockToText, textToBlock } from "@/lib/blockSerializer";
+import type { ApplyDraftFn } from "@/components/plan/ChatPanel";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -75,13 +77,32 @@ function newChapter(number: number): Chapter {
 }
 
 function findBlockInfo(doc: PlanDocument, blockId: string): SelectedBlockInfo | null {
+  // Search preface sections
+  for (const sub of (doc.preface ?? [])) {
+    for (const b of sub.blocks) {
+      if (b.id === blockId) return {
+        blockId, chapterId: "preface", subId: sub.id,
+        heading: sub.heading, blockType: b.type,
+        rawContent: blockToText(b), provenance: b.provenance,
+      };
+    }
+  }
+  // Search numbered chapters
   for (const ch of doc.chapters) {
     for (const b of (ch.intro ?? [])) {
-      if (b.id === blockId) return { blockId, heading: ch.title, provenance: b.provenance };
+      if (b.id === blockId) return {
+        blockId, chapterId: ch.id, subId: null,
+        heading: ch.title, blockType: b.type,
+        rawContent: blockToText(b), provenance: b.provenance,
+      };
     }
     for (const sub of ch.sections) {
       for (const b of sub.blocks) {
-        if (b.id === blockId) return { blockId, heading: sub.heading, provenance: b.provenance };
+        if (b.id === blockId) return {
+          blockId, chapterId: ch.id, subId: sub.id,
+          heading: sub.heading, blockType: b.type,
+          rawContent: blockToText(b), provenance: b.provenance,
+        };
       }
     }
   }
@@ -96,26 +117,41 @@ function useEditorApi(
   return useMemo<EditorApi>(() => ({
 
     updateBlock(chapterId, subId, blockId, next) {
-      setDoc(doc => ({
-        ...doc,
-        chapters: doc.chapters.map(ch => {
-          if (ch.id !== chapterId) return ch;
-          if (subId === null) {
-            return { ...ch, intro: (ch.intro ?? []).map(b => b.id === blockId ? next : b) };
-          }
+      setDoc(doc => {
+        if (chapterId === "preface") {
           return {
-            ...ch,
-            sections: ch.sections.map(sub => {
+            ...doc,
+            preface: (doc.preface ?? []).map(sub => {
               if (sub.id !== subId) return sub;
               return {
                 ...sub,
-                status: sub.status === "auto" ? "edited" : sub.status,
+                status: (sub.status === "auto" ? "edited" : sub.status) as Subchapter["status"],
                 blocks: sub.blocks.map(b => b.id === blockId ? next : b),
               };
             }),
           };
-        }),
-      }));
+        }
+        return {
+          ...doc,
+          chapters: doc.chapters.map(ch => {
+            if (ch.id !== chapterId) return ch;
+            if (subId === null) {
+              return { ...ch, intro: (ch.intro ?? []).map(b => b.id === blockId ? next : b) };
+            }
+            return {
+              ...ch,
+              sections: ch.sections.map(sub => {
+                if (sub.id !== subId) return sub;
+                return {
+                  ...sub,
+                  status: sub.status === "auto" ? "edited" : sub.status,
+                  blocks: sub.blocks.map(b => b.id === blockId ? next : b),
+                };
+              }),
+            };
+          }),
+        };
+      });
     },
 
     addBlock(chapterId, subId, kind, afterBlockId) {
@@ -336,11 +372,29 @@ export default function PlanEditorPage() {
       const initStr = sessionStorage.getItem("plan-editor-init");
       if (initStr) {
         sessionStorage.removeItem("plan-editor-init");
-        const init = JSON.parse(initStr) as { kind: "blank" | "template" | "recent"; lang: "en" | "ar" };
+        const init = JSON.parse(initStr) as {
+          kind: "blank" | "template" | "recent" | "from-db";
+          lang: "en" | "ar";
+          planId?: string;
+        };
         const l = init.lang ?? "en";
         setLang(l);
         if (init.kind === "blank") {
           setDoc(makeBlankPlan(l));
+        } else if (init.kind === "from-db" && init.planId) {
+          // Load PlanDocument directly from the generated_plans table
+          fetch(`/api/plan-generation/${init.planId}`, { cache: "no-store" })
+            .then(r => r.ok ? r.json() : Promise.reject(`HTTP ${r.status}`))
+            .then(row => {
+              const loaded = row.document as PlanDocument;
+              if (loaded?.meta?.title && Array.isArray(loaded.chapters)) {
+                setDoc(loaded);
+                setLang(loaded.language ?? "en");
+              } else {
+                setDoc(makeSamplePlan(l));
+              }
+            })
+            .catch(() => setDoc(makeSamplePlan(l)));
         } else if (init.kind === "recent") {
           const saved = localStorage.getItem(STORAGE_KEY(l));
           if (saved) {
@@ -403,6 +457,16 @@ export default function PlanEditorPage() {
   }), [activeEditorState, setActiveEditor]);
 
   const editorApi = useEditorApi(setDoc);
+
+  const handleApplyDraft = useCallback<ApplyDraftFn>((
+    text, targetBlockId, targetChapterId, targetSubId, originalType
+  ) => {
+    const prov: HumanProvenance = humanProv();
+    const replacement = textToBlock(text, originalType, prov);
+    // Preserve the original block ID so updateBlock can find it
+    const patched = { ...replacement, id: targetBlockId };
+    editorApi.updateBlock(targetChapterId, targetSubId, targetBlockId, patched as Block);
+  }, [editorApi]);
 
   useEffect(() => {
     document.body.classList.add("plan-editor-open");
@@ -726,7 +790,7 @@ export default function PlanEditorPage() {
 
           {/* Right — Chat panel */}
           <div className="no-print shrink-0 h-full">
-            <ChatPanel ref={chatPanelRef} selectedBlock={selectedBlock} doc={doc} />
+            <ChatPanel ref={chatPanelRef} selectedBlock={selectedBlock} doc={doc} onApplyDraft={handleApplyDraft} />
           </div>
 
         </div>

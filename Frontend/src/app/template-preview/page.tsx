@@ -7,23 +7,9 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { Template } from "@/templates/plan/formal-gov/Template";
-import { makeSamplePlan, findBlockProvenance } from "@/templates/plan/sample-plan";
+import { makeSamplePlan } from "@/templates/plan/sample-plan";
 import type { Provenance } from "@/types/plan-document";
-
-function describe(p: Provenance): string {
-  switch (p.kind) {
-    case "agent_signal":
-      return `From the ${p.agent} agent via ${p.source}: "${p.finding}"${
-        p.confidence != null ? ` (confidence ${p.confidence}%)` : ""
-      }`;
-    case "reference_plan":
-      return `Based on ${p.planTitle} — "${p.sectionHeading}"${p.page ? `, p.${p.page}` : ""}`;
-    case "human":
-      return "Written by you";
-    case "mixed":
-      return `Multiple sources (${p.sources.length})`;
-  }
-}
+import { describeProvenance as describe, findBlockProvenance } from "@/lib/provenanceUtils";
 
 export default function TemplatePreviewPage() {
   const [lang, setLang] = useState<"en" | "ar">("en");

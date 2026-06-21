@@ -368,12 +368,21 @@ export default function PlanHomePage() {
                 onClick={() => router.push("/plan-generation/blank")}
               />
 
-              {/* Strategic Plan */}
+              {/* Strategic Plan — manual wizard */}
               <TemplateCard
                 label="Strategic Plan"
                 sublabel="AI-generated strategic document"
                 preview={<FormalGovPreview />}
                 onClick={() => openTemplate("template", "en")}
+              />
+
+              {/* Generate from agent data */}
+              <TemplateCard
+                label="Generate from Data"
+                sublabel="Assemble plan from agent outputs"
+                badge="NEW"
+                preview={<FormalGovPreview />}
+                onClick={() => router.push("/plan-generation/generate-from-data")}
               />
 
               {/* Executive Plan Report */}

@@ -3584,3 +3584,125 @@ def add_swot_candidate(req: SwotCandidateCreate):
             "manually added by user", "keep",
         ))
     return {"status": "created", "candidate_id": candidate_id}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  CHIEF EDITOR — Plan generation
+# ══════════════════════════════════════════════════════════════════════════════
+
+class _PlanGenerateRequest(BaseModel):
+    org_id:  str | None = None
+    use_llm: bool       = True
+
+
+def _run_plan_generation(job_id: str, org_id: str | None, use_llm: bool) -> None:
+    """Background task: build + store a PlanDocument via the Chief Editor."""
+    import traceback
+    try:
+        # Lazy import so the heavy langchain deps don't block API startup
+        from chief_editor.generator import generate_plan, _DEFAULT_ORG_ID  # noqa: PLC0415
+        actual_org_id = org_id or _DEFAULT_ORG_ID
+        plan_id = generate_plan(org_id=actual_org_id, use_llm=use_llm, job_id=job_id)
+        _finish(job_id, {"plan_id": plan_id})
+    except Exception as exc:
+        tb = traceback.format_exc()[-800:]
+        _fail(job_id, f"{type(exc).__name__}: {exc}\n{tb}")
+
+
+@app.post("/api/plan-generation/generate", status_code=202)
+def plan_generation_generate(
+    body: _PlanGenerateRequest,
+    background_tasks: BackgroundTasks,
+):
+    """
+    Admin-only gate is enforced by the Next.js proxy route.
+    FastAPI launches the Chief Editor pipeline in the background and returns job_id.
+    """
+    job_id = _new_job()
+    background_tasks.add_task(_run_plan_generation, job_id, body.org_id, body.use_llm)
+    return {"job_id": job_id}
+
+
+@app.get("/api/plan-generation/{plan_id}")
+def plan_generation_get(plan_id: str):
+    """Fetch a generated_plans row (document + metadata)."""
+    conn = _get_db_conn()
+    if not conn:
+        raise HTTPException(status_code=503, detail="Database unavailable")
+    try:
+        from chief_editor.storage import get_plan  # noqa: PLC0415
+        row = get_plan(conn, plan_id)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+    if not row:
+        raise HTTPException(status_code=404, detail="Plan not found")
+    return dict(row)
+
+
+# ── Plan editor chat ──────────────────────────────────────────────────────────
+
+class _PlanChatRequest(BaseModel):
+    message:        str
+    blockHeading:   str | None = None
+    blockContent:   str | None = None   # serialised text of the selected block
+    provenanceDesc: str | None = None
+    docTitle:       str | None = None
+    orgName:        str | None = None
+
+
+@app.post("/api/plan-chat")
+def plan_chat(body: _PlanChatRequest):
+    """
+    Real LLM reply for the plan editor chat panel.
+    Uses Vertex AI (gemini-2.5-flash).  Max 512 output tokens per call.
+
+    blockContent is the plain-text serialisation of whatever block the user
+    had selected, so the LLM can read and rewrite the actual content — not
+    just the heading.
+    """
+    try:
+        from chief_editor.llm import get_chat_model        # noqa: PLC0415
+        from langchain_core.messages import (              # noqa: PLC0415
+            HumanMessage, SystemMessage,
+        )
+
+        system = (
+            f"You are an AI writing assistant helping a strategic planning team at "
+            f"{body.orgName or 'a university'} edit and improve their strategic plan "
+            f"titled '{body.docTitle or 'Strategic Plan'}'. "
+            "Rules:\n"
+            "1. Never invent facts, names, numbers, or citations not present in the provided content.\n"
+            "2. When rewriting or drafting, output ONLY the replacement text — no preamble, "
+            "no 'Here is the revised version:', no markdown code fences.\n"
+            "3. Match the register of the source: formal, third-person academic English.\n"
+            "4. If asked to produce a list, output one item per line starting with '- '."
+        )
+
+        context_parts: list[str] = []
+        if body.blockHeading:
+            context_parts.append(f"Section: {body.blockHeading}")
+        if body.blockContent:
+            context_parts.append(f"Current content:\n{body.blockContent}")
+        if body.provenanceDesc:
+            context_parts.append(f"Source: {body.provenanceDesc}")
+
+        user_msg = body.message
+        if context_parts:
+            user_msg = "\n\n".join(context_parts) + "\n\n---\n\n" + user_msg
+
+        llm  = get_chat_model(model="gemini-2.5-flash", max_output_tokens=512)
+        resp = llm.invoke([SystemMessage(content=system), HumanMessage(content=user_msg)])
+        reply = (getattr(resp, "content", None) or "").strip()
+
+        if not reply:
+            raise ValueError("Empty response from LLM")
+
+        return {"reply": reply}
+
+    except Exception as exc:
+        import logging as _log
+        _log.getLogger(__name__).warning("[plan-chat] error: %s", exc)
+        raise HTTPException(
+            status_code=503,
+            detail="Chat service temporarily unavailable — try again in a moment.",
+        )

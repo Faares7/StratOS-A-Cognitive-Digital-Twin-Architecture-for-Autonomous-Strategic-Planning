@@ -22,7 +22,8 @@ uvicorn[standard]>=0.29.0
 langgraph>=0.2.0
 langchain-core>=0.3.0
 langchain-google-genai>=1.0.0      # Tech Agent + Workforce Agent (Gemini)
-langchain-google-vertexai>=3.0.0   # KPI Agent (Vertex AI / ADC auth)
+langchain-google-vertexai>=3.0.0   # KPI Agent + Chief Editor condensers (Vertex AI / ADC auth)
+langchain-anthropic>=1.4.0         # Chief Editor writer/reviser (Claude Opus 4.8 via Vertex)
 langchain-ollama>=0.1.0            # Sentiment Agent (local Ollama)
 langchain-huggingface>=0.0.3       # Sentiment Agent (HuggingFace embeddings)
 

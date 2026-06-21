@@ -1,0 +1,352 @@
+{
+  "insights": [
+    {
+      "id": "sm-01-tuition-costs-",
+      "category": "threat",
+      "title": "Tuition costs / Living expenses",
+      "description": "The increasing cost of living on the Nile may affect students' ability to afford tuition and living expenses",
+      "pillar_tag": "Pillar 2: Strategic Planning",
+      "impact_level": "low",
+      "confidence_score": 80,
+      "reference_count": 1,
+      "created_at": "2026-05-12T00:33:58.807149+00:00",
+      "data_source": "live",
+      "is_validated": false,
+      "ai_suggestion": true,
+      "evidence": {
+        "type": "raw_text",
+        "explanation": "The increasing cost of living on the Nile may affect students' ability to afford tuition and living expenses",
+        "data_points": {
+          "posts_analyzed": 1,
+          "source_group": "Nile University Friends in Egypt",
+          "avg_confidence": 0.8
+        }
+      }
+    },
+    {
+      "id": "sm-02-competitor-uni",
+      "category": "threat",
+      "title": "Competitor universities",
+      "description": "Students are looking for alternative universities with more reasonable prices, potentially threatening Nile University's enrollment",
+      "pillar_tag": "Pillar 2: Strategic Planning",
+      "impact_level": "high",
+      "confidence_score": 80,
+      "reference_count": 5,
+      "created_at": "2026-05-12T00:33:58.807149+00:00",
+      "data_source": "live",
+      "is_validated": false,
+      "ai_suggestion": true,
+      "evidence": {
+        "type": "raw_text",
+        "explanation": "Students are looking for alternative universities with more reasonable prices, potentially threatening Nile University's enrollment; Zewail University's system is harsh, implying a potential advantage for Nile University's ITCS AI faculty; October 6 University has distinct faculties that may attract students away from Nile University's ITCS AI faculty",
+        "data_points": {
+          "posts_analyzed": 5,
+          "source_group": "Nile University Friends in Egypt",
+          "avg_confidence": 0.8
+        }
+      }
+    },
+    {
+      "id": "sm-03-limited-langua",
+      "category": "threat",
+      "title": "Limited language support",
+      "description": "The university's lack of support for languages other than English may hinder its ability to attract international students or compete in a global market",
+      "pillar_tag": "Pillar 2: Strategic Planning",
+      "impact_level": "low",
+      "confidence_score": 80,
+      "reference_count": 1,
+      "created_at": "2026-05-12T00:33:58.807149+00:00",
+      "data_source": "live",
+      "is_validated": false,
+      "ai_suggestion": true,
+      "evidence": {
+        "type": "raw_text",
+        "explanation": "The university's lack of support for languages other than English may hinder its ability to attract international students or compete in a global market",
+        "data_points": {
+          "posts_analyzed": 1,
+          "source_group": "Nile University Friends in Egypt",
+          "avg_confidence": 0.8
+        }
+      }
+    },
+    {
+      "id": "sm-04-affordability-",
+      "category": "opportunity",
+      "title": "Affordability and discounts",
+      "description": "Nile University offers a 10% discount for cash payments, making it a more affordable option for students",
+      "pillar_tag": "Pillar 8: Community Engagement",
+      "impact_level": "low",
+      "confidence_score": 80,
+      "reference_count": 1,
+      "created_at": "2026-05-12T00:33:58.807149+00:00",
+      "data_source": "live",
+      "is_validated": false,
+      "ai_suggestion": true,
+      "evidence": {
+        "type": "raw_text",
+        "explanation": "Nile University offers a 10% discount for cash payments, making it a more affordable option for students",
+        "data_points": {
+          "posts_analyzed": 1,
+          "source_group": "Nile University Friends in Egypt",
+          "avg_confidence": 0.8
+        }
+      }
+    },
+    {
+      "id": "sm-05-competitor-uni",
+      "category": "opportunity",
+      "title": "Competitor university gap",
+      "description": "Cairo University's lack of a computer science and communications major may drive students to Nile University instead",
+      "pillar_tag": "Pillar 8: Community Engagement",
+      "impact_level": "low",
+      "confidence_score": 80,
+      "reference_count": 1,
+      "created_at": "2026-05-12T00:33:58.807149+00:00",
+      "data_source": "live",
+      "is_validated": false,
+      "ai_suggestion": true,
+      "evidence": {
+        "type": "raw_text",
+        "explanation": "Cairo University's lack of a computer science and communications major may drive students to Nile University instead",
+        "data_points": {
+          "posts_analyzed": 1,
+          "source_group": "Nile University Friends in Egypt",
+          "avg_confidence": 0.8
+        }
+      }
+    },
+    {
+      "id": "sm-06-tuition-costs",
+      "category": "threat",
+      "title": "Tuition costs",
+      "description": "Nile University's high tuition costs and new GPA requirement may deter potential students",
+      "pillar_tag": "Pillar 2: Strategic Planning",
+      "impact_level": "high",
+      "confidence_score": 80,
+      "reference_count": 6,
+      "created_at": "2026-05-12T00:33:58.807149+00:00",
+      "data_source": "live",
+      "is_validated": false,
+      "ai_suggestion": true,
+      "evidence": {
+        "type": "raw_text",
+        "explanation": "Nile University's high tuition costs and new GPA requirement may deter potential students; Students may face increased tuition costs if they don't maintain their GPA after the first year; High tuition fees at Nile University may lead students to consider transferring to another university due to financial constraints",
+        "data_points": {
+          "posts_analyzed": 6,
+          "source_group": "Nile University Friends in Egypt",
+          "avg_confidence": 0.8
+        }
+      }
+    },
+    {
+      "id": "sm-07-competition-fr",
+      "category": "threat",
+      "title": "Competition from public universities",
+      "description": "A student warns others that public universities offer more flexibility, convenience, and lower expenses, making Nile University a potentially regrettable choice",
+      "pillar_tag": "Pillar 2: Strategic Planning",
+      "impact_level": "low",
+      "confidence_score": 90,
+      "reference_count": 1,
+      "created_at": "2026-05-12T00:33:58.807149+00:00",
+      "data_source": "live",
+      "is_validated": false,
+      "ai_suggestion": true,
+      "evidence": {
+        "type": "raw_text",
+        "explanation": "A student warns others that public universities offer more flexibility, convenience, and lower expenses, making Nile University a potentially regrettable choice",
+        "data_points": {
+          "posts_analyzed": 1,
+          "source_group": "Nile University Friends in Egypt",
+          "avg_confidence": 0.9
+        }
+      }
+    },
+    {
+      "id": "sm-08-lack-of-indust",
+      "category": "threat",
+      "title": "Lack of industry recognition",
+      "description": "The university degree may not be recognized or valued by employers, and may not prepare students for the job market",
+      "pillar_tag": "Pillar 2: Strategic Planning",
+      "impact_level": "medium",
+      "confidence_score": 90,
+      "reference_count": 2,
+      "created_at": "2026-05-12T00:33:58.807149+00:00",
+      "data_source": "live",
+      "is_validated": false,
+      "ai_suggestion": true,
+      "evidence": {
+        "type": "raw_text",
+        "explanation": "The university degree may not be recognized or valued by employers, and may not prepare students for the job market; Computer science graduates may not be registered in the Engineers Syndicate, potentially affecting their professional status",
+        "data_points": {
+          "posts_analyzed": 2,
+          "source_group": "Nile University Friends in Egypt",
+          "avg_confidence": 0.85
+        }
+      }
+    },
+    {
+      "id": "sm-09-university-rep",
+      "category": "threat",
+      "title": "University reputation irrelevance",
+      "description": "The post suggests that attending a specific university, such as Nile University, does not provide a competitive advantage in the job market",
+      "pillar_tag": "Pillar 2: Strategic Planning",
+      "impact_level": "low",
+      "confidence_score": 80,
+      "reference_count": 1,
+      "created_at": "2026-05-12T00:33:58.807149+00:00",
+      "data_source": "live",
+      "is_validated": false,
+      "ai_suggestion": true,
+      "evidence": {
+        "type": "raw_text",
+        "explanation": "The post suggests that attending a specific university, such as Nile University, does not provide a competitive advantage in the job market",
+        "data_points": {
+          "posts_analyzed": 1,
+          "source_group": "Nile University Friends in Egypt",
+          "avg_confidence": 0.8
+        }
+      }
+    },
+    {
+      "id": "sm-10-economic-press",
+      "category": "threat",
+      "title": "Economic pressures",
+      "description": "Students are considering withdrawing expenses from MSA after being accepted to Nile University, indicating potential financial difficulties",
+      "pillar_tag": "Pillar 2: Strategic Planning",
+      "impact_level": "low",
+      "confidence_score": 80,
+      "reference_count": 1,
+      "created_at": "2026-05-12T00:33:58.807149+00:00",
+      "data_source": "live",
+      "is_validated": false,
+      "ai_suggestion": true,
+      "evidence": {
+        "type": "raw_text",
+        "explanation": "Students are considering withdrawing expenses from MSA after being accepted to Nile University, indicating potential financial difficulties",
+        "data_points": {
+          "posts_analyzed": 1,
+          "source_group": "Nile University Friends in Egypt",
+          "avg_confidence": 0.8
+        }
+      }
+    },
+    {
+      "id": "sm-11-negative-unive",
+      "category": "threat",
+      "title": "Negative university reputation",
+      "description": "Students from various universities, including possibly Nile University, are discouraging others from joining, indicating a negative perception of the university",
+      "pillar_tag": "Pillar 2: Strategic Planning",
+      "impact_level": "low",
+      "confidence_score": 80,
+      "reference_count": 1,
+      "created_at": "2026-05-12T00:33:58.807149+00:00",
+      "data_source": "live",
+      "is_validated": false,
+      "ai_suggestion": true,
+      "evidence": {
+        "type": "raw_text",
+        "explanation": "Students from various universities, including possibly Nile University, are discouraging others from joining, indicating a negative perception of the university",
+        "data_points": {
+          "posts_analyzed": 1,
+          "source_group": "Nile University Friends in Egypt",
+          "avg_confidence": 0.8
+        }
+      }
+    },
+    {
+      "id": "sm-12-student-dissat",
+      "category": "threat",
+      "title": "Student dissatisfaction",
+      "description": "A student expressed dissatisfaction with the university, implying that other universities are better",
+      "pillar_tag": "Pillar 2: Strategic Planning",
+      "impact_level": "low",
+      "confidence_score": 80,
+      "reference_count": 1,
+      "created_at": "2026-05-12T00:33:58.807149+00:00",
+      "data_source": "live",
+      "is_validated": false,
+      "ai_suggestion": true,
+      "evidence": {
+        "type": "raw_text",
+        "explanation": "A student expressed dissatisfaction with the university, implying that other universities are better",
+        "data_points": {
+          "posts_analyzed": 1,
+          "source_group": "Nile University Friends in Egypt",
+          "avg_confidence": 0.8
+        }
+      }
+    },
+    {
+      "id": "sm-13-course-workloa",
+      "category": "threat",
+      "title": "Course workload and passing requirements",
+      "description": "The faculty's course workload and passing requirements may be too stringent, potentially affecting student performance and retention.",
+      "pillar_tag": "Pillar 2: Strategic Planning",
+      "impact_level": "low",
+      "confidence_score": 80,
+      "reference_count": 1,
+      "created_at": "2026-05-12T00:33:58.807149+00:00",
+      "data_source": "live",
+      "is_validated": false,
+      "ai_suggestion": true,
+      "evidence": {
+        "type": "raw_text",
+        "explanation": "The faculty's course workload and passing requirements may be too stringent, potentially affecting student performance and retention.",
+        "data_points": {
+          "posts_analyzed": 1,
+          "source_group": "Nile University Friends in Egypt",
+          "avg_confidence": 0.8
+        }
+      }
+    },
+    {
+      "id": "sm-14-poor-treatment",
+      "category": "threat",
+      "title": "Poor treatment by faculty",
+      "description": "Students feel they are not being treated well by professors and assistants at Nile University's ITCS AI faculty",
+      "pillar_tag": "Pillar 2: Strategic Planning",
+      "impact_level": "low",
+      "confidence_score": 80,
+      "reference_count": 1,
+      "created_at": "2026-05-12T00:33:58.807149+00:00",
+      "data_source": "live",
+      "is_validated": false,
+      "ai_suggestion": true,
+      "evidence": {
+        "type": "raw_text",
+        "explanation": "Students feel they are not being treated well by professors and assistants at Nile University's ITCS AI faculty",
+        "data_points": {
+          "posts_analyzed": 1,
+          "source_group": "Nile University Friends in Egypt",
+          "avg_confidence": 0.8
+        }
+      }
+    },
+    {
+      "id": "sm-15-limited-progra",
+      "category": "threat",
+      "title": "Limited program offerings",
+      "description": "Nile University lacks nursing and health sciences programs, potentially attracting students to competitor universities",
+      "pillar_tag": "Pillar 2: Strategic Planning",
+      "impact_level": "low",
+      "confidence_score": 80,
+      "reference_count": 1,
+      "created_at": "2026-05-12T00:33:58.807149+00:00",
+      "data_source": "live",
+      "is_validated": false,
+      "ai_suggestion": true,
+      "evidence": {
+        "type": "raw_text",
+        "explanation": "Nile University lacks nursing and health sciences programs, potentially attracting students to competitor universities",
+        "data_points": {
+          "posts_analyzed": 1,
+          "source_group": "Nile University Friends in Egypt",
+          "avg_confidence": 0.8
+        }
+      }
+    }
+  ],
+  "opportunities": 2,
+  "threats": 23,
+  "total_posts_analyzed": 25
+}

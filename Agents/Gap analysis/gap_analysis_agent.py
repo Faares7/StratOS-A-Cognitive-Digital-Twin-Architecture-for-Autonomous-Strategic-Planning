@@ -24,7 +24,7 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 from core.llm import local_brain, JSON_GUARDRAIL  # noqa: E402
-from core.persistence import build_envelope, save_envelope  # noqa: E402
+from core.persistence import build_envelope, save_envelope, save_gap_analysis_items  # noqa: E402
 
 
 # ── Structured output schema ──────────────────────────────────────────────────
@@ -236,7 +236,9 @@ def compile_and_run(pillars: list[dict], feedback: dict | None = None) -> list[d
                 "suggestions":   suggestions,
             },
         )
-        save_envelope(envelope)
+        run_id = save_envelope(envelope)
+        if run_id:
+            save_gap_analysis_items(run_id, suggestions)
     except Exception as e:
         print(f"[gap_analysis] unified envelope save failed: {e}")
 

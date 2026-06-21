@@ -1,0 +1,466 @@
+{
+  "_meta": {
+    "language": "en",
+    "source": "itcs_profile.json (tabular/factual data) + NU_strategic_plan_2020-2024.pdf (narrative sections, translated from Arabic)",
+    "generated_for": "Chief Editor v1 carryover stand-in",
+    "note": "temporary; replace with DB extraction later"
+  },
+  "sections": [
+    {
+      "section_key": "cover",
+      "title_en": "Cover Page",
+      "chapter": 0,
+      "section_type": "static",
+      "needs_review": false,
+      "review_reason": "",
+      "provenance": { "source_plan": "ITCS Strategic Plan 2020-2024", "page_start": 1, "page_end": 1 },
+      "blocks": [
+        { "type": "paragraph", "text": "Strategic Plan" },
+        { "type": "paragraph", "text": "Faculty of Information Technology and Computer Science (ITCS)" },
+        { "type": "paragraph", "text": "Nile University" },
+        { "type": "paragraph", "text": "Plan Period: January 2020 – December 2024" },
+        { "type": "paragraph", "text": "Initial Approval: December 2019 | Updated Version Approved: December 2022" },
+        { "type": "paragraph", "text": "Prepared by the Quality Assurance Unit — Faculty of Information Technology and Computer Science, Nile University" }
+      ]
+    },
+    {
+      "section_key": "approval_date",
+      "title_en": "Plan Approval Date",
+      "chapter": 0,
+      "section_type": "static",
+      "needs_review": false,
+      "review_reason": "",
+      "provenance": { "source_plan": "ITCS Strategic Plan 2020-2024", "page_start": 2, "page_end": 2 },
+      "blocks": [
+        { "type": "paragraph", "text": "The original strategic plan was approved in December 2019." },
+        { "type": "paragraph", "text": "An updated version of the plan was approved in December 2022, incorporating revisions resulting from the external review visit and stakeholder feedback received during quality review sessions." }
+      ]
+    },
+    {
+      "section_key": "dean_message",
+      "title_en": "Dean's Message",
+      "chapter": 0,
+      "section_type": "static",
+      "needs_review": true,
+      "review_reason": "The dean may have changed since the plan was drafted; this message should be updated to reflect the current dean's voice and institutional priorities before publication.",
+      "provenance": { "source_plan": "ITCS Strategic Plan 2020-2024", "page_start": 3, "page_end": 3 },
+      "blocks": [
+        { "type": "paragraph", "text": "The strategic plan reflects the school's vision to attain world-class standing. Excellence must therefore be a fundamental characteristic woven into all educational and research activities, with due regard to local, regional, and international needs alike." },
+        { "type": "paragraph", "text": "The plan is committed to continuously attracting and retaining a distinguished academic and administrative team, and to sustaining the enrolment of outstanding students by providing laboratory facilities and learning environments that keep pace with the latest technological advances." },
+        { "type": "paragraph", "text": "The plan ultimately strives to forge a strong and purposeful link between learning and scientific research, directing both toward serving national industry and contributing to global knowledge at the highest levels of quality." }
+      ]
+    },
+    {
+      "section_key": "prep_team",
+      "title_en": "Strategic Plan Preparation and Update Team",
+      "chapter": 0,
+      "section_type": "static",
+      "needs_review": true,
+      "review_reason": "Team members and their roles may have changed since December 2022. The names and titles listed reflect the composition of the team at the time the updated plan was approved.",
+      "provenance": { "source_plan": "ITCS Strategic Plan 2020-2024", "page_start": 4, "page_end": 5 },
+      "blocks": [
+        { "type": "paragraph", "text": "The following team was formed to undertake the preparation and update of the ITCS Strategic Plan. The Strategic Planning Management Office was constituted to lead this task, comprising the Dean, the Strategic Planning Standards Officer, the Quality Assurance Unit Director, and two administrative members assigned to study university resources on the basis of the external review visit report." },
+        { "type": "paragraph", "text": "Team Leader: Prof. Ahmed Hazem El-Mahdy — Dean of the Faculty" },
+        {
+          "type": "list",
+          "ordered": false,
+          "items": [
+            "Dr. Sahar Ali Fawzi Fayq — Director, Strategic Planning Management Office (Executive Team)",
+            "Dr. Walid Al-Atabany — Director, Quality Assurance Unit (Executive Team)",
+            "Prof. Ahmed Hassan Yousef — Former Dean of the Faculty",
+            "Dr. Nashwa Abd El-Baky — Member, Strategic Planning Management Office",
+            "Prof. Bensent El-Kafrawi — Former Director, Quality Assurance Unit",
+            "Dr. Ahmed Mohamed El-Helw — Vice Dean for Postgraduate Studies",
+            "Dr. Hala Zayed — Vice Dean for Undergraduate Studies",
+            "Dr. Mustafa Al-Attar — Director, Artificial Intelligence Program",
+            "Dr. Walaa Moukhtar — Director, Computer Science Program",
+            "Dr. Mohamed Mysara — Director, Biomedical Informatics Program",
+            "Dr. Mohamed El-Hadeedy — Former Director, Biomedical Informatics Program",
+            "Dr. Sahar Selim — Faculty Member",
+            "Dr. Tamer Arafa — Faculty Member",
+            "Dr. Islam Tharwat — Faculty Member",
+            "Ms. Zeinab Al-Masry — Quality Unit Coordinator",
+            "Ms. Norhane Helmy — Computer Science Program Coordinator",
+            "Ms. Hala Ahmed — Postgraduate Programs Coordinator",
+            "Advisory Council Representative — Community Representative",
+            "Mohamed Yesri — Student Union Representative",
+            "Maryam Awaish — Assistant Lecturer",
+            "Mona Abd El-Sattar — Teaching Assistant",
+            "Mohamed Elshahed — Teaching Assistant",
+            "Mohamed Ibrahim — Teaching Assistant",
+            "Hager Elshawa — Teaching Assistant"
+          ]
+        },
+        { "type": "paragraph", "text": "Internal Review: Director, Quality Assurance Center, Nile University." },
+        { "type": "paragraph", "text": "External Review: Dr. Abeer Shelby (Volunteer Reviewer)." }
+      ]
+    },
+    {
+      "section_key": "introduction",
+      "title_en": "Plan Introduction",
+      "chapter": 0,
+      "section_type": "static",
+      "needs_review": false,
+      "review_reason": "",
+      "provenance": { "source_plan": "ITCS Strategic Plan 2020-2024", "page_start": 8, "page_end": 9 },
+      "blocks": [
+        { "type": "paragraph", "text": "Strategic planning is a methodology and work approach achieved through the application of scientific methods in both thought and practice. Accordingly, the dissemination of a strategic planning culture is regarded as one of the foundations of institutional advancement in civil and civic society. Strategic planning rests on analyzing the present reality and anticipating the future in order to achieve desired goals within a defined time horizon. The strategic plan encompasses the governing institutional values, the institution's vision and mission, and the strategic goals and objectives that the plan is designed to achieve within its specified period." },
+        { "type": "paragraph", "text": "The ITCS Strategic Plan for Nile University addresses several dimensions: introducing the governing values of the school as derived from the university's framework; articulating the school's vision and mission; and setting out the strategic goals formulated with the active participation of stakeholders, including faculty members, administrative staff, students, civil society organizations, and companies operating in the information technology and computer science sector. The plan also presents the intellectual and methodological framework for its preparation, encompassing needs identification and risk assessment, as well as a comprehensive analysis of the school's internal and external environment." },
+        { "type": "paragraph", "text": "A gap analysis was conducted to identify the distance between the current state of the school and its aspirations over a five-year period (January 2020 to December 2024). On this basis, strategic goals were defined to ensure advancement in educational and research activities, to keep pace with rapid developments in information technology and computer science, to enable proper follow-up of graduates, to provide services to local and international communities, and to achieve integration with the information technology industry sector." },
+        { "type": "paragraph", "text": "The school's mission was updated to reflect its educational and research role in a manner consistent with societal expectations of higher education institutions, and to contribute to achieving the university's mission in alignment with community needs and the state's sustainable development plans." },
+        { "type": "paragraph", "text": "The school aims to achieve educational quality and raise its efficiency by supporting students through the application of modern educational tools and by maintaining continuous engagement with students across various scientific, social, sporting, and technical activities." },
+        { "type": "paragraph", "text": "An executive plan was formulated to achieve the strategic goals through the implementation of executive activities, the identification of performance indicators, and the establishment of time frameworks for each activity with an adjustable estimated budget. Monitoring and evaluation mechanisms were also defined to assess annual progress in the executive plan and to measure performance levels." }
+      ]
+    },
+    {
+      "section_key": "college_overview",
+      "title_en": "Faculty Overview and Institutional Profile",
+      "chapter": 1,
+      "section_type": "static",
+      "needs_review": true,
+      "review_reason": "Enrollment figures are current only to academic year 2022–2023 and faculty headcount figures to 2022–2023; both should be updated with the latest available data before publication.",
+      "provenance": { "source_plan": "ITCS Strategic Plan 2020-2024", "page_start": 11, "page_end": 17 },
+      "blocks": [
+        { "type": "paragraph", "text": "The Faculty of Information Technology and Computer Science (ITCS) is one of the founding schools of Nile University, Egypt's first private research university, established in 2006. The school was formally renamed and restructured as ITCS in 2018 by Presidential Decree. It is located at Juhayna Square, 26th of July Corridor, El Sheikh Zayed, Giza, adjacent to the Smart Village technology hub. The school holds accreditation from the National Authority for Quality Assurance and Accreditation of Education (NAQAAE), initially granted in December 2019 and renewed in December 2022." },
+        { "type": "paragraph", "text": "The faculty offers undergraduate programs in Computer Science (launched 2016), Biomedical Informatics (launched 2018), Artificial Intelligence (launched 2020), and Cybersecurity (launched 2022). Postgraduate degrees include the MSc in Informatics, MSc in Information Security, MSc in Software Engineering, and the PhD in Informatics (ministerial approval 2020). Professional diplomas are offered in Big Data and Data Science, Biomedical Informatics, and Computational Drug Discovery and Development (C3D)." },
+        { "type": "paragraph", "text": "Undergraduate students are admitted from holders of the Egyptian Thanawiya Amma (Mathematics track or Biology track with Mathematics 2 supplementary course), as well as equivalent Arab and foreign certificates. Postgraduate applicants are required to hold a bachelor's degree in a relevant discipline, or to demonstrate prior professional experience in information technology or computer science fields." },
+        {
+          "type": "table",
+          "caption": "Undergraduate Student Enrollment by Program and Academic Year",
+          "header": ["Academic Year", "Computer Science", "Biomedical Informatics", "Artificial Intelligence"],
+          "rows": [
+            ["2018–2019", "124", "15", "—"],
+            ["2019–2020", "182", "91", "—"],
+            ["2020–2021", "348", "208", "77"],
+            ["2021–2022", "530", "229", "176"],
+            ["2022–2023", "820", "261", "223"]
+          ]
+        },
+        {
+          "type": "table",
+          "caption": "Postgraduate Student Enrollment by Program and Academic Year",
+          "header": ["Academic Year", "MSc Informatics", "MSc Information Security", "MSc Software Engineering", "PhD Informatics"],
+          "rows": [
+            ["2018–2019", "169", "127", "75", "—"],
+            ["2019–2020", "206", "122", "82", "—"],
+            ["2020–2021", "93", "24", "15", "4"],
+            ["2021–2022", "110", "24", "16", "5"],
+            ["2022–2023", "164", "39", "24", "7"]
+          ]
+        },
+        {
+          "type": "table",
+          "caption": "Academic Staff Headcount by Year",
+          "header": ["Academic Year", "Faculty Members", "Teaching Assistants", "Total"],
+          "rows": [
+            ["2019–2020", "6", "11", "17"],
+            ["2020–2021", "11", "21", "32"],
+            ["2021–2022", "20", "40", "60"],
+            ["2022–2023", "18", "43", "61"]
+          ]
+        }
+      ]
+    },
+    {
+      "section_key": "org_structure",
+      "title_en": "Organizational Structure",
+      "chapter": 1,
+      "section_type": "static",
+      "needs_review": true,
+      "review_reason": "Personnel and role assignments are subject to change; the names and titles listed reflect positions as recorded in the 2020–2024 plan and the 2026 faculty directory and should be verified before publication.",
+      "provenance": { "source_plan": "ITCS Strategic Plan 2020-2024", "page_start": 18, "page_end": 18 },
+      "blocks": [
+        { "type": "paragraph", "text": "The Faculty of Information Technology and Computer Science (ITCS) operates under a governance structure that includes the Office of the Dean, associate deans for undergraduate and postgraduate programs, program directors for each academic track, a Quality Assurance Unit, a Strategic Planning Management Office, the Centre for Informatics (CIS), and supporting administrative and technical staff." },
+        {
+          "type": "list",
+          "ordered": false,
+          "items": [
+            "Dean / Acting Vice President for Research: Prof. Ahmed Hazem El-Mahdy",
+            "Associate Dean for Undergraduate Programs and Director, Centre for Informatics (CIS): Prof. Walid Al-Atabany",
+            "Associate Dean for Postgraduate Programs: Prof. Mohamed El-Helw",
+            "Quality Unit Director: Dr. Ghada Khoriba (Associate Professor)",
+            "Postgraduate Program Director (MSc and PhD): Prof. Sahar Ali Fawzi",
+            "Computer Science Program Director: Dr. Walaa Medhat",
+            "Artificial Intelligence Program Director: Dr. Mustafa Elattar",
+            "Biomedical Informatics Program Director and Biomedical Informatics Diploma Director: Dr. Mohamed Mysara",
+            "Big Data and Data Science Professional Diploma Director: Dr. Tamer Arafa"
+          ]
+        },
+        { "type": "paragraph", "text": "The school's advisory framework includes a Faculty Advisory Council with representation from the civil community and industry. Academic governance is further supported by periodic faculty council meetings at which strategic and academic decisions — including formal updates to the school's vision, mission, and governing values — are approved." }
+      ]
+    },
+    {
+      "section_key": "financial_resources",
+      "title_en": "Financial Resources and Physical Infrastructure",
+      "chapter": 1,
+      "section_type": "static",
+      "needs_review": true,
+      "review_reason": "Physical infrastructure details are drawn from the 2020–2024 plan and may not reflect additions or improvements made after the plan was compiled.",
+      "provenance": { "source_plan": "ITCS Strategic Plan 2020-2024", "page_start": 19, "page_end": 19 },
+      "blocks": [
+        { "type": "paragraph", "text": "The faculty's physical infrastructure is distributed across two university buildings (UB1 and UB2) on the Nile University campus. The school benefits from purpose-built facilities that support both instructional delivery and applied research." },
+        {
+          "type": "table",
+          "caption": "Teaching and Learning Facilities",
+          "header": ["Facility", "Quantity / Specification"],
+          "rows": [
+            ["Lecture halls and classrooms", "36 rooms (42–96 m² for classrooms; 80–240 m² for halls)"],
+            ["General computer laboratories", "5 labs; 150 seats total; Intel Core i5, 4–8 GB RAM"],
+            ["Library", "730 m²; capacity 150 students; air-conditioned; electronic catalogue; digital research collections"],
+            ["Medical clinic", "Available on campus"],
+            ["Sports facilities", "Gymnasium, football pitch, volleyball court, ping pong tables"]
+          ]
+        },
+        { "type": "paragraph", "text": "Specialized research and teaching laboratories include:" },
+        {
+          "type": "list",
+          "ordered": false,
+          "items": [
+            "Big Data and High-Performance Computing Laboratory",
+            "Augmented Reality / Virtual Reality Laboratory",
+            "Physics Laboratory",
+            "Electronics Laboratory",
+            "Logic Design Circuits Laboratory"
+          ]
+        },
+        { "type": "paragraph", "text": "The school maintains a dedicated digital library providing electronic cataloguing and curated digital collections for researchers. Full Wi-Fi coverage is deployed across the campus to support continuous connectivity for students, faculty, and administrative staff." },
+        { "type": "paragraph", "text": "Financial resources for the school's activities are drawn from university operating budgets, externally funded research projects, and grants obtained through the Centre for Informatics (CIS). Research funding is actively sought through national competitive programs and international partnerships, with the aim of diversifying revenue streams to reduce dependence on any single source." }
+      ]
+    },
+    {
+      "section_key": "excellence_features",
+      "title_en": "Distinguishing Features of Excellence",
+      "chapter": 1,
+      "section_type": "static",
+      "needs_review": false,
+      "review_reason": "",
+      "provenance": { "source_plan": "ITCS Strategic Plan 2020-2024", "page_start": 20, "page_end": 21 },
+      "blocks": [
+        { "type": "paragraph", "text": "The Faculty of Information Technology and Computer Science is distinguished by a range of institutional and academic features that set it apart within the Egyptian higher education landscape:" },
+        {
+          "type": "list",
+          "ordered": false,
+          "items": [
+            "Part of Egypt's first private research university (Nile University, founded 2006), with a strong and sustained focus on scientific research",
+            "Diverse faculty specializations spanning multiple information technology and computer science programs",
+            "The majority of faculty members hold doctoral degrees from leading universities in the United States, Europe, and Japan",
+            "A dedicated Centre for Informatics (CIS) hosting specialized research groups in bioinformatics, medical imaging, text mining, pervasive computing, medical informatics, and information security",
+            "Internally and externally funded research projects",
+            "Support for student innovation and entrepreneurship through the Nile Pioneers (Rowad El-Nil) incubation centre",
+            "Strategically located adjacent to the Smart Village technology hub, facilitating direct industry linkage",
+            "State-supported programs in Artificial Intelligence and Biomedical Informatics, aligned with Egypt Vision 2030",
+            "Distinguished postgraduate programs attracting students from a wide range of academic disciplines",
+            "Full deployment and active use of the Moodle Learning Management System by faculty and teaching assistants",
+            "Alumni holding distinguished positions in leading global technology companies",
+            "Annual academic conference held jointly with the Faculty of Engineering",
+            "Responsibility for delivering computing foundation courses across all Nile University programs",
+            "Continuous student engagement through the Power-Campus digital platform",
+            "Full Wi-Fi coverage and a specialized digital library for researchers",
+            "An active, regularly updated faculty website",
+            "An efficient administrative team dedicated to serving students and faculty",
+            "Adequate facilities supporting academic, athletic, and cultural activities",
+            "A periodic self-assessment system enabling faculty to maintain educational and research quality",
+            "An annual career fair and structured support for student field training",
+            "A merit-based scholarship system for outstanding students"
+          ]
+        }
+      ]
+    },
+    {
+      "section_key": "planning_philosophy",
+      "title_en": "Planning Philosophy and Methodological Framework",
+      "chapter": 2,
+      "section_type": "static",
+      "needs_review": false,
+      "review_reason": "",
+      "provenance": { "source_plan": "ITCS Strategic Plan 2020-2024", "page_start": 23, "page_end": 25 },
+      "blocks": [
+        { "type": "paragraph", "text": "The school adopts a philosophy in which strategic planning constitutes the governing framework for all academic, administrative, and financial activities, with the ultimate objective of achieving its mission and goals in the near future." },
+        { "type": "paragraph", "text": "The school believes that adherence to a strategic planning policy ensures clarity of the institution's future vision, the determination of strategic goals and objectives, and the capacity to advance the school's mission by addressing existing problems and challenges on the basis of organized, comprehensive analysis and research." },
+        { "type": "paragraph", "text": "Strategic planning equips the school with policies and mechanisms to anticipate a better future, both internally and externally; to exploit opportunities to meet needs according to defined priorities; to make optimal use of available resources; to achieve integration and coordination across different administrative units; and to exercise effective control over implementation challenges. The school adopts a strategy of growth and expansion in its specialized programs, accompanied by continuous improvement in educational quality, in order to reach levels at which students achieve excellence and competitiveness at local, regional, and international levels." },
+        { "type": "paragraph", "text": "Philosophy of Quality Assurance:" },
+        {
+          "type": "list",
+          "ordered": false,
+          "items": [
+            "Spreading a quality culture and supporting accreditation and excellence in performance across all school activities",
+            "Spreading the culture of strategic planning as an entry point for institutional development and a tool for risk management, through workshops and brainstorming sessions",
+            "Strengthening the connection between the school and the surrounding community through continuing education services that raise the competence of professionals in the information technology sector"
+          ]
+        },
+        { "type": "paragraph", "text": "Methodology for Preparing the Strategic Plan:" },
+        { "type": "paragraph", "text": "The team responsible for formulating the school's strategic plan adopted a logical framework for organizing the planning activities: beginning with the identification of the school's general values and principles, then diagnosing the school's current reality to identify its strengths, analyzing its problems and weaknesses, exploring available opportunities for advancement, and identifying threats that surround and constrain its efficiency and effectiveness. Through this process, the gap between the current reality and the school's aspirations is determined, enabling the formulation of strategic goals that express the school's ambitions for developing its educational programs and research plans. Executive plans are then developed that contain the projects and procedural steps required to place the strategic goals into action, reducing and ultimately closing the identified gap." },
+        { "type": "paragraph", "text": "Intellectual Framework for the Strategic Plan:" },
+        { "type": "paragraph", "text": "The ITCS Strategic Plan is anchored in the following foundational requirements:" },
+        {
+          "type": "list",
+          "ordered": true,
+          "items": [
+            "Alignment with the state's strategic direction in higher education, including the requirements of the Supreme Council for Private Universities, the achievement of Egypt Vision 2030 and sustainable development goals, and the qualification of students to compete scientifically, culturally, and socially in local and global labor markets",
+            "Compliance with the twelve criteria established by the National Authority for Quality Assurance and Accreditation of Education (NAQAAE) to measure the success of higher education institutions, ensuring all quality requirements are addressed in the school's activities and services",
+            "Full alignment of the faculty's strategic plan with the overarching strategic plan of Nile University",
+            "Systematic identification of all relevant stakeholders — including university management, the Advisory Council, faculty and teaching assistants, administrative and technical staff, students, alumni, parents, industry representatives, and the broader community — and incorporation of their needs into the plan"
+          ]
+        },
+        { "type": "paragraph", "text": "Needs Identification — The following needs were identified as essential for ensuring plan success:" },
+        {
+          "type": "list",
+          "ordered": true,
+          "items": [
+            "Applying the quality philosophy and providing its tools and implementation mechanisms in all aspects of school administration",
+            "Establishing an integrated strategy that pursues continuous improvement to meet the requirements of all stakeholders, with a commitment to quality, transparency, accountability, and a culture of excellence",
+            "Developing governance values related to teamwork, creativity, excellence, and transparency, and increasing job satisfaction among all those working at the school",
+            "Raising the competence of faculty members and teaching assistants and developing their skills through continuous professional training",
+            "Ensuring the existence of a dedicated administrative unit responsible for quality assurance and performance evaluation — embodied in the school's Quality Assurance Unit",
+            "Establishing regular systems for collecting and exchanging information and data to conduct studies, analyze results, and assess the effectiveness and efficiency of implemented plans"
+          ]
+        }
+      ]
+    },
+    {
+      "section_key": "risk_assessment",
+      "title_en": "Risk Assessment",
+      "chapter": 2,
+      "section_type": "static",
+      "needs_review": false,
+      "review_reason": "",
+      "provenance": { "source_plan": "ITCS Strategic Plan 2020-2024", "page_start": 26, "page_end": 27 },
+      "blocks": [
+        { "type": "paragraph", "text": "The successful development and implementation of the strategic plan requires the identification and assessment of risks surrounding plan execution, the formulation of a clear approach to dealing with obstacles, and the provision of the material and technical support necessary for implementation. The following table sets out the principal risks identified and the measures proposed to address each." },
+        {
+          "type": "table",
+          "caption": "Identified Risks and Mitigation Strategies",
+          "header": ["Risk", "Mitigation Strategies"],
+          "rows": [
+            [
+              "Growth in the number of IT/CS faculties in Egypt, including branches of foreign universities, intensifying the competitive environment",
+              "Strengthen industry linkage to ensure the competitive positioning of graduates locally and internationally; pursue dual-degree and international cooperation arrangements"
+            ],
+            [
+              "Insufficient resources for plan implementation due to adverse conditions surrounding higher education",
+              "Prepare realistic estimates of anticipated resources; diversify funding sources; continuously monitor financial needs and develop alternative resource streams"
+            ],
+            [
+              "Continuous change in labor market requirements affecting curricula and program content",
+              "Continuously develop curricula and programs in response to labor market intelligence; expand practical training and internship opportunities for students"
+            ],
+            [
+              "Mismatch between the physical spaces allocated to the faculty and its rate of growth in student numbers",
+              "Pursue construction of new university buildings (already under development); optimize utilization of existing spaces in the interim"
+            ],
+            [
+              "External regulatory decisions that negatively affect student admission standards or pre-university education quality",
+              "Attract distinguished students from a broad range of pre-university certificate types; recruit international students; implement remedial programs targeting language proficiency and core science subjects"
+            ],
+            [
+              "Resistance to change and insufficient awareness of the importance of commitment to the strategic plan among established staff",
+              "Pursue phased professional development for long-serving staff; organize training workshops to spread the quality culture; expand participation in quality activities; introduce material and moral incentive systems; incorporate quality performance as a formal evaluation criterion; redistribute responsibilities and workload more broadly across faculty and teaching assistants"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "section_key": "vision_mission",
+      "title_en": "Vision, Mission, and Governing Values",
+      "chapter": 4,
+      "section_type": "static",
+      "needs_review": false,
+      "review_reason": "",
+      "provenance": { "source_plan": "ITCS Strategic Plan 2020-2024", "page_start": 49, "page_end": 53 },
+      "blocks": [
+        { "type": "paragraph", "text": "University Vision: To be a world-class inspirational institution with significant public benefit." },
+        { "type": "paragraph", "text": "University Mission: To contribute to the development of cultural values and to technology-driven economics in Egypt and the region through the pursuit of education, research, innovation, and entrepreneurship at the highest levels of excellence, by: offering leading-edge undergraduate and graduate programs and executive education; carrying out interdisciplinary research; collaborating with distinguished international universities and research institutions; and committing to a strong linkage with business and industry while dedicating to serving the community." },
+        { "type": "paragraph", "text": "Faculty Vision: To be a world-class school recognized as one of the top information technology and computer science schools in the region for research, education, and entrepreneurship." },
+        { "type": "paragraph", "text": "Faculty Mission: The school is committed to preparing scientifically and professionally distinguished graduates in many information technology and computer science disciplines. It strives to strongly contribute to society's prosperity; achieve sustainable development goals; and support the information technology industry through multidisciplinary scientific research, innovation, and enhancement of entrepreneurial capabilities." },
+        { "type": "paragraph", "text": "The school's vision and mission were formally approved by the Faculty Council on 2 November 2022 (Council Resolution No. 9). The formulation process involved environmental analysis, brainstorming sessions with faculty members and community stakeholders, structured consultation surveys, and final review during quality assurance sessions." },
+        { "type": "paragraph", "text": "Governing Values:" },
+        {
+          "type": "list",
+          "ordered": false,
+          "items": [
+            "Excellence and Innovation: The capacity to harness all available potential to achieve ambitious goals, leaving no room for failure.",
+            "Ethics and Integrity: Unwavering commitment to practical and scientific integrity standards in all activities.",
+            "Diversity and Complementarity: Accepting differences and actively seeking complementary perspectives.",
+            "Respect for Privacy: Full acceptance of individuality and the right to personal autonomy."
+          ]
+        }
+      ]
+    },
+    {
+      "section_key": "guiding_policies",
+      "title_en": "Guiding Policies",
+      "chapter": 5,
+      "section_type": "static",
+      "needs_review": false,
+      "review_reason": "",
+      "provenance": { "source_plan": "ITCS Strategic Plan 2020-2024", "page_start": 56, "page_end": 57 },
+      "blocks": [
+        { "type": "paragraph", "text": "Guiding policies represent the general lines upon which the school relies when implementing its strategy, ensuring the appropriateness of all activities it undertakes to achieve its goals, mission, and vision." },
+        { "type": "paragraph", "text": "General Policies:" },
+        {
+          "type": "list",
+          "ordered": false,
+          "items": [
+            "Apply quality assurance methods across all aspects of school activity, including education, scientific research, innovation, and community service",
+            "Pursue continuous development of all school activities",
+            "Interact promptly and effectively with scientific and technological developments",
+            "Maintain flexibility and transparency in practices, policies, decisions, and plans",
+            "Uphold values of justice and equality for all students, faculty members, teaching assistants, and all employees",
+            "Satisfy beneficiaries in ways that do not compromise the quality of the school's outputs or contradict its scientific and technological principles",
+            "Adopt incentive and compensation policies that link rewards directly to effort exerted and quality of performance"
+          ]
+        },
+        { "type": "paragraph", "text": "Teaching, Learning, and Evaluation Policies:" },
+        {
+          "type": "list",
+          "ordered": false,
+          "items": [
+            "Apply recognized academic reference standards",
+            "Center the educational process on students as the primary beneficiaries and most important output of the school",
+            "Establish fair and unified standards for student evaluation",
+            "Instil values of self-directed, continuous, and project-based learning",
+            "Achieve benchmark ratios for students relative to faculty members and to available learning resources",
+            "Conduct continuous evaluation and review of programs and courses through: analysis of labor market needs, review of program reports, analysis of graduate surveys, and periodic collection of student feedback",
+            "Expand the use of technology in managing the educational process, including learning management systems and electronic examinations",
+            "Provide dedicated attention to gifted students and to students with learning challenges",
+            "Keep pace with developments in specializations, programs, and academic courses",
+            "Support student activities and academic advising",
+            "Maintain continuous evaluation of educational effectiveness and efficiency",
+            "Ensure integration with school policies in scientific research, community service, and environmental development"
+          ]
+        },
+        { "type": "paragraph", "text": "Scientific Research and Graduate Studies Policies:" },
+        {
+          "type": "list",
+          "ordered": false,
+          "items": [
+            "Achieve integration and coordination between the school's research efforts and the national plan for scientific research",
+            "Link the school's research agenda to local and international development plans and community needs",
+            "Encourage student participation in scientific research from the earliest years of study",
+            "Develop the financial resources necessary to fund and sustain scientific research",
+            "Promote applied research that addresses national and local community problems",
+            "Support internal, external, and collaborative research projects",
+            "Encourage publication in high-impact refereed international scientific journals",
+            "Raise and develop the capabilities of the school's researchers",
+            "Foster scientific partnerships across different and adjacent academic disciplines"
+          ]
+        },
+        { "type": "paragraph", "text": "Community Participation and Environmental Development Policies:" },
+        {
+          "type": "list",
+          "ordered": false,
+          "items": [
+            "Achieve integration between the school's community service efforts and the national framework for community development and environmental protection",
+            "Contribute to resolving environmental challenges and developing environmental awareness",
+            "Maintain active communication with institutions, beneficiaries, graduates, and companies working in the information technology sector",
+            "Provide specialized scientific and training support to community and environmental stakeholders",
+            "Engage students alongside faculty members in community service activities",
+            "Adopt and support environmental and community service activities, expanding the school's reach in this domain",
+            "Ensure integration with the school's policies in the fields of education and scientific research"
+          ]
+        }
+      ]
+    }
+  ]
+}

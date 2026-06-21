@@ -21,6 +21,7 @@ import type {
   PlanDocument, Block, Chapter, Subchapter, HumanProvenance, PlanMeta,
 } from "@/types/plan-document";
 import type { EditorApi } from "@/components/plan/EditorApi";
+import { blockToText } from "@/lib/blockSerializer";
 
 // ── Storage ────────────────────────────────────────────────────────────────────
 
@@ -84,13 +85,30 @@ function newChapter(number: number): Chapter {
 }
 
 function findBlockInfo(doc: PlanDocument, blockId: string): SelectedBlockInfo | null {
+  for (const sub of (doc.preface ?? [])) {
+    for (const b of sub.blocks) {
+      if (b.id === blockId) return {
+        blockId, chapterId: "preface", subId: sub.id,
+        heading: sub.heading, blockType: b.type,
+        rawContent: blockToText(b), provenance: b.provenance,
+      };
+    }
+  }
   for (const ch of doc.chapters) {
     for (const b of (ch.intro ?? [])) {
-      if (b.id === blockId) return { blockId, heading: ch.title, provenance: b.provenance };
+      if (b.id === blockId) return {
+        blockId, chapterId: ch.id, subId: null,
+        heading: ch.title, blockType: b.type,
+        rawContent: blockToText(b), provenance: b.provenance,
+      };
     }
     for (const sub of ch.sections) {
       for (const b of sub.blocks) {
-        if (b.id === blockId) return { blockId, heading: sub.heading, provenance: b.provenance };
+        if (b.id === blockId) return {
+          blockId, chapterId: ch.id, subId: sub.id,
+          heading: sub.heading, blockType: b.type,
+          rawContent: blockToText(b), provenance: b.provenance,
+        };
       }
     }
   }

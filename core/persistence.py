@@ -157,3 +157,65 @@ def save_envelope(envelope: dict) -> str | None:
     finally:
         if conn is not None:
             conn.close()
+
+
+_GAP_PILLAR_IDS: dict[str, int] = {
+    "Program Mission and Management":           1,
+    "Program Design":                           2,
+    "Teaching, Learning and Assessment":        3,
+    "Students and Graduate Outcomes":           4,
+    "Faculty and Teaching Assistants":          5,
+    "Resources and Learning Facilities":        6,
+    "Quality Assurance and Program Evaluation": 7,
+}
+
+
+def save_gap_analysis_items(run_id: str, suggestions: list[dict]) -> int:
+    """
+    Persist the raw output of the gap analysis agent to gap_analysis_items.
+
+    Args:
+        run_id:      The run_id returned by save_envelope for this run.
+        suggestions: The list returned by compile_and_run():
+                     [{pillar, suggestions: [{gap_identified, suggestion, reasoning}]}]
+
+    Returns:
+        Number of rows inserted, or 0 if DB is not configured / insert fails.
+    """
+    if not DB_CONNECTION_STRING:
+        return 0
+    conn = None
+    total = 0
+    try:
+        conn = _get_conn()
+        with conn:
+            with conn.cursor() as cur:
+                for block in suggestions:
+                    pillar_name = block.get("pillar", "")
+                    pillar_id   = _GAP_PILLAR_IDS.get(pillar_name)
+                    for pos, item in enumerate(block.get("suggestions", [])):
+                        cur.execute(
+                            """
+                            INSERT INTO gap_analysis_items
+                                (run_id, pillar_name, pillar_id,
+                                 gap_identified, suggestion, reasoning, position)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s)
+                            """,
+                            (
+                                run_id,
+                                pillar_name,
+                                pillar_id,
+                                item.get("gap_identified", ""),
+                                item.get("suggestion", ""),
+                                item.get("reasoning", ""),
+                                pos,
+                            ),
+                        )
+                        total += 1
+        print(f"[persistence] Saved {total} gap_analysis_items for run {run_id}.")
+    except Exception as e:
+        print(f"[persistence] save_gap_analysis_items failed: {e}")
+    finally:
+        if conn is not None:
+            conn.close()
+    return total
