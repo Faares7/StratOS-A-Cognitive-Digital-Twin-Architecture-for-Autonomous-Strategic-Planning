@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Sparkles, Filter, Loader2, Play } from "lucide-react";
+import { Sparkles, Filter, Loader2, Play, ClipboardCheck } from "lucide-react";
 import { Header } from "@/components/layout/Header";
 import { useSWOT } from "@/hooks/useSWOT";
 import { NAQAAE_PILLARS } from "@/types";
@@ -24,6 +24,7 @@ import {
 import { cn } from "@/lib/utils";
 import { TrendingUp, TrendingDown, Target, AlertTriangle, FileText, Eye } from "lucide-react";
 import { useRole } from "@/hooks/useRole";
+import { useRouter } from "next/navigation";
 
 // ── Category config ────────────────────────────────────────────────────────────
 const CAT = {
@@ -209,6 +210,7 @@ export default function SWOTPage() {
     runAgent, agentRunning, agentError,
   } = useSWOT();
   const { canMutate } = useRole();
+  const router = useRouter();
 
   const totalInsights = Object.values(byCategory).flat().length;
 
@@ -217,6 +219,23 @@ export default function SWOTPage() {
       <Header title="SWOT Analysis" subtitle="AI-powered strategic insights validated against research data" />
 
       <div className="flex flex-col gap-5 p-6">
+        {/* Strategic SWOT review CTA */}
+        <div className="flex items-center justify-between rounded-xl border border-cyan-500/20 bg-cyan-500/5 px-4 py-3">
+          <div>
+            <p className="text-sm font-semibold text-slate-100">Strategic SWOT for the Plan</p>
+            <p className="text-xs text-slate-500">
+              Review the consolidated, de-duplicated SWOT the rest of the architecture will use — keep, cut, edit, or add items.
+            </p>
+          </div>
+          <button
+            onClick={() => router.push("/swot/review")}
+            disabled={!canMutate}
+            className="flex items-center gap-2 rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-3 py-2 text-xs font-medium text-cyan-300 transition-all hover:bg-cyan-500/20 disabled:opacity-40"
+          >
+            <ClipboardCheck className="h-4 w-4" /> Review Strategic SWOT
+          </button>
+        </div>
+
         {/* Live Agent Controls */}
         <div className="flex flex-wrap items-center gap-2">
           {(
@@ -333,6 +352,7 @@ export default function SWOTPage() {
           </div>
         )}
       </div>
+
     </div>
   );
 }

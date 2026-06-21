@@ -2981,3 +2981,198 @@ def patch_objective(objective_id: str, req: ObjectivePatch):
         )
         _clear_feasibility(cur, "strategic_objectives", "objective_id", objective_id)
     return {"status": "updated", "objective_id": objective_id}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  SWOT Consolidation — review gate (rank-all; human is the sole keep/cut filter)
+# ══════════════════════════════════════════════════════════════════════════════
+# The pipeline ranks every canonical SWOT item by salience and writes them to
+# swot_consolidation_candidates (migration 003). These endpoints let the SWOT UI
+# trigger a run, load the latest run, and edit / delete / add / keep-cut the items
+# that the REST of the architecture (gap analysis, goals) will consume.
+
+_SWOT_CAND_COLS = """
+    candidate_id::text, consolidation_run_id::text, branch, type,
+    pillar_id, pillar_name, title, description,
+    salience_score, lifecycle_state, selected, reviewer_decision,
+    selection_reason, factor_breakdown, member_item_ids, created_at,
+    approved, approved_at
+"""
+
+
+def _task_swot_consolidation(job_id: str) -> None:
+    try:
+        from Agents.swot_consolidation import consolidate
+        out = consolidate(persist=True)
+        _finish(job_id, {
+            "consolidation_run_id": out.get("consolidation_run_id"),
+            "candidate_count": len(out.get("candidates", [])),
+        })
+    except Exception as exc:
+        _fail(job_id, str(exc))
+
+
+@app.post("/api/swot-consolidation/run", status_code=202)
+def run_swot_consolidation(background_tasks: BackgroundTasks):
+    """Queue a consolidation run (normalize → dedup → lifecycle → score → rank → persist)."""
+    job_id = _new_job()
+    background_tasks.add_task(_task_swot_consolidation, job_id)
+    return {"job_id": job_id}
+
+
+@app.get("/api/swot-consolidation/latest")
+def latest_swot_consolidation(include_carried: bool = False):
+    """The most recent consolidation run's candidates, ranked. carried_forward items
+    (previous-plan concerns with no current signal) are excluded unless include_carried."""
+    conn = _get_db_conn()
+    if not conn:
+        return {"consolidation_run_id": None, "candidates": []}
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute("""
+            SELECT consolidation_run_id::text AS rid
+            FROM swot_consolidation_candidates
+            ORDER BY created_at DESC LIMIT 1
+        """)
+        row = cur.fetchone()
+        if not row:
+            return {"consolidation_run_id": None, "candidates": []}
+        rid = row["rid"]
+        carried_clause = "" if include_carried else "AND lifecycle_state <> 'carried_forward'"
+        cur.execute(f"""
+            SELECT {_SWOT_CAND_COLS}
+            FROM swot_consolidation_candidates
+            WHERE consolidation_run_id = %s {carried_clause}
+            ORDER BY branch, type, salience_score DESC
+        """, (rid,))
+        candidates = cur.fetchall()
+        approved_at = next(
+            (c["approved_at"] for c in candidates if c.get("approved")),
+            None,
+        )
+        return {"consolidation_run_id": rid, "candidates": candidates, "approved_at": approved_at}
+
+
+class SwotApprove(BaseModel):
+    consolidation_run_id: str
+
+
+@app.post("/api/swot-consolidation/approve")
+def approve_swot_consolidation(req: SwotApprove):
+    """Mark a consolidation run's reviewed SWOT as approved for downstream use.
+    Clears any previously approved run first so only one run is ever active."""
+    conn = _get_db_conn()
+    if not conn:
+        raise HTTPException(status_code=503, detail="Database not configured.")
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        # Clear the previous approval (only one run is approved at a time).
+        cur.execute(
+            "UPDATE swot_consolidation_candidates SET approved = false, approved_at = NULL WHERE approved = true"
+        )
+        # Stamp every candidate in this run as approved.
+        cur.execute(
+            """
+            UPDATE swot_consolidation_candidates
+            SET approved = true, approved_at = NOW()
+            WHERE consolidation_run_id = %s
+            RETURNING approved_at
+            """,
+            (req.consolidation_run_id,),
+        )
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="No candidates found for this run.")
+        approved_at = row["approved_at"]
+    return {"status": "approved", "consolidation_run_id": req.consolidation_run_id,
+            "approved_at": approved_at}
+
+
+class SwotCandidatePatch(BaseModel):
+    title: str | None = None
+    description: str | None = None
+    type: str | None = None
+    pillar_id: int | None = None
+    pillar_name: str | None = None
+    reviewer_decision: str | None = None   # 'keep' | 'cut' | 'pending'
+    selected: bool | None = None
+
+
+@app.patch("/api/swot-consolidation/candidates/{candidate_id}")
+def patch_swot_candidate(candidate_id: str, req: SwotCandidatePatch):
+    """Edit a candidate and/or set the human keep/cut decision."""
+    conn = _get_db_conn()
+    if not conn:
+        raise HTTPException(status_code=503, detail="Database not configured.")
+    sets, vals = [], []
+    for col in ("title", "description", "type", "pillar_id", "pillar_name",
+                "reviewer_decision", "selected"):
+        v = getattr(req, col)
+        if v is not None:
+            sets.append(f"{col} = %s")
+            vals.append(v)
+    if not sets:
+        raise HTTPException(status_code=400, detail="Nothing to update.")
+    if req.reviewer_decision is not None:
+        sets.append("reviewed_at = NOW()")
+        if req.selected is None:   # mirror selected from the decision unless set explicitly
+            sets.append("selected = %s")
+            vals.append(req.reviewer_decision == "keep")
+    vals.append(candidate_id)
+    with conn.cursor() as cur:
+        cur.execute(
+            f"UPDATE swot_consolidation_candidates SET {', '.join(sets)} WHERE candidate_id = %s",
+            vals,
+        )
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Candidate not found.")
+    return {"status": "updated", "candidate_id": candidate_id}
+
+
+@app.delete("/api/swot-consolidation/candidates/{candidate_id}")
+def delete_swot_candidate(candidate_id: str):
+    conn = _get_db_conn()
+    if not conn:
+        raise HTTPException(status_code=503, detail="Database not configured.")
+    with conn.cursor() as cur:
+        cur.execute(
+            "DELETE FROM swot_consolidation_candidates WHERE candidate_id = %s",
+            (candidate_id,),
+        )
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Candidate not found.")
+    return {"status": "deleted", "candidate_id": candidate_id}
+
+
+class SwotCandidateCreate(BaseModel):
+    consolidation_run_id: str
+    branch: str             # 'internal' | 'external'
+    type: str               # strength | weakness | opportunity | threat
+    description: str
+    title: str | None = None
+    pillar_id: int | None = None
+    pillar_name: str | None = None
+
+
+@app.post("/api/swot-consolidation/candidates", status_code=201)
+def add_swot_candidate(req: SwotCandidateCreate):
+    """Add a manual SWOT item to a consolidation run (kept by default)."""
+    conn = _get_db_conn()
+    if not conn:
+        raise HTTPException(status_code=503, detail="Database not configured.")
+    candidate_id = str(uuid.uuid4())
+    with conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO swot_consolidation_candidates
+                (candidate_id, consolidation_run_id, branch, type, pillar_id, pillar_name,
+                 title, description, member_item_ids, contributing_agents, snapshot_count,
+                 factor_breakdown, salience_score, lifecycle_state, selected,
+                 selection_reason, reviewer_decision, reviewed_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s::uuid[], %s, %s,
+                    %s, %s, %s, %s, %s, %s, NOW())
+        """, (
+            candidate_id, req.consolidation_run_id, req.branch, req.type,
+            req.pillar_id, req.pillar_name, req.title, req.description,
+            [], [], None,
+            psycopg2.extras.Json({"manual": True}), 0.0, "new", True,
+            "manually added by user", "keep",
+        ))
+    return {"status": "created", "candidate_id": candidate_id}
