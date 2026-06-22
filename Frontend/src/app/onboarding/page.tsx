@@ -97,12 +97,12 @@ function Stepper({ current }: { current: number }) {
           <div className="flex flex-col items-center gap-1.5">
             <div
               className={cn(
-                "flex h-8 w-8 items-center justify-center rounded-full border-2 text-xs font-bold transition-all duration-300",
+                "flex h-8 w-8 items-center justify-center rounded-full border-2 text-xs font-bold transition-all duration-200",
                 i < current
-                  ? "border-cyan-500 bg-cyan-500 text-[#080a14]"
+                  ? "border-[#b8922f] bg-[#b8922f] text-[#070911]"
                   : i === current
-                  ? "border-cyan-500 bg-cyan-500/10 text-cyan-400"
-                  : "border-white/10 bg-transparent text-slate-600"
+                  ? "border-[#b8922f] bg-[#b8922f]/10 text-[#b8922f]"
+                  : "border-white/[0.09] bg-transparent text-[#2b2f45]"
               )}
             >
               {i < current ? (
@@ -115,10 +115,10 @@ function Stepper({ current }: { current: number }) {
               className={cn(
                 "text-[10px] font-medium",
                 i === current
-                  ? "text-cyan-400"
+                  ? "text-[#b8922f]"
                   : i < current
-                  ? "text-slate-400"
-                  : "text-slate-600"
+                  ? "text-[#8d97b8]"
+                  : "text-[#2b2f45]"
               )}
             >
               {label}
@@ -128,7 +128,7 @@ function Stepper({ current }: { current: number }) {
             <div
               className={cn(
                 "mx-3 mt-3.5 h-[2px] flex-1 rounded-full transition-all duration-500",
-                i < current ? "bg-cyan-500" : "bg-white/10"
+                i < current ? "bg-[#b8922f]" : "bg-white/[0.08]"
               )}
             />
           )}
@@ -162,10 +162,10 @@ function TextInput({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className={cn(
-          "w-full rounded-lg border border-white/10 bg-[#080a14]",
-          "px-3.5 py-2.5 text-sm text-slate-200 placeholder-slate-600",
-          "outline-none transition-colors",
-          "focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20"
+          "w-full rounded-lg border border-white/[0.09] bg-[#070911]",
+          "px-3.5 py-2.5 text-[13px] text-[#e0e4ef] placeholder-[#2b2f45]",
+          "outline-none transition-colors duration-150",
+          "focus:border-[#b8922f]/40 focus:ring-1 focus:ring-[#b8922f]/15"
         )}
       />
     </div>
@@ -197,9 +197,9 @@ function Step1Context({
         <TextInput label="Faculty / Department" placeholder="e.g., ITCS" value={faculty} onChange={setFaculty} />
         <TextInput label="Strategic Period" placeholder="e.g., 2024-2027" value={period} onChange={setPeriod} />
       </div>
-      <div className="rounded-lg border border-white/5 bg-white/[0.02] px-4 py-3">
-        <p className="text-xs text-slate-500">
-          <span className="font-semibold text-slate-400">University:</span>{" "}
+      <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] px-4 py-3">
+        <p className="text-[12px] text-[#505672]">
+          <span className="font-semibold text-[#8d97b8]">University:</span>{" "}
           Nile University — pre-configured for this single-tenant workspace.
         </p>
       </div>
@@ -290,8 +290,8 @@ function Step2Integrations({
         )}
       </div>
 
-      <div className="rounded-xl border border-cyan-500/10 bg-cyan-500/[0.04] p-5">
-        <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-cyan-500">
+      <div className="rounded-xl border border-[#b8922f]/12 bg-[#b8922f]/[0.04] p-5">
+        <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-[#b8922f]/70">
           Meetings Agent Prerequisite
         </p>
         <h3 className="mb-2 text-base font-semibold text-slate-100">Automate Your Meeting Notes</h3>
@@ -303,7 +303,7 @@ function Step2Integrations({
 
         {/* Step 1 — Install */}
         <div className="flex gap-3.5">
-          <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 border-cyan-500/40 text-[11px] font-bold text-cyan-400">
+          <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 border-[#b8922f]/35 text-[11px] font-bold text-[#b8922f]">
             1
           </div>
           <div className="flex-1 pb-5">
@@ -315,7 +315,7 @@ function Step2Integrations({
               href="https://chromewebstore.google.com/detail/fathom-ai-note-taker-for/nhocmlminaplaendbabmoemehbpgdemn"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 rounded-lg border border-cyan-500/25 bg-cyan-500/10 px-4 py-2 text-sm font-medium text-cyan-400 transition hover:border-cyan-500/40 hover:bg-cyan-500/15"
+              className="inline-flex items-center gap-2 rounded-lg border border-[#b8922f]/25 bg-[#b8922f]/10 px-4 py-2 text-[13px] font-medium text-[#b8922f] transition-colors duration-150 hover:border-[#b8922f]/40 hover:bg-[#b8922f]/15"
             >
               <Chrome className="h-4 w-4" />
               Add Fathom to Chrome
@@ -326,7 +326,7 @@ function Step2Integrations({
 
         {/* Step 2 — Sign in with the same account */}
         <div className="flex gap-3.5">
-          <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 border-cyan-500/40 text-[11px] font-bold text-cyan-400">
+          <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 border-[#b8922f]/35 text-[11px] font-bold text-[#b8922f]">
             2
           </div>
           <div className="flex-1">
@@ -352,7 +352,7 @@ function Step2Integrations({
         {/* Confirmation */}
         <button
           onClick={() => setFathomReady(!fathomReady)}
-          className="mt-4 flex w-full items-start gap-3 rounded-lg border border-white/5 bg-[#080a14] px-3.5 py-3 text-left transition hover:border-white/10"
+          className="mt-4 flex w-full items-start gap-3 rounded-lg border border-white/[0.07] bg-[#070911] px-3.5 py-3 text-left transition-colors duration-150 hover:border-white/[0.10]"
         >
           <div
             className={cn(
@@ -396,7 +396,7 @@ function ChecklistGroup({
   }
 
   return (
-    <div className="rounded-xl border border-white/5 bg-[#080a14] p-4">
+    <div className="rounded-xl border border-white/[0.07] bg-[#070911] p-4">
       <p className="mb-0.5 text-sm font-semibold text-slate-100">{title}</p>
       <p className="mb-3 text-xs text-slate-500">{description}</p>
       <div className="space-y-1.5">
@@ -411,10 +411,10 @@ function ChecklistGroup({
               <div
                 className={cn(
                   "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border-2 transition-all",
-                  checked ? "border-cyan-500 bg-cyan-500" : "border-white/20 bg-transparent"
+                  checked ? "border-[#b8922f] bg-[#b8922f]" : "border-white/[0.12] bg-transparent"
                 )}
               >
-                {checked && <Check className="h-2.5 w-2.5 text-[#080a14]" strokeWidth={3} />}
+                {checked && <Check className="h-2.5 w-2.5 text-[#070911]" strokeWidth={3} />}
               </div>
               <span className={cn("text-xs leading-relaxed", checked ? "text-slate-200" : "text-slate-500")}>
                 {opt}
@@ -431,15 +431,15 @@ function ChecklistGroup({
           onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); }}
           placeholder="Add new option..."
           className={cn(
-            "flex-1 rounded-lg border border-white/10 bg-[#0d1117] px-3 py-1.5",
-            "text-xs text-slate-300 placeholder-slate-600 outline-none",
-            "focus:border-cyan-500/40 focus:ring-1 focus:ring-cyan-500/15"
+            "flex-1 rounded-lg border border-white/[0.09] bg-[#0f1422] px-3 py-1.5",
+            "text-[12px] text-[#8d97b8] placeholder-[#2b2f45] outline-none",
+            "focus:border-[#b8922f]/35 focus:ring-1 focus:ring-[#b8922f]/12"
           )}
         />
         <button
           onClick={handleAdd}
           disabled={!inputVal.trim()}
-          className="flex items-center gap-1 rounded-lg border border-white/10 px-3 py-1.5 text-xs text-slate-400 transition hover:border-cyan-500/30 hover:text-cyan-400 disabled:pointer-events-none disabled:opacity-30"
+          className="flex items-center gap-1 rounded-lg border border-white/[0.09] px-3 py-1.5 text-[11px] text-[#505672] transition-colors duration-150 hover:border-[#b8922f]/30 hover:text-[#b8922f] disabled:pointer-events-none disabled:opacity-30"
         >
           <Plus className="h-3.5 w-3.5" />
           Add
@@ -672,7 +672,7 @@ export default function OnboardingPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center bg-[#080a14] px-6 py-14">
+    <div className="flex min-h-screen flex-col items-center bg-[#070911] px-6 py-14">
       <div className="mb-10">
         <StratOSMark />
       </div>
@@ -685,7 +685,7 @@ export default function OnboardingPage() {
           <Stepper current={step} />
         </div>
 
-        <div key={step} className="animate-fade-in rounded-2xl border border-white/5 bg-[#0d1117] p-7">
+        <div key={step} className="animate-fade-in rounded-xl border border-white/[0.07] bg-[#0f1422] p-7">
           {step === 0 && (
             <Step1Context faculty={faculty} setFaculty={setFaculty} period={period} setPeriod={setPeriod} />
           )}
@@ -721,7 +721,7 @@ export default function OnboardingPage() {
           <button
             onClick={() => setStep((s) => Math.max(0, s - 1))}
             disabled={step === 0 || submitting}
-            className="flex items-center gap-1.5 rounded-xl border border-white/10 px-4 py-2.5 text-sm font-medium text-slate-400 transition hover:border-white/20 hover:text-slate-200 disabled:pointer-events-none disabled:opacity-30"
+            className="flex items-center gap-1.5 rounded-xl border border-white/[0.09] px-4 py-2.5 text-[13px] font-medium text-[#505672] transition-colors duration-150 hover:border-white/[0.14] hover:text-[#8d97b8] disabled:pointer-events-none disabled:opacity-30"
           >
             <ArrowLeft className="h-4 w-4" />
             Back
@@ -743,8 +743,8 @@ export default function OnboardingPage() {
                 className={cn(
                   "flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold transition-all",
                   canProceed
-                    ? "bg-cyan-500 text-[#080a14] shadow-glow-sm hover:bg-cyan-400"
-                    : "cursor-not-allowed bg-white/5 text-slate-600"
+                    ? "bg-[#b8922f] text-[#070911] hover:bg-[#c9a84c]"
+                    : "cursor-not-allowed bg-white/[0.04] text-[#2b2f45]"
                 )}
               >
                 Next
@@ -754,7 +754,7 @@ export default function OnboardingPage() {
               <button
                 onClick={handleComplete}
                 disabled={submitting}
-                className="flex items-center gap-2 rounded-xl bg-cyan-500 px-5 py-2.5 text-sm font-semibold text-[#080a14] shadow-glow-sm transition hover:bg-cyan-400 disabled:opacity-60"
+                className="flex items-center gap-2 rounded-xl bg-[#b8922f] px-5 py-2.5 text-sm font-semibold text-[#070911] transition-colors duration-150 hover:bg-[#c9a84c] disabled:opacity-60"
               >
                 {submitting ? (
                   <>

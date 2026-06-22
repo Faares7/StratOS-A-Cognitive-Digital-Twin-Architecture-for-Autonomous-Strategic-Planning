@@ -4,25 +4,26 @@
 
 @layer base {
   :root {
-    --background: 228 47% 4%;
-    --foreground: 210 40% 96%;
-    --card: 228 35% 6%;
-    --card-foreground: 210 40% 96%;
-    --popover: 228 35% 6%;
-    --popover-foreground: 210 40% 96%;
-    --primary: 189 94% 53%;
-    --primary-foreground: 228 47% 8%;
-    --secondary: 228 20% 12%;
-    --secondary-foreground: 210 30% 80%;
-    --muted: 228 20% 10%;
-    --muted-foreground: 215 20% 50%;
-    --accent: 228 20% 12%;
-    --accent-foreground: 210 30% 85%;
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 228 20% 10%;
-    --input: 228 20% 10%;
-    --ring: 189 94% 53%;
+    /* ── StratOS Sovereign palette ──────────────────────────────────── */
+    --background: 228 42% 5%;        /* #070911 Midnight          */
+    --foreground: 224 25% 91%;       /* #e0e4ef Frost             */
+    --card: 228 32% 10%;             /* #0f1422 Obsidian (more distinct) */
+    --card-foreground: 224 25% 91%;
+    --popover: 228 30% 14%;          /* #171e30 Lifted            */
+    --popover-foreground: 224 25% 91%;
+    --primary: 43 59% 45%;           /* #b8922f Sovereign Gold    */
+    --primary-foreground: 228 42% 5%;
+    --secondary: 228 36% 11%;
+    --secondary-foreground: 230 18% 56%;
+    --muted: 228 37% 8%;
+    --muted-foreground: 230 18% 38%; /* #505672 Steel             */
+    --accent: 228 36% 11%;
+    --accent-foreground: 224 25% 91%;
+    --destructive: 354 60% 55%;      /* #d44452 Crimson           */
+    --destructive-foreground: 224 25% 91%;
+    --border: 229 28% 13%;
+    --input: 228 37% 8%;
+    --ring: 43 59% 45%;              /* Gold focus ring           */
     --radius: 0.75rem;
   }
 }
@@ -37,9 +38,14 @@
   }
 
   body {
-    @apply bg-[#080a14] text-slate-200;
+    @apply bg-[#070911] text-[#e0e4ef];
     font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
-    font-feature-settings: "rlig" 1, "calt" 1;
+    font-feature-settings: "rlig" 1, "calt" 1, "tnum" 1;
+    /* Cartographic grid — the signature element. Evokes "mapping the organisation". */
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.042) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.042) 1px, transparent 1px);
+    background-size: 40px 40px;
   }
 
   /* Custom scrollbar */
@@ -51,13 +57,146 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.07);
     border-radius: 3px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.15);
+    background: rgba(184, 146, 47, 0.22);
   }
 }
+
+/* ── Light mode ──────────────────────────────────────────────────────────── */
+/*
+   Global overrides — every surface, text, and border token flips.
+   Covers all 14 dark hex variants found across dashboard, gap-analysis,
+   meetings, surveys, strategy, and other pages.
+   Semantic accent colours (gold, green, orange, red, cerulean) are unchanged.
+*/
+
+html.light {
+  --background: 40 24% 95%;
+  --foreground: 228 42% 10%;
+  --card: 0 0% 100%;
+  --card-foreground: 228 42% 10%;
+  --popover: 40 18% 91%;
+  --popover-foreground: 228 42% 10%;
+  --border: 228 20% 86%;
+  --input: 40 20% 90%;
+  --muted: 40 18% 91%;
+  --muted-foreground: 228 18% 44%;
+}
+
+/* Body — warm parchment, dark cartographic grid */
+html.light body {
+  background-color: #f5f3ee;
+  color: #0f1422;
+  background-image:
+    linear-gradient(rgba(0, 0, 0, 0.032) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.032) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* Scrollbar */
+html.light ::-webkit-scrollbar-thumb        { background: rgba(0, 0, 0, 0.10); }
+html.light ::-webkit-scrollbar-thumb:hover  { background: rgba(184, 146, 47, 0.35); }
+
+/* Skeleton */
+html.light .skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.04) 25%,
+    rgba(0, 0, 0, 0.09) 37%,
+    rgba(0, 0, 0, 0.04) 63%
+  );
+  background-size: 400% 100%;
+  animation: shimmer 1.4s ease infinite;
+}
+
+/* ── Surface backgrounds — ALL dark hex variants → light equivalents ─────── */
+/* Base / body surfaces */
+html.light .bg-\[\#070911\]  { background-color: #f5f3ee !important; }
+html.light .bg-\[\#080a14\]  { background-color: #f5f3ee !important; }
+html.light .bg-\[\#080a16\]  { background-color: #f5f3ee !important; }
+html.light .bg-\[\#070a16\]  { background-color: #edeae2 !important; } /* sidebar */
+html.light .bg-\[\#0b0e1a\]  { background-color: #f5f3ee !important; }
+html.light .bg-\[\#0d1020\]  { background-color: #f5f3ee !important; }
+html.light .bg-\[\#111827\]  { background-color: #f5f3ee !important; }
+html.light .bg-\[\#131825\]  { background-color: #f5f3ee !important; }
+
+/* Card surfaces */
+html.light .bg-\[\#0d1117\]  { background-color: #ffffff !important; }
+html.light .bg-\[\#0f1422\]  { background-color: #ffffff !important; }
+
+/* Elevated / hover surfaces */
+html.light .bg-\[\#171e30\]  { background-color: #e9e5dc !important; }
+html.light .bg-\[\#1a2030\]  { background-color: #e9e5dc !important; }
+html.light .bg-\[\#1e293b\]  { background-color: #e9e5dc !important; }
+html.light .bg-\[\#1e2535\]  { background-color: #e9e5dc !important; }
+
+/* Header backdrop */
+html.light .bg-\[\#070911\]\/90 { background-color: rgba(245, 243, 238, 0.92) !important; }
+html.light .bg-\[\#080a14\]\/90 { background-color: rgba(245, 243, 238, 0.92) !important; }
+
+/* Hover state variants */
+html.light .hover\:bg-\[\#0f1422\]:hover { background-color: #ede9e0 !important; }
+html.light .hover\:bg-\[\#171e30\]:hover { background-color: #e0dbd1 !important; }
+html.light .hover\:bg-\[\#0d1117\]:hover { background-color: #ede9e0 !important; }
+html.light .hover\:bg-\[\#0b0e1a\]:hover { background-color: #ede9e0 !important; }
+
+/* White-at-opacity backgrounds (badges, dividers, subtle fills) */
+html.light .bg-white\/\[0\.03\] { background-color: rgba(0, 0, 0, 0.03) !important; }
+html.light .bg-white\/\[0\.04\] { background-color: rgba(0, 0, 0, 0.04) !important; }
+html.light .bg-white\/\[0\.05\] { background-color: rgba(0, 0, 0, 0.05) !important; }
+html.light .bg-white\/\[0\.06\] { background-color: rgba(0, 0, 0, 0.06) !important; }
+html.light .bg-white\/\[0\.07\] { background-color: rgba(0, 0, 0, 0.07) !important; }
+html.light .bg-white\/5        { background-color: rgba(0, 0, 0, 0.05) !important; }
+
+/* ── Text colours ────────────────────────────────────────────────────────── */
+html.light .text-\[\#e0e4ef\]              { color: #0f1422 !important; }
+html.light .text-\[\#8d97b8\]              { color: #3d4566 !important; }
+html.light .text-\[\#505672\]              { color: #6b7090 !important; }
+html.light .text-\[\#2b2f45\]              { color: #a0a8c0 !important; }
+
+/* Hover text variants */
+html.light .hover\:text-\[\#e0e4ef\]:hover { color: #0f1422 !important; }
+html.light .hover\:text-\[\#8d97b8\]:hover { color: #3d4566 !important; }
+html.light .group:hover .group-hover\:text-\[\#e0e4ef\] { color: #0f1422 !important; }
+html.light .group:hover .group-hover\:text-\[\#8d97b8\] { color: #3d4566 !important; }
+
+/* ── Borders & dividers ──────────────────────────────────────────────────── */
+html.light .border-white\/\[0\.05\]       { border-color: rgba(15, 20, 34, 0.06) !important; }
+html.light .border-white\/\[0\.06\]       { border-color: rgba(15, 20, 34, 0.07) !important; }
+html.light .border-white\/\[0\.07\]       { border-color: rgba(15, 20, 34, 0.09) !important; }
+html.light .border-white\/\[0\.08\]       { border-color: rgba(15, 20, 34, 0.10) !important; }
+html.light .border-white\/\[0\.09\]       { border-color: rgba(15, 20, 34, 0.12) !important; }
+html.light .divide-white\/\[0\.05\] > * + * { border-color: rgba(15, 20, 34, 0.06) !important; }
+html.light .divide-white\/\[0\.06\] > * + * { border-color: rgba(15, 20, 34, 0.07) !important; }
+
+/* ── Tailwind named slate colours (used across SWOT, meetings, surveys, etc.) ── */
+/* Light-on-dark → dark-on-light for the near-white shades that become invisible */
+html.light .text-slate-100  { color: #0f1422 !important; }
+html.light .text-slate-200  { color: #1e293b !important; }
+html.light .text-slate-300  { color: #334155 !important; }
+html.light .text-slate-400  { color: #475569 !important; }
+/* slate-500 / 600 / 700 are already dark enough on white — no override needed */
+
+/* Hover variants */
+html.light .hover\:text-slate-100:hover { color: #0f1422 !important; }
+html.light .hover\:text-slate-200:hover { color: #1e293b !important; }
+html.light .hover\:text-slate-300:hover { color: #334155 !important; }
+
+/* Dark slate backgrounds → light */
+html.light .bg-slate-900 { background-color: #f8f7f4 !important; }
+html.light .bg-slate-800 { background-color: #f0ede6 !important; }
+html.light .bg-slate-700 { background-color: #e5e1d8 !important; }
+html.light .bg-slate-600 { background-color: #d8d4cb !important; }
+
+/* ── Cyan accent colours — darken for legibility on light backgrounds ─────── */
+html.light .text-cyan-100  { color: #0369a1 !important; }
+html.light .text-cyan-300  { color: #0284c7 !important; }
+html.light .text-cyan-400  { color: #0284c7 !important; }
+html.light .text-cyan-500  { color: #0369a1 !important; }
+html.light .text-cyan-600  { color: #0c4a6e !important; }
 
 /* ── Plan-doc template tokens (scoped — never touch dashboard) ───────────── */
 /* Color tokens defined here; Tailwind classes reference them via tailwind.config */
@@ -304,16 +443,6 @@ body.plan-editor-open [class*="bottom-20"][class*="right-5"][class*="fixed"] {
   }
   .w-4\.5 {
     width: 1.125rem;
-  }
-
-  /* Glow animations */
-  @keyframes glow-pulse {
-    0%, 100% { box-shadow: 0 0 10px rgba(34, 211, 238, 0.15); }
-    50% { box-shadow: 0 0 20px rgba(34, 211, 238, 0.3); }
-  }
-
-  .glow-cyan {
-    animation: glow-pulse 3s ease-in-out infinite;
   }
 
   /* Skeleton loader */

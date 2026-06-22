@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 // force-dynamic is required so useSearchParams() can read the ?error= param
 // that NextAuth appends when an OAuth failure occurs.
@@ -77,7 +77,7 @@ function StratOSLogo() {
         <p className="text-2xl font-bold tracking-tight text-slate-100">
           Strat<span className="text-red-500">OS</span>
         </p>
-        <p className="mt-0.5 text-xs font-medium tracking-widest text-slate-500 uppercase">
+        <p className="mt-0.5 text-[10px] font-semibold tracking-[0.1em] text-[#505672] uppercase">
           Nile University · ITCS
         </p>
       </div>
@@ -123,27 +123,25 @@ function LoginCard() {
       </div>
 
       {/* Card */}
-      <div className="rounded-2xl border border-white/[0.06] bg-[#0d1117] px-8 py-8 shadow-2xl">
-        {/* Heading */}
+      <div className="rounded-xl border border-white/[0.07] bg-[#0f1422] px-8 py-8 shadow-card">
         <div className="mb-6 text-center">
-          <h1 className="text-base font-semibold text-slate-100">
+          <h1 className="text-[15px] font-semibold tracking-[-0.01em] text-[#e0e4ef]">
             Sign in to your workspace
           </h1>
-          <p className="mt-1.5 text-sm text-slate-500">
+          <p className="mt-1.5 text-[13px] text-[#505672]">
             Use your authorised Nile University Google account to continue.
           </p>
         </div>
 
-        {/* Error callout */}
         {errorMessage && (
           <div
             role="alert"
-            className="mb-5 flex items-start gap-2.5 rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3"
+            className="mb-5 flex items-start gap-2.5 rounded-lg border border-[#d44452]/20 bg-[#d44452]/10 px-4 py-3"
           >
             <svg
               viewBox="0 0 20 20"
               fill="currentColor"
-              className="mt-px h-4 w-4 shrink-0 text-red-400"
+              className="mt-px h-4 w-4 shrink-0 text-[#d44452]"
               aria-hidden
             >
               <path
@@ -152,34 +150,20 @@ function LoginCard() {
                 clipRule="evenodd"
               />
             </svg>
-            <p className="text-xs leading-relaxed text-red-300">{errorMessage}</p>
+            <p className="text-[12px] leading-relaxed text-[#d44452]/90">{errorMessage}</p>
           </div>
         )}
 
-        {/* Google sign-in button */}
         <button
           onClick={handleSignIn}
           disabled={loading}
           aria-busy={loading}
-          className="flex w-full items-center justify-center gap-3 rounded-lg bg-white px-4 py-2.5 text-sm font-medium text-slate-800 shadow-sm transition-all hover:bg-slate-100 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+          className="flex w-full items-center justify-center gap-3 rounded-lg border border-white/[0.09] bg-white px-4 py-2.5 text-[13px] font-medium text-slate-800 shadow-sm transition-all duration-150 hover:bg-slate-100 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
         >
           {loading ? (
-            <svg
-              className="h-4 w-4 animate-spin text-slate-500"
-              viewBox="0 0 24 24"
-              fill="none"
-              aria-hidden
-            >
-              <circle
-                className="opacity-25"
-                cx="12" cy="12" r="10"
-                stroke="currentColor" strokeWidth="4"
-              />
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-              />
+            <svg className="h-4 w-4 animate-spin text-slate-500" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
             </svg>
           ) : (
             <GoogleIcon />
@@ -187,19 +171,16 @@ function LoginCard() {
           {loading ? "Redirecting…" : "Continue with Google"}
         </button>
 
-        {/* Divider */}
         <div className="my-6 h-px bg-white/[0.06]" />
 
-        {/* Access restriction note */}
-        <p className="text-center text-xs leading-relaxed text-slate-600">
+        <p className="text-center text-[12px] leading-relaxed text-[#505672]">
           Access is restricted to authorised Nile University accounts.
           If you believe you should have access, contact your ITCS administrator.
         </p>
       </div>
 
-      {/* Footer wordmark */}
-      <p className="mt-8 text-center text-xs text-slate-700">
-        Strat<span className="text-red-800">OS</span> · Cognitive Digital Twin ·{" "}
+      <p className="mt-8 text-center text-[11px] text-[#2b2f45]">
+        Strat<span className="text-red-900">OS</span> · Cognitive Digital Twin ·{" "}
         {new Date().getFullYear()}
       </p>
     </div>
@@ -212,7 +193,7 @@ function LoginCard() {
 
 export default function LoginScreen() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#080a14] px-4 py-16">
+    <main className="flex min-h-screen items-center justify-center bg-[#070911] px-4 py-16">
       <Suspense fallback={null}>
         <LoginCard />
       </Suspense>

@@ -27,13 +27,15 @@ import urllib.parse
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import psycopg2
 import psycopg2.extras
 import requests as _requests
+import shutil
+import tempfile
 from dotenv import load_dotenv
-from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
+from fastapi import BackgroundTasks, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel
@@ -44,6 +46,7 @@ load_dotenv(ROOT_DIR / ".env", override=True)
 
 AGENTS_DIR: Path = ROOT_DIR / "Agents"
 GAP_ANALYSIS_AGENT_PATH: Path = AGENTS_DIR / "Gap analysis" / "gap_analysis_agent.py"
+OCR_AGENT_PATH: Path = AGENTS_DIR / "ocr" / "agent.py"
 DATA_DIR: Path = ROOT_DIR / "Data"
 SOCIAL_AGENT_DIR: Path = ROOT_DIR / "Social Media Scraping Agent"
 MEETINGS_AGENT_PATH: Path = AGENTS_DIR / "meetings" / "agent.py"
@@ -248,16 +251,10 @@ def _new_job() -> str:
         "status": "running",
         "result": None,
         "error": None,
-        "progress": None,
         "started_at": _NOW(),
         "finished_at": None,
     }
     return job_id
-
-
-def _set_progress(job_id: str, processed: int, total: int, stage: str = "generating") -> None:
-    if job_id in _jobs:
-        _jobs[job_id]["progress"] = {"processed": processed, "total": total, "stage": stage}
 
 
 def _finish(job_id: str, result: Any) -> None:
@@ -1424,408 +1421,6 @@ def run_kpi(req: KPIRequest, background_tasks: BackgroundTasks):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  ACTION PLAN AGENT  (الخطة التنفيذية)
-#  Run → Goal → Objective → Action item. For an APPROVED (plan_status='final')
-#  strategy run, drafts 2–4 executive activities per objective and fills the
-#  operational columns. "LLM classifies, Python computes" — Gemini writes the
-#  prose / picks the archetype; Python prices it from Data/financials/* with
-#  per-year inflation and a soft 5%-of-tuition ceiling check.
-# ══════════════════════════════════════════════════════════════════════════════
-
-ACTION_PLAN_AGENT_PATH: Path = AGENTS_DIR / "action_planner" / "action_planner.py"
-
-
-class ActionPlanRequest(BaseModel):
-    run_id: str
-    enable_self_critique: bool = True
-    require_final: bool = True
-
-
-def _ensure_action_planner(reload: bool = False) -> Any:
-    """Load the action planner module by path (cached unless reload=True)."""
-    if str(ROOT_DIR) not in sys.path:
-        sys.path.insert(0, str(ROOT_DIR))
-    if reload:
-        sys.modules.pop("action_plan_agent", None)
-    if not ACTION_PLAN_AGENT_PATH.exists():
-        raise FileNotFoundError(f"Action planner not found: {ACTION_PLAN_AGENT_PATH}")
-    return _load_module("action_plan_agent", ACTION_PLAN_AGENT_PATH)
-
-
-def _task_action_plan(job_id: str, req: ActionPlanRequest) -> None:
-    try:
-        mod = _ensure_action_planner(reload=True)
-        result: dict = mod.compile_and_run(
-            req.run_id,
-            enable_self_critique=req.enable_self_critique,
-            require_final=req.require_final,
-            progress_cb=lambda done, total: _set_progress(job_id, done, total),
-        )
-        if result.get("error"):
-            _fail(job_id, result["error"])
-            return
-        _finish(job_id, result)
-    except Exception as exc:
-        _fail(job_id, str(exc))
-
-
-@app.post("/api/action-plan", status_code=202)
-def run_action_plan(req: ActionPlanRequest, background_tasks: BackgroundTasks):
-    """
-    Trigger the Action Plan agent for a finalized strategy run (background job).
-
-    Returns 202 + {job_id}. Poll GET /api/jobs/{job_id} for the budget summary;
-    read the full plan via GET /api/action-plan/{run_id}.
-    """
-    if not req.run_id:
-        raise HTTPException(status_code=400, detail="run_id is required")
-    job_id = _new_job()
-    background_tasks.add_task(_task_action_plan, job_id, req)
-    return {"job_id": job_id}
-
-
-# NOTE: these static paths MUST be declared before /api/action-plan/{run_id},
-# otherwise "runs"/"vocab" are captured as a run_id.
-@app.get("/api/action-plan/vocab")
-def action_plan_vocab():
-    """Controlled vocabularies for the editor — single source of truth for the UI."""
-    mod = _ensure_action_planner()
-    catalog = mod.load_catalog()
-    return {
-        "roles": list(mod.ROLE_VOCAB),
-        "archetypes": [
-            {
-                "key": k,
-                "label": catalog[k].get("label", k),
-                "description": catalog[k].get("description", ""),
-                "base_cost_egp": catalog[k].get("base_cost_egp"),
-                "cost_driver": catalog[k].get("cost_driver"),
-                "funding_source": catalog[k].get("funding_source"),
-            }
-            for k in mod.ARCHETYPE_KEYS
-        ],
-    }
-
-
-@app.get("/api/action-plan/runs")
-def list_action_plan_runs():
-    """Strategy runs that have goals/objectives — candidates for the run picker."""
-    conn = _get_db_conn()
-    if not conn:
-        raise HTTPException(status_code=503, detail="Database not configured")
-    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-        cur.execute(
-            """
-            SELECT r.run_id, r.run_timestamp,
-                   r.structured_data->>'plan_status' AS plan_status,
-                   (SELECT count(*) FROM strategic_goals g WHERE g.run_id = r.run_id) AS goals,
-                   (SELECT count(*) FROM strategic_objectives o
-                        JOIN strategic_goals g ON o.goal_id = g.goal_id
-                        WHERE g.run_id = r.run_id) AS objectives,
-                   EXISTS(SELECT 1 FROM strategic_actions a WHERE a.run_id = r.run_id) AS has_action_plan
-            FROM agent_runs r
-            WHERE r.agent_id = 'goals_planner'
-              AND EXISTS (SELECT 1 FROM strategic_goals g WHERE g.run_id = r.run_id)
-            ORDER BY r.run_timestamp DESC
-            LIMIT 50
-            """
-        )
-        rows = cur.fetchall()
-    return {
-        "runs": [
-            {
-                "run_id": str(r["run_id"]),
-                "plan_status": r["plan_status"],
-                "created_at": r["run_timestamp"].isoformat() if r["run_timestamp"] else None,
-                "goals": r["goals"],
-                "objectives": r["objectives"],
-                "has_action_plan": r["has_action_plan"],
-            }
-            for r in rows
-        ]
-    }
-
-
-@app.get("/api/action-plan/{run_id}")
-def get_action_plan(run_id: str):
-    """
-    Return the generated action plan for a run, grouped Goal → Objective → Actions,
-    with a recomputed per-year budget summary. Friendly empty shape if not yet generated.
-    """
-    conn = _get_db_conn()
-    if not conn:
-        raise HTTPException(status_code=503, detail="Database not configured")
-
-    try:
-        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute(
-                """
-                SELECT
-                    g.goal_id, g.title AS goal_title, g.description AS goal_description,
-                    o.objective_id, o.text AS objective_text, o.tows_type, o.pillar_id,
-                    a.action_id, a.activity_rationale, a.activity_text, a.kpi_name,
-                    a.timeline_reasoning, a.start_quarter, a.end_quarter, a.start_year_index,
-                    a.responsible_exec, a.responsible_monitor,
-                    a.classification_reasoning, a.assigned_archetype, a.duration_multiplier,
-                    a.base_cost_egp, a.inflated_cost_egp, a.cost_driver, a.funding_source,
-                    a.cost_explanation, a.edited_by_user, a.position AS action_pos
-                FROM strategic_actions a
-                JOIN strategic_objectives o ON a.objective_id = o.objective_id
-                JOIN strategic_goals g ON o.goal_id = g.goal_id
-                WHERE a.run_id = %s
-                ORDER BY g.position, o.position, a.position
-                """,
-                (run_id,),
-            )
-            rows = cur.fetchall()
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Query failed: {exc}")
-
-    if not rows:
-        return {
-            "run_id": run_id,
-            "generated": False,
-            "goals": [],
-            "budget_summary": None,
-            "totals": {"goals": 0, "objectives": 0, "actions": 0},
-        }
-
-    mod = _ensure_action_planner()
-    pillar_names = mod.PILLAR_NAMES
-
-    goals: dict[str, dict] = {}
-    objectives: dict[str, dict] = {}
-    priced: list[dict] = []
-
-    for r in rows:
-        gid = str(r["goal_id"])
-        if gid not in goals:
-            goals[gid] = {
-                "goal_id": gid,
-                "title": r["goal_title"],
-                "description": r["goal_description"],
-                "objectives": [],
-            }
-        oid = str(r["objective_id"])
-        if oid not in objectives:
-            obj = {
-                "objective_id": oid,
-                "text": r["objective_text"],
-                "tows_type": r["tows_type"],
-                "pillar_id": r["pillar_id"],
-                "pillar_name": pillar_names.get(r["pillar_id"]),
-                "actions": [],
-            }
-            objectives[oid] = obj
-            goals[gid]["objectives"].append(obj)
-
-        inflated = float(r["inflated_cost_egp"]) if r["inflated_cost_egp"] is not None else 0.0
-        base = float(r["base_cost_egp"]) if r["base_cost_egp"] is not None else 0.0
-        is_central = r["funding_source"] == "central_capex"
-        objectives[oid]["actions"].append(
-            {
-                "action_id": str(r["action_id"]),
-                "activity_rationale": r["activity_rationale"],
-                "activity_text": r["activity_text"],
-                "kpi_name": r["kpi_name"],
-                "timeline_reasoning": r["timeline_reasoning"],
-                "start_quarter": r["start_quarter"],
-                "end_quarter": r["end_quarter"],
-                "responsible_exec": r["responsible_exec"],
-                "responsible_monitor": r["responsible_monitor"],
-                "classification_reasoning": r["classification_reasoning"],
-                "assigned_archetype": r["assigned_archetype"],
-                "duration_multiplier": r["duration_multiplier"],
-                "base_cost_egp": base,
-                "inflated_cost_egp": inflated,
-                "cost_driver": r["cost_driver"],
-                "funding_source": r["funding_source"],
-                "cost_explanation": r["cost_explanation"],
-                "budget_display": "Funded Centrally" if is_central else f"{inflated:,.0f} EGP",
-                "edited_by_user": r["edited_by_user"],
-            }
-        )
-        priced.append(
-            {
-                "start_year_index": int(r["start_year_index"] or 0),
-                "funding_source": r["funding_source"],
-                "inflated_cost_egp": inflated,
-            }
-        )
-
-    budget_summary = mod.reconcile_budget(priced, mod.load_revenue())
-
-    return {
-        "run_id": run_id,
-        "generated": True,
-        "goals": list(goals.values()),
-        "budget_summary": budget_summary,
-        "totals": {
-            "goals": len(goals),
-            "objectives": len(objectives),
-            "actions": len(rows),
-        },
-    }
-
-
-# ── HITL editing for a single action (re-prices on cost-driving changes) ─────────
-
-class ActionEditRequest(BaseModel):
-    # All optional — only provided fields are changed.
-    activity_text: Optional[str] = None
-    kpi_name: Optional[str] = None
-    start_quarter: Optional[str] = None
-    end_quarter: Optional[str] = None
-    responsible_exec: Optional[str] = None
-    responsible_monitor: Optional[str] = None
-    assigned_archetype: Optional[str] = None
-    duration_multiplier: Optional[int] = None
-
-
-_ACTION_EDITABLE_TEXT = (
-    "activity_text", "kpi_name", "responsible_exec", "responsible_monitor",
-)
-
-
-def _reprice_and_update(action_id: str, *, archetype: str, duration: int,
-                        start_quarter: str, end_quarter: str,
-                        text_overrides: dict, edited: bool) -> dict:
-    """
-    Shared writer for edit + reset. Normalises the schedule, RE-PRICES via the
-    agent (so cost stays consistent with the cost-driving inputs), re-renders
-    cost_explanation, and writes the live columns only (never original_*).
-    """
-    mod = _ensure_action_planner()
-    catalog = mod.load_catalog()
-    archetype = archetype if archetype in mod.ARCHETYPE_KEYS else "general_initiative"
-    duration = max(1, min(4, int(duration)))
-    sched = mod.normalize_schedule(start_quarter, end_quarter)
-    pricing = mod.price_activity(archetype, duration, sched["start_year_index"], catalog)
-    cost_explanation = mod.render_cost_explanation(pricing["pricing_provenance"], pricing["inflated_cost_egp"])
-
-    conn = _get_db_conn()
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            UPDATE strategic_actions SET
-                activity_text = COALESCE(%s, activity_text),
-                kpi_name = COALESCE(%s, kpi_name),
-                responsible_exec = COALESCE(%s, responsible_exec),
-                responsible_monitor = COALESCE(%s, responsible_monitor),
-                start_quarter = %s, end_quarter = %s, start_year_index = %s,
-                assigned_archetype = %s, duration_multiplier = %s,
-                base_cost_egp = %s, inflated_cost_egp = %s, cost_driver = %s,
-                funding_source = %s, cost_explanation = %s, pricing_provenance = %s,
-                edited_by_user = %s
-            WHERE action_id = %s
-            """,
-            (
-                text_overrides.get("activity_text"), text_overrides.get("kpi_name"),
-                text_overrides.get("responsible_exec"), text_overrides.get("responsible_monitor"),
-                sched["start_quarter"], sched["end_quarter"], sched["start_year_index"],
-                archetype, duration,
-                pricing["base_cost_egp"], pricing["inflated_cost_egp"], pricing["cost_driver"],
-                pricing["funding_source"], cost_explanation, psycopg2.extras.Json(pricing["pricing_provenance"]),
-                edited, action_id,
-            ),
-        )
-        if cur.rowcount == 0:
-            raise HTTPException(status_code=404, detail=f"Action {action_id} not found")
-    return {
-        "action_id": action_id,
-        "start_quarter": sched["start_quarter"], "end_quarter": sched["end_quarter"],
-        "assigned_archetype": archetype, "duration_multiplier": duration,
-        "inflated_cost_egp": pricing["inflated_cost_egp"],
-        "funding_source": pricing["funding_source"],
-        "cost_explanation": cost_explanation, "edited_by_user": edited,
-    }
-
-
-@app.patch("/api/action-plan/action/{action_id}")
-def edit_action(action_id: str, req: ActionEditRequest):
-    """
-    Edit one action. Cost-driving changes (quarters / archetype / duration) trigger
-    a deterministic Python re-price. original_* snapshots are never touched; sets
-    edited_by_user = true.
-    """
-    conn = _get_db_conn()
-    if not conn:
-        raise HTTPException(status_code=503, detail="Database not configured")
-
-    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-        cur.execute(
-            "SELECT assigned_archetype, duration_multiplier, start_quarter, end_quarter "
-            "FROM strategic_actions WHERE action_id = %s",
-            (action_id,),
-        )
-        cur_row = cur.fetchone()
-    if not cur_row:
-        raise HTTPException(status_code=404, detail=f"Action {action_id} not found")
-
-    if req.assigned_archetype is not None:
-        mod = _ensure_action_planner()
-        if req.assigned_archetype not in mod.ARCHETYPE_KEYS:
-            raise HTTPException(status_code=400, detail=f"Unknown archetype '{req.assigned_archetype}'")
-
-    text_overrides = {f: getattr(req, f) for f in _ACTION_EDITABLE_TEXT if getattr(req, f) is not None}
-    return _reprice_and_update(
-        action_id,
-        archetype=req.assigned_archetype or cur_row["assigned_archetype"],
-        duration=req.duration_multiplier if req.duration_multiplier is not None else cur_row["duration_multiplier"],
-        start_quarter=req.start_quarter or cur_row["start_quarter"],
-        end_quarter=req.end_quarter or cur_row["end_quarter"],
-        text_overrides=text_overrides,
-        edited=True,
-    )
-
-
-@app.post("/api/action-plan/action/{action_id}/reset")
-def reset_action(action_id: str):
-    """
-    Reset one action to its frozen AI snapshot (original_*), recompute the cost
-    from the original cost-driving fields, and clear edited_by_user.
-    """
-    conn = _get_db_conn()
-    if not conn:
-        raise HTTPException(status_code=503, detail="Database not configured")
-
-    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-        cur.execute(
-            """
-            SELECT original_activity_text, original_kpi_name,
-                   original_start_quarter, original_end_quarter,
-                   original_responsible_exec, original_responsible_monitor,
-                   original_assigned_archetype, original_duration_multiplier
-            FROM strategic_actions WHERE action_id = %s
-            """,
-            (action_id,),
-        )
-        o = cur.fetchone()
-    if not o:
-        raise HTTPException(status_code=404, detail=f"Action {action_id} not found")
-    if o["original_assigned_archetype"] is None:
-        raise HTTPException(
-            status_code=409,
-            detail="This action predates edit-snapshot support (migration 005); regenerate the plan to enable reset.",
-        )
-
-    return _reprice_and_update(
-        action_id,
-        archetype=o["original_assigned_archetype"],
-        duration=o["original_duration_multiplier"],
-        start_quarter=o["original_start_quarter"],
-        end_quarter=o["original_end_quarter"],
-        text_overrides={
-            "activity_text": o["original_activity_text"],
-            "kpi_name": o["original_kpi_name"],
-            "responsible_exec": o["original_responsible_exec"],
-            "responsible_monitor": o["original_responsible_monitor"],
-        },
-        edited=False,
-    )
-
-
-# ══════════════════════════════════════════════════════════════════════════════
 #  HITL GAP ANALYSIS
 #  Phase 1 — GET  /api/gap-analysis/draft     → fetch editable draft data
 #  Phase 2 — POST /api/gap-analysis/calculate → LangGraph QA agent → job_id
@@ -2813,7 +2408,168 @@ def _task_strategy(job_id: str, swot_run_id: str | None) -> None:
             "validated":       validated,
             "errors":          errors,
         })
+    except Exception as exc:
+        _fail(job_id, str(exc))
 
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  OCR — Previous Strategic Plan Upload & Section Extraction
+#  POST /api/ocr/upload          → queue extraction job, return {job_id, upload_id}
+#  GET  /api/ocr/sections        → list all extracted section sets
+#  GET  /api/ocr/sections/{uid}  → sections for one upload
+# ══════════════════════════════════════════════════════════════════════════════
+
+_OCR_SECTIONS_TABLE_SQL = """
+CREATE TABLE IF NOT EXISTS strategic_plan_sections (
+    id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    upload_id    UUID        NOT NULL,
+    filename     TEXT        NOT NULL,
+    section_key  TEXT        NOT NULL,
+    section_type TEXT        NOT NULL,
+    title_ar     TEXT,
+    content      TEXT        NOT NULL,
+    page_start   INTEGER,
+    page_end     INTEGER,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_sps_upload_id    ON strategic_plan_sections (upload_id);
+CREATE INDEX IF NOT EXISTS idx_sps_section_type ON strategic_plan_sections (section_type);
+"""
+
+
+def _ensure_ocr_table() -> None:
+    conn = _get_db_conn()
+    if not conn:
+        return
+    try:
+        with conn.cursor() as cur:
+            cur.execute(_OCR_SECTIONS_TABLE_SQL)
+    except Exception as exc:
+        print(f"[ocr] table creation failed: {exc}")
+
+
+def _save_ocr_sections(result: dict) -> None:
+    """Persist extracted sections to Supabase."""
+    _ensure_ocr_table()
+    conn = _get_db_conn()
+    if not conn:
+        return
+    try:
+        with conn.cursor() as cur:
+            for sec in result.get("sections", []):
+                cur.execute(
+                    """
+                    INSERT INTO strategic_plan_sections
+                        (upload_id, filename, section_key, section_type,
+                         title_ar, content, page_start, page_end)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    """,
+                    (
+                        result["upload_id"],
+                        result["filename"],
+                        sec["section_key"],
+                        sec["section_type"],
+                        sec.get("title_ar", ""),
+                        sec.get("content", ""),
+                        sec.get("page_start"),
+                        sec.get("page_end"),
+                    ),
+                )
+    except Exception as exc:
+        print(f"[ocr] section save failed: {exc}")
+
+
+_OCR_RAW_TABLE_SQL = """
+CREATE TABLE IF NOT EXISTS strategic_plan_raw (
+    id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    upload_id    UUID        NOT NULL UNIQUE,
+    filename     TEXT        NOT NULL,
+    total_pages  INT         NOT NULL DEFAULT 0,
+    mode         TEXT,
+    content_md   TEXT        NOT NULL,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+"""
+
+
+def _save_ocr_raw(result: dict) -> None:
+    """Persist the full extracted markdown (pre-sectioning) to strategic_plan_raw."""
+    raw_md = result.get("raw_content_md", "")
+    if not raw_md:
+        return
+    conn = _get_db_conn()
+    if not conn:
+        return
+    try:
+        with conn.cursor() as cur:
+            cur.execute(_OCR_RAW_TABLE_SQL)
+            cur.execute(
+                """
+                INSERT INTO strategic_plan_raw
+                    (upload_id, filename, total_pages, mode, content_md)
+                VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT (upload_id) DO UPDATE
+                    SET content_md  = EXCLUDED.content_md,
+                        mode        = EXCLUDED.mode,
+                        total_pages = EXCLUDED.total_pages
+                """,
+                (
+                    result["upload_id"],
+                    result["filename"],
+                    result.get("total_pages", 0),
+                    result.get("mode", ""),
+                    raw_md,
+                ),
+            )
+    except Exception as exc:
+        print(f"[ocr] raw save failed: {exc}")
+
+
+def _task_ocr(job_id: str, pdf_path: str) -> None:
+    try:
+        if str(ROOT_DIR) not in sys.path:
+            sys.path.insert(0, str(ROOT_DIR))
+
+        sys.modules.pop("ocr_agent", None)
+
+        if not OCR_AGENT_PATH.exists():
+            raise FileNotFoundError(f"OCR agent not found: {OCR_AGENT_PATH}")
+
+        mod = _load_module("ocr_agent", OCR_AGENT_PATH)
+        result: dict = mod.compile_and_run(pdf_path)
+
+        # Persist to Supabase in background threads so the job completes fast
+        threading.Thread(target=_save_ocr_sections, args=(result,),
+                         daemon=True, name="ocr-db-save").start()
+        threading.Thread(target=_save_ocr_raw, args=(result,),
+                         daemon=True, name="ocr-db-raw").start()
+
+        _finish(job_id, result)
+    except Exception as exc:
+        _fail(job_id, str(exc))
+    finally:
+        # Always clean up the temp file
+        try:
+            os.unlink(pdf_path)
+        except Exception:
+            pass
+
+
+def _task_ocr_md(job_id: str, md_text: str, filename: str) -> None:
+    """Background task: classify a pre-extracted .md file (no Document AI)."""
+    try:
+        if str(ROOT_DIR) not in sys.path:
+            sys.path.insert(0, str(ROOT_DIR))
+        sys.modules.pop("ocr_agent", None)
+        if not OCR_AGENT_PATH.exists():
+            raise FileNotFoundError(f"OCR agent not found: {OCR_AGENT_PATH}")
+        mod    = _load_module("ocr_agent", OCR_AGENT_PATH)
+        result = mod.parse_extracted_md(md_text, filename)
+        threading.Thread(target=_save_ocr_sections, args=(result,),
+                         daemon=True, name="ocr-md-db-save").start()
+        threading.Thread(target=_save_ocr_raw, args=(result,),
+                         daemon=True, name="ocr-md-db-raw").start()
+        _finish(job_id, result)
     except Exception as exc:
         _fail(job_id, str(exc))
 
@@ -3389,320 +3145,128 @@ def patch_objective(objective_id: str, req: ObjectivePatch):
         )
         _clear_feasibility(cur, "strategic_objectives", "objective_id", objective_id)
     return {"status": "updated", "objective_id": objective_id}
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-#  SWOT Consolidation — review gate (rank-all; human is the sole keep/cut filter)
-# ══════════════════════════════════════════════════════════════════════════════
-# The pipeline ranks every canonical SWOT item by salience and writes them to
-# swot_consolidation_candidates (migration 003). These endpoints let the SWOT UI
-# trigger a run, load the latest run, and edit / delete / add / keep-cut the items
-# that the REST of the architecture (gap analysis, goals) will consume.
-
-_SWOT_CAND_COLS = """
-    candidate_id::text, consolidation_run_id::text, branch, type,
-    pillar_id, pillar_name, title, description,
-    salience_score, lifecycle_state, selected, reviewer_decision,
-    selection_reason, factor_breakdown, member_item_ids, created_at,
-    approved, approved_at
-"""
-
-
-def _task_swot_consolidation(job_id: str) -> None:
-    try:
-        from Agents.swot_consolidation import consolidate
-        out = consolidate(persist=True)
-        _finish(job_id, {
-            "consolidation_run_id": out.get("consolidation_run_id"),
-            "candidate_count": len(out.get("candidates", [])),
-        })
-    except Exception as exc:
-        _fail(job_id, str(exc))
-
-
-@app.post("/api/swot-consolidation/run", status_code=202)
-def run_swot_consolidation(background_tasks: BackgroundTasks):
-    """Queue a consolidation run (normalize → dedup → lifecycle → score → rank → persist)."""
-    job_id = _new_job()
-    background_tasks.add_task(_task_swot_consolidation, job_id)
-    return {"job_id": job_id}
-
-
-@app.get("/api/swot-consolidation/latest")
-def latest_swot_consolidation(include_carried: bool = False):
-    """The most recent consolidation run's candidates, ranked. carried_forward items
-    (previous-plan concerns with no current signal) are excluded unless include_carried."""
-    conn = _get_db_conn()
-    if not conn:
-        return {"consolidation_run_id": None, "candidates": []}
-    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-        cur.execute("""
-            SELECT consolidation_run_id::text AS rid
-            FROM swot_consolidation_candidates
-            ORDER BY created_at DESC LIMIT 1
-        """)
-        row = cur.fetchone()
-        if not row:
-            return {"consolidation_run_id": None, "candidates": []}
-        rid = row["rid"]
-        carried_clause = "" if include_carried else "AND lifecycle_state <> 'carried_forward'"
-        cur.execute(f"""
-            SELECT {_SWOT_CAND_COLS}
-            FROM swot_consolidation_candidates
-            WHERE consolidation_run_id = %s {carried_clause}
-            ORDER BY branch, type, salience_score DESC
-        """, (rid,))
-        candidates = cur.fetchall()
-        approved_at = next(
-            (c["approved_at"] for c in candidates if c.get("approved")),
-            None,
-        )
-        return {"consolidation_run_id": rid, "candidates": candidates, "approved_at": approved_at}
-
-
-class SwotApprove(BaseModel):
-    consolidation_run_id: str
-
-
-@app.post("/api/swot-consolidation/approve")
-def approve_swot_consolidation(req: SwotApprove):
-    """Mark a consolidation run's reviewed SWOT as approved for downstream use.
-    Clears any previously approved run first so only one run is ever active."""
-    conn = _get_db_conn()
-    if not conn:
-        raise HTTPException(status_code=503, detail="Database not configured.")
-    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-        # Clear the previous approval (only one run is approved at a time).
-        cur.execute(
-            "UPDATE swot_consolidation_candidates SET approved = false, approved_at = NULL WHERE approved = true"
-        )
-        # Stamp every candidate in this run as approved.
-        cur.execute(
-            """
-            UPDATE swot_consolidation_candidates
-            SET approved = true, approved_at = NOW()
-            WHERE consolidation_run_id = %s
-            RETURNING approved_at
-            """,
-            (req.consolidation_run_id,),
-        )
-        row = cur.fetchone()
-        if not row:
-            raise HTTPException(status_code=404, detail="No candidates found for this run.")
-        approved_at = row["approved_at"]
-    return {"status": "approved", "consolidation_run_id": req.consolidation_run_id,
-            "approved_at": approved_at}
-
-
-class SwotCandidatePatch(BaseModel):
-    title: str | None = None
-    description: str | None = None
-    type: str | None = None
-    pillar_id: int | None = None
-    pillar_name: str | None = None
-    reviewer_decision: str | None = None   # 'keep' | 'cut' | 'pending'
-    selected: bool | None = None
-
-
-@app.patch("/api/swot-consolidation/candidates/{candidate_id}")
-def patch_swot_candidate(candidate_id: str, req: SwotCandidatePatch):
-    """Edit a candidate and/or set the human keep/cut decision."""
-    conn = _get_db_conn()
-    if not conn:
-        raise HTTPException(status_code=503, detail="Database not configured.")
-    sets, vals = [], []
-    for col in ("title", "description", "type", "pillar_id", "pillar_name",
-                "reviewer_decision", "selected"):
-        v = getattr(req, col)
-        if v is not None:
-            sets.append(f"{col} = %s")
-            vals.append(v)
-    if not sets:
-        raise HTTPException(status_code=400, detail="Nothing to update.")
-    if req.reviewer_decision is not None:
-        sets.append("reviewed_at = NOW()")
-        if req.selected is None:   # mirror selected from the decision unless set explicitly
-            sets.append("selected = %s")
-            vals.append(req.reviewer_decision == "keep")
-    vals.append(candidate_id)
-    with conn.cursor() as cur:
-        cur.execute(
-            f"UPDATE swot_consolidation_candidates SET {', '.join(sets)} WHERE candidate_id = %s",
-            vals,
-        )
-        if cur.rowcount == 0:
-            raise HTTPException(status_code=404, detail="Candidate not found.")
-    return {"status": "updated", "candidate_id": candidate_id}
-
-
-@app.delete("/api/swot-consolidation/candidates/{candidate_id}")
-def delete_swot_candidate(candidate_id: str):
-    conn = _get_db_conn()
-    if not conn:
-        raise HTTPException(status_code=503, detail="Database not configured.")
-    with conn.cursor() as cur:
-        cur.execute(
-            "DELETE FROM swot_consolidation_candidates WHERE candidate_id = %s",
-            (candidate_id,),
-        )
-        if cur.rowcount == 0:
-            raise HTTPException(status_code=404, detail="Candidate not found.")
-    return {"status": "deleted", "candidate_id": candidate_id}
-
-
-class SwotCandidateCreate(BaseModel):
-    consolidation_run_id: str
-    branch: str             # 'internal' | 'external'
-    type: str               # strength | weakness | opportunity | threat
-    description: str
-    title: str | None = None
-    pillar_id: int | None = None
-    pillar_name: str | None = None
-
-
-@app.post("/api/swot-consolidation/candidates", status_code=201)
-def add_swot_candidate(req: SwotCandidateCreate):
-    """Add a manual SWOT item to a consolidation run (kept by default)."""
-    conn = _get_db_conn()
-    if not conn:
-        raise HTTPException(status_code=503, detail="Database not configured.")
-    candidate_id = str(uuid.uuid4())
-    with conn.cursor() as cur:
-        cur.execute("""
-            INSERT INTO swot_consolidation_candidates
-                (candidate_id, consolidation_run_id, branch, type, pillar_id, pillar_name,
-                 title, description, member_item_ids, contributing_agents, snapshot_count,
-                 factor_breakdown, salience_score, lifecycle_state, selected,
-                 selection_reason, reviewer_decision, reviewed_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s::uuid[], %s, %s,
-                    %s, %s, %s, %s, %s, %s, NOW())
-        """, (
-            candidate_id, req.consolidation_run_id, req.branch, req.type,
-            req.pillar_id, req.pillar_name, req.title, req.description,
-            [], [], None,
-            psycopg2.extras.Json({"manual": True}), 0.0, "new", True,
-            "manually added by user", "keep",
-        ))
-    return {"status": "created", "candidate_id": candidate_id}
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-#  CHIEF EDITOR — Plan generation
-# ══════════════════════════════════════════════════════════════════════════════
-
-class _PlanGenerateRequest(BaseModel):
-    org_id:  str | None = None
-    use_llm: bool       = True
-
-
-def _run_plan_generation(job_id: str, org_id: str | None, use_llm: bool) -> None:
-    """Background task: build + store a PlanDocument via the Chief Editor."""
-    import traceback
-    try:
-        # Lazy import so the heavy langchain deps don't block API startup
-        from chief_editor.generator import generate_plan, _DEFAULT_ORG_ID  # noqa: PLC0415
-        actual_org_id = org_id or _DEFAULT_ORG_ID
-        plan_id = generate_plan(org_id=actual_org_id, use_llm=use_llm, job_id=job_id)
-        _finish(job_id, {"plan_id": plan_id})
-    except Exception as exc:
-        tb = traceback.format_exc()[-800:]
-        _fail(job_id, f"{type(exc).__name__}: {exc}\n{tb}")
-
-
-@app.post("/api/plan-generation/generate", status_code=202)
-def plan_generation_generate(
-    body: _PlanGenerateRequest,
+@app.post("/api/ocr/parse-md", status_code=202)
+async def ocr_parse_md(
     background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
 ):
     """
-    Admin-only gate is enforced by the Next.js proxy route.
-    FastAPI launches the Chief Editor pipeline in the background and returns job_id.
+    Accept a pre-extracted .md file (output of D:/OCR/extract_pdf.py).
+    Runs section classification locally — no Document AI, no cloud costs.
+    Returns {job_id} for polling via GET /api/jobs/{job_id}.
     """
+    if not (file.filename or "").lower().endswith(".md"):
+        raise HTTPException(status_code=400, detail="Only .md files are accepted")
+    try:
+        raw     = await file.read()
+        md_text = raw.decode("utf-8")
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Could not read file: {exc}")
+
     job_id = _new_job()
-    background_tasks.add_task(_run_plan_generation, job_id, body.org_id, body.use_llm)
+    background_tasks.add_task(
+        _task_ocr_md, job_id, md_text, file.filename or "extracted.md"
+    )
     return {"job_id": job_id}
 
 
-@app.get("/api/plan-generation/{plan_id}")
-def plan_generation_get(plan_id: str):
-    """Fetch a generated_plans row (document + metadata)."""
+@app.post("/api/ocr/upload", status_code=202)
+async def ocr_upload(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+):
+    """
+    Accept a PDF upload of a previous strategic plan, queue OCR extraction.
+
+    Returns {job_id} — poll GET /api/jobs/{job_id} for the result:
+      {
+        "upload_id":   str,
+        "filename":    str,
+        "sections":    [
+          { "section_key", "section_type", "title_ar", "content",
+            "page_start", "page_end" }, ...
+        ],
+        "total_pages": int,
+        "stats":       { "docai", "hybrid", "fallback", "empty" }
+      }
+    """
+    if not file.filename or not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Only PDF files are accepted.")
+
+    # Write to a named temp file that persists until the background task deletes it
+    suffix = ".pdf"
+    tmp_fd, tmp_path = tempfile.mkstemp(suffix=suffix)
+    try:
+        with os.fdopen(tmp_fd, "wb") as f:
+            shutil.copyfileobj(file.file, f)
+    except Exception as exc:
+        os.unlink(tmp_path)
+        raise HTTPException(status_code=500, detail=f"File save failed: {exc}")
+
+    job_id = _new_job()
+    background_tasks.add_task(_task_ocr, job_id, tmp_path)
+    return {"job_id": job_id}
+
+
+@app.get("/api/ocr/sections")
+def list_ocr_section_sets():
+    """List all uploaded plans with their upload_id, filename, and section counts."""
+    _ensure_ocr_table()
+    conn = _get_db_conn()
+    if not conn:
+        return {"uploads": []}
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT upload_id::text, filename,
+                       COUNT(*)                                    AS total_sections,
+                       COUNT(*) FILTER (WHERE section_type = 'static')  AS static_count,
+                       COUNT(*) FILTER (WHERE section_type = 'dynamic') AS dynamic_count,
+                       MIN(created_at)                             AS uploaded_at
+                FROM strategic_plan_sections
+                GROUP BY upload_id, filename
+                ORDER BY uploaded_at DESC
+                """
+            )
+            rows = cur.fetchall()
+    except Exception as exc:
+        print(f"[ocr] list failed: {exc}")
+        return {"uploads": []}
+    return {"uploads": [dict(r) for r in rows]}
+
+
+@app.get("/api/ocr/sections/{upload_id}")
+def get_ocr_sections(upload_id: str):
+    """Return all classified sections for one uploaded plan."""
+    _ensure_ocr_table()
     conn = _get_db_conn()
     if not conn:
         raise HTTPException(status_code=503, detail="Database unavailable")
     try:
-        from chief_editor.storage import get_plan  # noqa: PLC0415
-        row = get_plan(conn, plan_id)
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT id::text, upload_id::text, filename,
+                       section_key, section_type, title_ar,
+                       content, page_start, page_end, created_at
+                FROM strategic_plan_sections
+                WHERE upload_id::text = %s
+                ORDER BY page_start ASC
+                """,
+                (upload_id,),
+            )
+            rows = cur.fetchall()
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
-    if not row:
-        raise HTTPException(status_code=404, detail="Plan not found")
-    return dict(row)
 
+    if not rows:
+        raise HTTPException(status_code=404, detail="Upload not found")
 
-# ── Plan editor chat ──────────────────────────────────────────────────────────
-
-class _PlanChatRequest(BaseModel):
-    message:        str
-    blockHeading:   str | None = None
-    blockContent:   str | None = None   # serialised text of the selected block
-    provenanceDesc: str | None = None
-    docTitle:       str | None = None
-    orgName:        str | None = None
-
-
-@app.post("/api/plan-chat")
-def plan_chat(body: _PlanChatRequest):
-    """
-    Real LLM reply for the plan editor chat panel.
-    Uses Vertex AI (gemini-2.5-flash).  Max 512 output tokens per call.
-
-    blockContent is the plain-text serialisation of whatever block the user
-    had selected, so the LLM can read and rewrite the actual content — not
-    just the heading.
-    """
-    try:
-        from chief_editor.llm import get_chat_model        # noqa: PLC0415
-        from langchain_core.messages import (              # noqa: PLC0415
-            HumanMessage, SystemMessage,
-        )
-
-        system = (
-            f"You are an AI writing assistant helping a strategic planning team at "
-            f"{body.orgName or 'a university'} edit and improve their strategic plan "
-            f"titled '{body.docTitle or 'Strategic Plan'}'. "
-            "Rules:\n"
-            "1. Never invent facts, names, numbers, or citations not present in the provided content.\n"
-            "2. When rewriting or drafting, output ONLY the replacement text — no preamble, "
-            "no 'Here is the revised version:', no markdown code fences.\n"
-            "3. Match the register of the source: formal, third-person academic English.\n"
-            "4. If asked to produce a list, output one item per line starting with '- '."
-        )
-
-        context_parts: list[str] = []
-        if body.blockHeading:
-            context_parts.append(f"Section: {body.blockHeading}")
-        if body.blockContent:
-            context_parts.append(f"Current content:\n{body.blockContent}")
-        if body.provenanceDesc:
-            context_parts.append(f"Source: {body.provenanceDesc}")
-
-        user_msg = body.message
-        if context_parts:
-            user_msg = "\n\n".join(context_parts) + "\n\n---\n\n" + user_msg
-
-        llm  = get_chat_model(model="gemini-2.5-flash", max_output_tokens=512)
-        resp = llm.invoke([SystemMessage(content=system), HumanMessage(content=user_msg)])
-        reply = (getattr(resp, "content", None) or "").strip()
-
-        if not reply:
-            raise ValueError("Empty response from LLM")
-
-        return {"reply": reply}
-
-    except Exception as exc:
-        import logging as _log
-        _log.getLogger(__name__).warning("[plan-chat] error: %s", exc)
-        raise HTTPException(
-            status_code=503,
-            detail="Chat service temporarily unavailable — try again in a moment.",
-        )
+    sections = [dict(r) for r in rows]
+    filename = sections[0]["filename"]
+    return {
+        "upload_id": upload_id,
+        "filename":  filename,
+        "sections":  sections,
+    }

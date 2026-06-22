@@ -49,22 +49,36 @@ const config: Config = {
         "plan-muted-fg": "var(--plan-muted-fg)",
         "plan-body":     "var(--plan-body)",
         "plan-heading":  "var(--plan-heading)",
-        // StratOS semantic
+        // StratOS surface hierarchy
+        surface: {
+          base: "#070911",
+          "01":  "#0c0f1a",
+          "02":  "#121626",
+          "03":  "#1a2035",
+        },
+        // Sovereign Gold — sole interactive accent
+        gold: {
+          DEFAULT: "#b8922f",
+          hover:   "#c9a84c",
+          dim:     "rgba(184,146,47,0.12)",
+          border:  "rgba(184,146,47,0.22)",
+        },
+        // StratOS semantic data colours (distinct from gold accent)
         strength: {
-          DEFAULT: "#10b981",
-          dim: "#064e3b",
+          DEFAULT: "#1aad74",
+          dim:     "#05291b",
         },
         weakness: {
-          DEFAULT: "#f59e0b",
-          dim: "#451a03",
+          DEFAULT: "#c07824",
+          dim:     "#2c1a05",
         },
         opportunity: {
-          DEFAULT: "#22d3ee",
-          dim: "#164e63",
+          DEFAULT: "#0ea0c0",
+          dim:     "#032a32",
         },
         threat: {
-          DEFAULT: "#f43f5e",
-          dim: "#4c0519",
+          DEFAULT: "#d44452",
+          dim:     "#2c0a0e",
         },
       },
       borderRadius: {
@@ -92,10 +106,9 @@ const config: Config = {
         },
       },
       boxShadow: {
-        card: "0 1px 3px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.3)",
-        "card-hover": "0 4px 12px rgba(0,0,0,0.5)",
-        glow: "0 0 20px rgba(34,211,238,0.15)",
-        "glow-sm": "0 0 10px rgba(34,211,238,0.1)",
+        card:         "0 1px 3px rgba(0,0,0,0.5), 0 1px 2px rgba(0,0,0,0.4)",
+        "card-hover": "0 4px 16px rgba(0,0,0,0.6)",
+        "gold-sm":    "0 0 12px rgba(184,146,47,0.12)",
       },
     },
   },

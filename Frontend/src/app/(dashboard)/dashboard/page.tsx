@@ -2,15 +2,13 @@
 
 import React from "react";
 import { useDashboard } from "@/hooks/useDashboard";
+import { useMeetings } from "@/hooks/useMeetings";
 import { useAgentResults } from "@/contexts/AgentResultsContext";
 import { Header } from "@/components/layout/Header";
-import { ComplianceHeader } from "@/components/dashboard/ComplianceHeader";
-import { KPIGrid } from "@/components/dashboard/KPIGrid";
-import { SWOTSummaryCard } from "@/components/dashboard/SWOTSummaryCard";
+import { IntelligenceFeed } from "@/components/dashboard/IntelligenceFeed";
+import { AttentionRequired } from "@/components/dashboard/AttentionRequired";
 import { MeetingSummaries } from "@/components/dashboard/MeetingSummaries";
-import { ScenarioWidget } from "@/components/dashboard/ScenarioWidget";
-import { CompetitiveIntelWidget } from "@/components/dashboard/CompetitiveIntelWidget";
-import { SocialMediaWidget } from "@/components/dashboard/SocialMediaWidget";
+import { SWOTSummaryCard } from "@/components/dashboard/SWOTSummaryCard";
 
 function Skeleton({ className }: { className?: string }) {
   return <div className={`skeleton rounded-xl ${className ?? ""}`} />;
@@ -19,18 +17,17 @@ function Skeleton({ className }: { className?: string }) {
 function LoadingSkeleton() {
   return (
     <div className="flex flex-col gap-5 p-6 animate-fade-in">
-      <Skeleton className="h-28" />
-      <div className="grid grid-cols-6 gap-3">
-        {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-20" />)}
-      </div>
+      {/* Feed + Attention */}
       <div className="grid grid-cols-3 gap-5">
-        <div className="col-span-2"><Skeleton className="h-72" /></div>
-        <Skeleton className="h-72" />
+        <div className="col-span-2">
+          <Skeleton className="h-[360px]" />
+        </div>
+        <Skeleton className="h-[360px]" />
       </div>
-      <div className="grid grid-cols-3 gap-5">
-        <Skeleton className="h-52" />
-        <Skeleton className="h-52" />
-        <Skeleton className="h-52" />
+      {/* Meetings + SWOT */}
+      <div className="grid grid-cols-2 gap-5">
+        <Skeleton className="h-[280px]" />
+        <Skeleton className="h-[280px]" />
       </div>
     </div>
   );
@@ -38,57 +35,69 @@ function LoadingSkeleton() {
 
 export default function CommandCenterPage() {
   const { data, loading, error } = useDashboard();
-
-  // Pull live agent results from the global persistent context.
-  // If agents have been run (on any page), their insights appear here automatically.
+  const { meetings } = useMeetings();
   const { insights: liveInsights, results } = useAgentResults();
-  const researchData = results.research;
 
-  // Always use live agent results — show empty state until agents are run
-  const swotSummary = {
+  const swot = {
     strengths:     liveInsights.filter((i) => i.category === "strength"),
     weaknesses:    liveInsights.filter((i) => i.category === "weakness"),
     opportunities: liveInsights.filter((i) => i.category === "opportunity"),
     threats:       liveInsights.filter((i) => i.category === "threat"),
   };
 
+  // Fall back to mock data for threats/opportunities if agents haven't run yet
+  const threats      = swot.threats.length      > 0 ? swot.threats      : (data?.swot_summary.threats      ?? []);
+  const weaknesses   = swot.weaknesses.length   > 0 ? swot.weaknesses   : (data?.swot_summary.weaknesses   ?? []);
+  const opportunities = swot.opportunities.length > 0 ? swot.opportunities : (data?.swot_summary.opportunities ?? []);
+  const strengths    = swot.strengths.length    > 0 ? swot.strengths    : (data?.swot_summary.strengths    ?? []);
+
   return (
     <div className="flex min-h-full flex-col">
       <Header
         title="Command Center"
-        subtitle="Welcome back, Dr. Sarah Chen. Here's your strategic overview."
+        subtitle="Strategic overview — all intelligence in one place."
       />
 
       {loading && <LoadingSkeleton />}
 
       {error && (
-        <div className="m-6 rounded-xl border border-rose-500/20 bg-rose-500/10 p-4 text-sm text-rose-400">
+        <div className="m-6 rounded-xl border border-[#d44452]/20 bg-[#d44452]/10 p-4 text-sm text-[#d44452]">
           Failed to load dashboard: {error}
         </div>
       )}
 
       {data && (
         <div className="flex flex-col gap-5 p-6 animate-fade-in">
-          <ComplianceHeader compliance={data.compliance} />
-          <KPIGrid metrics={data.kpis} />
 
+          {/* Row 1: Intelligence feed (2/3) + Attention required (1/3) */}
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
             <div className="lg:col-span-2">
-              <SWOTSummaryCard
-                strengths={swotSummary.strengths}
-                weaknesses={swotSummary.weaknesses}
-                opportunities={swotSummary.opportunities}
-                threats={swotSummary.threats}
+              <IntelligenceFeed
+                meetings={meetings.length > 0 ? meetings : data.recent_meetings}
+                threats={threats}
+                weaknesses={weaknesses}
+                opportunities={opportunities}
+                simulation={data.last_simulation}
+                complianceUpdated={data.compliance.last_updated}
               />
             </div>
-            <MeetingSummaries meetings={data.recent_meetings} />
+            <AttentionRequired
+              meetings={meetings.length > 0 ? meetings : data.recent_meetings}
+              threats={threats}
+            />
           </div>
 
-          <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-            <CompetitiveIntelWidget data={researchData} />
-            <ScenarioWidget simulation={data.last_simulation} />
-            <SocialMediaWidget />
+          {/* Row 4: Meeting summaries (1/2) + SWOT summary (1/2) */}
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+            <MeetingSummaries meetings={meetings.length > 0 ? meetings.slice(0, 3) : data.recent_meetings} />
+            <SWOTSummaryCard
+              strengths={strengths}
+              weaknesses={weaknesses}
+              opportunities={opportunities}
+              threats={threats}
+            />
           </div>
+
         </div>
       )}
     </div>

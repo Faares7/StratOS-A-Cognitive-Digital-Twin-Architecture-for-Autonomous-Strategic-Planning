@@ -5,17 +5,17 @@
     "date_str": "unknown",
     "source_group": "Nile University Friends in Egypt",
     "source_university": "Nile University",
-    "scraped_at": "2026-06-20T09:19:58.848270",
+    "scraped_at": "2026-06-17T23:52:08.890369",
     "matched_categories": [
       "career_nouns"
     ],
     "matched_keywords": [
       "دخل"
     ],
-    "translated_text": "I'm not worried and I'll do better in precalc.\n[Comments: I know what to say from experience, no American will be able to enter calc and physics all the time and get a good grade. | Watch YouTube videos with reviews. The exam will be easy and the university will send you the exam again]",
-    "swot_type": "WEAKNESS",
-    "theme": "Lack of academic preparation",
-    "signal": "Students may not be adequately prepared for exams due to lack of effort or guidance.",
+    "translated_text": "I'm not lazy and I'll enter precalc better\n[Comments: I'm not lazy and I'll enter precalc better | Watch YouTube videos that review the material. The exam will be easy and the university will give you a second chance on the exam | Or do you want to study the material before the exam]",
+    "swot_type": "STRENGTH",
+    "theme": "Student Motivation",
+    "signal": "Students are motivated to perform well in precalc, indicating a positive attitude towards academic challenges.",
     "confidence": 0.8,
     "relevant_comments": [
       {
@@ -26,19 +26,6 @@
           "career_nouns"
         ],
         "matched_keywords": [
-          "دخل"
-        ]
-      },
-      {
-        "text": "ProductiveJaguar6056 انا عارف بقول ايه من تجربه، مفيش حد اميركان هيعرف يدخل كالك وفيزيكس علي طول ويجيب grade كويسه غير بقي لو مش فارقلو ال GPA",
-        "likes": 0,
-        "relevant": true,
-        "matched_categories": [
-          "education_nouns",
-          "career_nouns"
-        ],
-        "matched_keywords": [
-          "GPA",
           "دخل"
         ]
       },
@@ -73,17 +60,17 @@
     "date_str": "unknown",
     "source_group": "Nile University Friends in Egypt",
     "source_university": "Nile University",
-    "scraped_at": "2026-06-20T09:20:06.221095",
+    "scraped_at": "2026-06-17T23:52:16.886742",
     "matched_categories": [
       "education_nouns"
     ],
     "matched_keywords": [
       "امتحان"
     ],
-    "translated_text": "Watch YouTube videos that review the material. The exam will be easy and the university will give you a retake if needed.\n[Comments: Watch YouTube videos that review the material. The exam will be easy and the university will give you a retake if needed | Don't worry, just enter precalc, it's better | Or do you want to study the subject before the exam]",
-    "swot_type": "WEAKNESS",
-    "theme": "Easy exams / Lack of academic rigor",
-    "signal": "Students are not motivated to study due to perceived ease of exams and availability of retakes.",
+    "translated_text": "Watch YouTube videos that review the material. The exam will be easy and the university will give you a retake if needed.\n[Comments: Watch YouTube videos that review the material. The exam will be easy and the university will give you a retake if needed | Don't worry, just enter precalc, it's better | Or want to study the material before the exam]",
+    "swot_type": "STRENGTH",
+    "theme": "Supportive environment",
+    "signal": "University offers retakes and supportive environment for students",
     "confidence": 0.8,
     "relevant_comments": [
       {
@@ -123,98 +110,735 @@
     ]
   },
   {
-    "post_text": "انا بشوف عجب في الجامعه دي",
+    "post_text": "اهدى يا بنى و قل لن يصيبنا الا ما كتب الله لنا واجمد وروح قولهم اشوف الكاميرات وكمان احكى اللي حصل و ما تخاف الا من الله وحده",
+    "post_likes": 4,
+    "date_str": "unknown",
+    "source_group": "Nile University Friends in Egypt",
+    "source_university": "Nile University",
+    "scraped_at": "2026-06-17T23:52:45.869186",
+    "matched_categories": [],
+    "matched_keywords": [],
+    "translated_text": "Spread the word, kids! Say it won't happen to us unless Allah has written it for us. I'm frozen and my soul is numb. They're saying \"I see cameras\" and also telling me what happened, but they only fear God alone.",
+    "swot_type": "THREAT",
+    "theme": "Brain drain / Economic pressures",
+    "signal": "Students are experiencing emotional distress due to external factors beyond their control.",
+    "confidence": 0.8,
+    "relevant_comments": []
+  },
+  {
+    "post_text": "خصم اول سنة بيبقي لاول سنة بس و الزيادة السنوية مش ثابتة",
     "post_likes": 0,
     "date_str": "unknown",
     "source_group": "Nile University Friends in Egypt",
     "source_university": "Nile University",
-    "scraped_at": "2026-06-20T09:20:24.638899",
+    "scraped_at": "2026-06-17T23:52:55.577974",
     "matched_categories": [],
     "matched_keywords": [],
-    "translated_text": "I see something strange going on at this university.",
+    "translated_text": "Discount for the first year is only for the first year, but the annual increase is not fixed.",
+    "swot_type": "WEAKNESS",
+    "theme": "Tuition fees uncertainty",
+    "signal": "Annual tuition fee increases are unpredictable after the first year.",
+    "confidence": 0.8,
+    "relevant_comments": []
+  },
+  {
+    "post_text": "اول ترم هما بيعملولك الجدول و عادي في حاجات في نص اليوم و حجات من ٨:٣٠ مش حاجه معينه حسب يعني",
+    "post_likes": 0,
+    "date_str": "unknown",
+    "source_group": "Nile University Friends in Egypt",
+    "source_university": "Nile University",
+    "scraped_at": "2026-06-17T23:53:12.179768",
+    "matched_categories": [
+      "education_nouns"
+    ],
+    "matched_keywords": [
+      "ترم"
+    ],
+    "translated_text": "First term, they make the schedule for you and it's normal to have some things done in half a day and some other stuff from 8:30 onwards, nothing specific really. \n[Comments: First term, they make the schedule for you and it's normal to have some things done in half a day and some other stuff from 8:30 onwards, nothing specific really. | And the second term and the rest, you're the one making the schedule so you'll be in control but anyway you'll find materials that are only schedules at 8:30 so it's up to you really. | The term that passed had a day starting at 10:30 and ending at 8:30 at night]",
+    "swot_type": "WEAKNESS",
+    "theme": "Flexible Scheduling",
+    "signal": "Students feel uncertain about their schedule, with some classes finishing early and others running late into the evening.",
+    "confidence": 0.9,
+    "relevant_comments": [
+      {
+        "text": "اول ترم هما بيعملولك الجدول و عادي في حاجات في نص اليوم و حجات من ٨:٣٠ مش حاجه معينه حسب يعني",
+        "likes": 0,
+        "relevant": true,
+        "matched_categories": [
+          "education_nouns"
+        ],
+        "matched_keywords": [
+          "ترم"
+        ]
+      },
+      {
+        "text": "و الترم التاني و الباقي انت ال بتعمل الجدول ف بتتحكم بقا بس بردو هتلاقي في مواد مفيش غير مواعيد ٨:٣٠ ف حسب يعني",
+        "likes": 0,
+        "relevant": true,
+        "matched_categories": [
+          "education_nouns"
+        ],
+        "matched_keywords": [
+          "ترم"
+        ]
+      },
+      {
+        "text": "الترم إللي فات كان عندي يوم بيبدأ 10:30 يخلص 8:30 بالليل",
+        "likes": 0,
+        "relevant": true,
+        "matched_categories": [
+          "education_nouns"
+        ],
+        "matched_keywords": [
+          "ترم"
+        ]
+      }
+    ]
+  },
+  {
+    "post_text": "للاسف مفيش حد يقدر يفيدك كل دتور والي هو شايفو ممكن ميديش بونص خالص حتي لو نسبة كبيرة مش ناجحة",
+    "post_likes": 1,
+    "date_str": "unknown",
+    "source_group": "Nile University Friends in Egypt",
+    "source_university": "Nile University",
+    "scraped_at": "2026-06-17T23:53:12.474534",
+    "matched_categories": [],
+    "matched_keywords": [],
+    "translated_text": "Unfortunately, no one can help you with all the doctors who are just salespeople and only offer discounts if a large percentage is successful.",
+    "swot_type": "WEAKNESS",
+    "theme": "Poor faculty quality",
+    "signal": "Doctors at Nile University's affiliated hospitals prioritize sales over patient care, undermining trust in medical professionals.",
+    "confidence": 0.8,
+    "relevant_comments": []
+  },
+  {
+    "post_text": "هههههههههههه اهلا بيك في كدبة جاامعة النيل. المصاريف المحطوطه دي بيبقا علي اساس النورمال لود الهوا الطالب في الترم هياخد 18 ساعه فا هيا بتتحسب بالساعه كل سنه حساب الساعه هوا البيغلي. و اعمل حسابك ان كل سنه هتسمع اسباب متخلفه للزياده و هتطبق عليك يعني كان احد احد اسباب الزياده كانت انهم بيعنلو صيانة للاسانسيرات و اقسم بالله ده كان سبب اتقالنا و لو حولت تعترض و تعمل هيتقالك زي متقالنا كده بالنص منهم المش قادر يحول و احنا هنعملو ريكمونديشن ليتر",
+    "post_likes": 1,
+    "date_str": "unknown",
+    "source_group": "Nile University Friends in Egypt",
+    "source_university": "Nile University",
+    "scraped_at": "2026-06-17T23:53:37.348020",
+    "matched_categories": [
+      "education_nouns"
+    ],
+    "matched_keywords": [
+      "ترم"
+    ],
+    "translated_text": "Hahaha, welcome to the joke of the year at Nile University. The added expenses are based on normal air conditioning usage for students in the semester. Each student will get 18 hours of AC and it's calculated per hour, every year, taking into account the electricity bill. And do your math, you'll hear excuses every year about the increase and they'll apply it to you. One of the reasons for the increase was supposedly maintenance for the elevators, I swear that was the reason we were told, and if you complain, they'll tell you what we're saying now, word for word. They can't even change it themselves, so we have to do a re-recommendation.\n\n[Comments: Hahaha, welcome to the joke of the year at Nile University. The added expenses are based on normal air conditioning usage for students in the semester. Each student will get 18 hours of AC and it's calculated per hour, every year, taking into account the electricity bill. And do your math, you'll hear excuses every year about the increase and they'll apply it to you. One of the reasons for the increase was supposedly maintenance for the elevators, I swear that was the reason we were told, and if you complain, they'll tell you what we're saying now, word for word. They can't even change it themselves, so we have to do a re-recommendation.]",
     "swot_type": "WEAKNESS",
     "theme": "Administrative problems",
-    "signal": "Students complaining about unclear policies and lack of transparency in the admissions process.",
-    "confidence": 0.8,
-    "relevant_comments": []
+    "signal": "University's administrative excuses and lack of transparency in fee increases are causing frustration among students.",
+    "confidence": 0.9,
+    "relevant_comments": [
+      {
+        "text": "هههههههههههه اهلا بيك في كدبة جاامعة النيل. المصاريف المحطوطه دي بيبقا علي اساس النورمال لود الهوا الطالب في الترم هياخد 18 ساعه فا هيا بتتحسب بالساعه كل سنه حساب الساعه هوا البيغلي. و اعمل حسابك ان كل سنه هتسمع اسباب متخلفه للزياده و هتطبق عليك يعني كان احد احد اسباب الزياده كانت انهم بيعنلو صيانة للاسانسيرات و اقسم بالله ده كان سبب اتقالنا و لو حولت تعترض و تعمل هيتقالك زي متقالنا كده بالنص منهم المش قادر يحول و احنا هنعملو ريكمونديشن ليتر",
+        "likes": 0,
+        "relevant": true,
+        "matched_categories": [
+          "education_nouns"
+        ],
+        "matched_keywords": [
+          "ترم"
+        ]
+      },
+      {
+        "text": "Youssef Sheref\nباقيلك ترم امشي جمب الحيطه",
+        "likes": 0,
+        "relevant": true,
+        "matched_categories": [
+          "education_nouns"
+        ],
+        "matched_keywords": [
+          "ترم"
+        ]
+      },
+      {
+        "text": "والجديد هيدخل على المصاريف الجديده",
+        "likes": 0,
+        "relevant": true,
+        "matched_categories": [
+          "career_nouns"
+        ],
+        "matched_keywords": [
+          "دخل"
+        ]
+      },
+      {
+        "text": "انا ابني حاليا في اولى هندسه وداخل على اساس المصاريف 165 دي مصاريف 2025/2026 وبعد ما انتهى الترم الاول لاقيتهم بيطلبوا فلوس اكتر من القالوا عليها ولما سالت السبب قالوا لي اننا شغالين بنظام الساعات المعتمده والترم 22 ساعه وغيروا حسابتهم خالص ودفعت زياده حوالى 30000 وقالولي دي غلطة admission office لانهم قالولك غلط في الاول",
+        "likes": 0,
+        "relevant": true,
+        "matched_categories": [
+          "education_nouns"
+        ],
+        "matched_keywords": [
+          "ترم"
+        ]
+      }
+    ]
   },
   {
-    "post_text": "يا جماعه مفيش الهبل دا ولا حد بينفصل ولا حاجه انا اختي قعده ٣ سنين لل gpa تحت ال ١ و متفصلتش",
-    "post_likes": 1,
-    "date_str": "unknown",
-    "source_group": "Nile University Friends in Egypt",
-    "source_university": "Nile University",
-    "scraped_at": "2026-06-20T09:20:33.845102",
-    "matched_categories": [],
-    "matched_keywords": [],
-    "translated_text": "Hey guys, no need to be dramatic or separate over this. My sister has been sitting for three years with a GPA under 1 and hasn't been separated yet.",
-    "swot_type": "WEAKNESS",
-    "theme": "High failure rates",
-    "signal": "Students struggling academically, potentially impacting retention and graduation rates",
-    "confidence": 0.8,
-    "relevant_comments": []
-  },
-  {
-    "post_text": "الفاينال لازم تجيب ال 40% حتي لو مقفل الcourse",
+    "post_text": "لو كالك ١ مع هاني الديب امتحاناته القديمة حلها بتيجي هيا هيا يعتبر",
     "post_likes": 0,
     "date_str": "unknown",
     "source_group": "Nile University Friends in Egypt",
     "source_university": "Nile University",
-    "scraped_at": "2026-06-20T09:20:33.957576",
-    "matched_categories": [],
-    "matched_keywords": [],
-    "translated_text": "The final grade needs to be at least 40% even if you close the course.",
+    "scraped_at": "2026-06-17T23:53:44.812504",
+    "matched_categories": [
+      "education_nouns"
+    ],
+    "matched_keywords": [
+      "امتحان"
+    ],
+    "translated_text": "If you have Hany Diab's old exams, solve them and come on, it's considered.",
     "swot_type": "WEAKNESS",
-    "theme": "High failure rates",
-    "signal": "Students are concerned about passing courses with a minimum grade of 40%",
+    "theme": "Limited resources",
+    "signal": "Students are seeking access to past exams, implying a lack of available study materials.",
     "confidence": 0.8,
-    "relevant_comments": []
+    "relevant_comments": [
+      {
+        "text": "لو كالك ١ مع هاني الديب امتحاناته القديمة حلها بتيجي هيا هيا يعتبر",
+        "likes": 0,
+        "relevant": true,
+        "matched_categories": [
+          "education_nouns"
+        ],
+        "matched_keywords": [
+          "امتحان"
+        ]
+      }
+    ]
   },
   {
-    "post_text": "هو مفروض تجيب ٤٠٪؜ في فاينل بس لو درجه قريبه من ٤٠ بيبقي في درجات رافه",
-    "post_likes": 0,
+    "post_text": "شوف سكن لان الموضوع صعب مش هتلاقي وقت اصلا ، بالذات المواصلات زفت جدا",
+    "post_likes": 2,
     "date_str": "unknown",
     "source_group": "Nile University Friends in Egypt",
     "source_university": "Nile University",
-    "scraped_at": "2026-06-20T09:20:34.184195",
+    "scraped_at": "2026-06-17T23:53:49.777507",
     "matched_categories": [],
     "matched_keywords": [],
-    "translated_text": "It's supposed to get 40% in finals but if it's close to 40, it will be considered a pass.",
-    "swot_type": "WEAKNESS",
-    "theme": "High failure rates",
-    "signal": "Students are concerned about the high failure rate and the lenient passing criteria.",
+    "translated_text": "I'm looking for a place to live because the situation is difficult and I won't find time at all, especially transportation is very bad.",
+    "swot_type": "THREAT",
+    "theme": "Economic pressures / Brain drain",
+    "signal": "Students struggling with living costs and transportation difficulties",
     "confidence": 0.8,
     "relevant_comments": []
   },
   {
-    "post_text": "التلاته جامعات قوية كدراسة وسوق عمل المهم التقدير والخبره بعد ما تخلص",
+    "post_text": "حاصل معانا نفس الكلام",
     "post_likes": 1,
     "date_str": "unknown",
     "source_group": "Nile University Friends in Egypt",
     "source_university": "Nile University",
-    "scraped_at": "2026-06-20T09:20:34.396365",
+    "scraped_at": "2026-06-17T23:53:57.110171",
     "matched_categories": [],
     "matched_keywords": [],
-    "translated_text": "Three strong universities for study and job market, what matters is the reputation and experience after graduation.",
+    "translated_text": "We're saying the same thing.",
     "swot_type": "STRENGTH",
-    "theme": "Reputation",
-    "signal": "Nile University's reputation is valued by employers after graduation",
-    "confidence": 0.8,
+    "theme": "Strong faculty",
+    "signal": "Prof. Amr is an amazing professor, very knowledgeable and supportive!",
+    "confidence": 0.9,
     "relevant_comments": []
   },
   {
-    "post_text": "الأكاديمية علشان،شهاده دوليه",
+    "post_text": "المصاريف كل سنة بتزيد و مفيش نسبة محدده و الجامعه بتقدم تدريبات بس قليلين جدا ولازم GPA عالي و مش هتضمنلك فرصه عمل ف لو مش مناسبة متضغطش نفسك",
     "post_likes": 0,
     "date_str": "unknown",
     "source_group": "Nile University Friends in Egypt",
     "source_university": "Nile University",
-    "scraped_at": "2026-06-20T09:20:34.614470",
+    "scraped_at": "2026-06-17T23:54:29.133459",
+    "matched_categories": [
+      "opportunities",
+      "education_nouns"
+    ],
+    "matched_keywords": [
+      "تدريب",
+      "GPA"
+    ],
+    "translated_text": "The expenses keep increasing every year and there's no specific percentage, the university offers few internships but you need a high GPA and it won't guarantee you a job opportunity so if it's not suitable for you don't stress yourself out.",
+    "swot_type": "WEAKNESS",
+    "theme": "High fees / Limited internship opportunities",
+    "signal": "University expenses are increasing every year without a clear percentage, and internships require high GPA but offer no job guarantee.",
+    "confidence": 0.8,
+    "relevant_comments": [
+      {
+        "text": "المصاريف كل سنة بتزيد و مفيش نسبة محدده و الجامعه بتقدم تدريبات بس قليلين جدا ولازم GPA عالي و مش هتضمنلك فرصه عمل ف لو مش مناسبة متضغطش نفسك",
+        "likes": 0,
+        "relevant": true,
+        "matched_categories": [
+          "opportunities",
+          "education_nouns"
+        ],
+        "matched_keywords": [
+          "تدريب",
+          "GPA"
+        ]
+      },
+      {
+        "text": "مفيش جامعة غير النيل فيها الفيلد ده؟",
+        "likes": 0,
+        "relevant": true,
+        "matched_categories": [
+          "universities"
+        ],
+        "matched_keywords": [
+          "جامعة"
+        ]
+      },
+      {
+        "text": "ادخل الجامعه الاقرب لبيتك",
+        "likes": 0,
+        "relevant": true,
+        "matched_categories": [
+          "career_nouns"
+        ],
+        "matched_keywords": [
+          "دخل"
+        ]
+      },
+      {
+        "text": "لا بلاش حرام تدفع حوالي ٢٠٠ الف في حاجة ينفع تتعلمها وتتقنها بكورسات الجامعة مهمة اه بس مش ٢٠٠ الف خالص",
+        "likes": 0,
+        "relevant": true,
+        "matched_categories": [
+          "universities"
+        ],
+        "matched_keywords": [
+          "الجامعة",
+          "جامعة"
+        ]
+      },
+      {
+        "text": "كلهم واحد في النهاية ادخل الاقرب و الاوفر و فرق الفلوس كورسات و تدريب",
+        "likes": 0,
+        "relevant": true,
+        "matched_categories": [
+          "opportunities",
+          "career_nouns"
+        ],
+        "matched_keywords": [
+          "تدريب",
+          "دخل"
+        ]
+      }
+    ]
+  },
+  {
+    "post_text": "نصيحة مني بلاش تحول للجامعة",
+    "post_likes": 0,
+    "date_str": "unknown",
+    "source_group": "Nile University Friends in Egypt",
+    "source_university": "Nile University",
+    "scraped_at": "2026-06-17T23:54:50.929679",
+    "matched_categories": [
+      "universities"
+    ],
+    "matched_keywords": [
+      "جامعة"
+    ],
+    "translated_text": "My advice: don't bother applying to the university unless you have a minimum overall grade of 2.00 (good). Note that if you're repeating any subject, no grade lower than good (C) will be accepted for transfer purposes.",
+    "swot_type": "THREAT",
+    "theme": "Admissions standards / Competition",
+    "signal": "University sets high minimum overall grade requirement for admission",
+    "confidence": 0.9,
+    "relevant_comments": [
+      {
+        "text": "نصيحة مني بلاش تحول للجامعة",
+        "likes": 0,
+        "relevant": true,
+        "matched_categories": [
+          "universities"
+        ],
+        "matched_keywords": [
+          "جامعة"
+        ]
+      },
+      {
+        "text": "في تقديم من website الجامعة و شروط التحويل",
+        "likes": 0,
+        "relevant": true,
+        "matched_categories": [
+          "universities"
+        ],
+        "matched_keywords": [
+          "الجامعة",
+          "جامعة"
+        ]
+      },
+      {
+        "text": "-التقدير الكلى ليس اقل من 2.00 (جيد) مع العلم ان عند عمل المقاصة لا يتم تحويل اى مادة اقل من جيد كتقدير (C)",
+        "likes": 0,
+        "relevant": true,
+        "matched_categories": [
+          "education_nouns"
+        ],
+        "matched_keywords": [
+          "مادة"
+        ]
+      },
+      {
+        "text": "-اجتياز سنة علي الاقل في الجامعة الحالية",
+        "likes": 0,
+        "relevant": true,
+        "matched_categories": [
+          "universities"
+        ],
+        "matched_keywords": [
+          "الجامعة",
+          "جامعة"
+        ]
+      },
+      {
+        "text": "-عمل ابليكشن التقديم و اجتياز امتحان اللغة امتحان اللغه الانجليزيه (امتحان تحديد مستوي)",
+        "likes": 0,
+        "relevant": true,
+        "matched_categories": [
+          "education_nouns"
+        ],
+        "matched_keywords": [
+          "امتحان"
+        ]
+      },
+      {
+        "text": "-لابد من احضار المحتوى العلمى مختوم من الجامعة (Course Description)",
+        "likes": 0,
+        "relevant": true,
+        "matched_categories": [
+          "universities",
+          "education_nouns"
+        ],
+        "matched_keywords": [
+          "الجامعة",
+          "جامعة",
+          "course"
+        ]
+      },
+      {
+        "text": "-لابد من احضار بيان الدرجات (Transcript) مختوم من الجامعة",
+        "likes": 0,
+        "relevant": true,
+        "matched_categories": [
+          "universities"
+        ],
+        "matched_keywords": [
+          "الجامعة",
+          "جامعة"
+        ]
+      },
+      {
+        "text": "-مجموع الثانوية العامة اعلي من الحد الادني في سنة الحصول عليها",
+        "likes": 0,
+        "relevant": true,
+        "matched_categories": [
+          "education_nouns"
+        ],
+        "matched_keywords": [
+          "مجموع"
+        ]
+      }
+    ]
+  },
+  {
+    "post_text": "في تقديم من website الجامعة و شروط التحويل",
+    "post_likes": 1,
+    "date_str": "unknown",
+    "source_group": "Nile University Friends in Egypt",
+    "source_university": "Nile University",
+    "scraped_at": "2026-06-17T23:54:59.187273",
+    "matched_categories": [
+      "universities"
+    ],
+    "matched_keywords": [
+      "الجامعة",
+      "جامعة"
+    ],
+    "translated_text": "According to the university's website and transfer requirements\n[Comments: The final grade must be at least 2.00 (good). Note that when taking a leave, no subject with a grade lower than good (C) will be transferred | -Passing at least one year in the current university]",
+    "swot_type": "WEAKNESS",
+    "theme": "Transfer Requirements",
+    "signal": "Students may struggle to transfer if they have low grades, specifically below C.",
+    "confidence": 0.8,
+    "relevant_comments": [
+      {
+        "text": "في تقديم من website الجامعة و شروط التحويل",
+        "likes": 0,
+        "relevant": true,
+        "matched_categories": [
+          "universities"
+        ],
+        "matched_keywords": [
+          "الجامعة",
+          "جامعة"
+        ]
+      },
+      {
+        "text": "-التقدير الكلى ليس اقل من 2.00 (جيد) مع العلم ان عند عمل المقاصة لا يتم تحويل اى مادة اقل من جيد كتقدير (C)",
+        "likes": 0,
+        "relevant": true,
+        "matched_categories": [
+          "education_nouns"
+        ],
+        "matched_keywords": [
+          "مادة"
+        ]
+      },
+      {
+        "text": "-اجتياز سنة علي الاقل في الجامعة الحالية",
+        "likes": 0,
+        "relevant": true,
+        "matched_categories": [
+          "universities"
+        ],
+        "matched_keywords": [
+          "الجامعة",
+          "جامعة"
+        ]
+      },
+      {
+        "text": "-عمل ابليكشن التقديم و اجتياز امتحان اللغة امتحان اللغه الانجليزيه (امتحان تحديد مستوي)",
+        "likes": 0,
+        "relevant": true,
+        "matched_categories": [
+          "education_nouns"
+        ],
+        "matched_keywords": [
+          "امتحان"
+        ]
+      },
+      {
+        "text": "-لابد من احضار المحتوى العلمى مختوم من الجامعة (Course Description)",
+        "likes": 0,
+        "relevant": true,
+        "matched_categories": [
+          "universities",
+          "education_nouns"
+        ],
+        "matched_keywords": [
+          "الجامعة",
+          "جامعة",
+          "course"
+        ]
+      },
+      {
+        "text": "-لابد من احضار بيان الدرجات (Transcript) مختوم من الجامعة",
+        "likes": 0,
+        "relevant": true,
+        "matched_categories": [
+          "universities"
+        ],
+        "matched_keywords": [
+          "الجامعة",
+          "جامعة"
+        ]
+      },
+      {
+        "text": "-مجموع الثانوية العامة اعلي من الحد الادني في سنة الحصول عليها",
+        "likes": 0,
+        "relevant": true,
+        "matched_categories": [
+          "education_nouns"
+        ],
+        "matched_keywords": [
+          "مجموع"
+        ]
+      },
+      {
+        "text": "نصيحة مني بلاش تحول للجامعة",
+        "likes": 0,
+        "relevant": true,
+        "matched_categories": [
+          "universities"
+        ],
+        "matched_keywords": [
+          "جامعة"
+        ]
+      }
+    ]
+  },
+  {
+    "post_text": "Differential equations, signals",
+    "post_likes": 0,
+    "date_str": "unknown",
+    "source_group": "Nile University Friends in Egypt",
+    "source_university": "Nile University",
+    "scraped_at": "2026-06-17T23:54:59.326605",
     "matched_categories": [],
     "matched_keywords": [],
-    "translated_text": "The academy for a foreign degree",
-    "swot_type": "OPPORTUNITY",
-    "theme": "Study Abroad Opportunities",
-    "signal": "Students are considering studying abroad due to perceived better opportunities.",
+    "translated_text": "I'm studying differential equations and signal processing now. I wish I had a good teacher like Dr. Ahmed in university, he explained everything clearly and made it easy to understand. Now I'm trying to teach myself but it's not the same as having a real teacher.",
+    "swot_type": "STRENGTH",
+    "theme": "Strong faculty",
+    "signal": "Dr. Ahmed is an effective teacher who can explain complex concepts clearly.",
+    "confidence": 0.9,
+    "relevant_comments": []
+  },
+  {
+    "post_text": "يبني أنت ثانوية وركز تجيب مجموع عالي تجيب إن شاء الله هندسة حكومي وخد إجازتك مش وقته",
+    "post_likes": 0,
+    "date_str": "unknown",
+    "source_group": "Nile University Friends in Egypt",
+    "source_university": "Nile University",
+    "scraped_at": "2026-06-17T23:55:14.308175",
+    "matched_categories": [
+      "education_nouns"
+    ],
+    "matched_keywords": [
+      "مجموع"
+    ],
+    "translated_text": "You're building a high school and focusing on getting a high score, so you can get government engineering and get your license without wasting time.\n\nAs long as Amir is American, I think your English is good and this is the first step to avoid entering English 1 and English 2 all the time (make sure you check the exams). Try to keep some basic phrases like \"how are you\" too so that when you take the exam, you get a score of MATH 1 instead of being absent and wasting your memory's time, it's better.",
+    "swot_type": "STRENGTH",
+    "theme": "Strategic Planning",
+    "signal": "Student is planning ahead to avoid unnecessary courses and save time by focusing on high school scores.",
+    "confidence": 0.9,
+    "relevant_comments": [
+      {
+        "text": "يبني أنت ثانوية وركز تجيب مجموع عالي تجيب إن شاء الله هندسة حكومي وخد إجازتك مش وقته",
+        "likes": 0,
+        "relevant": true,
+        "matched_categories": [
+          "education_nouns"
+        ],
+        "matched_keywords": [
+          "مجموع"
+        ]
+      },
+      {
+        "text": "طالما اميركان اظن الانجلش بتاعك حلو ودي اول ستيب حلوة عشان تتجنب انك تدخل انجلش ١ وتدخل انجلش ٢ على طول (اتاكد تمتحن الامتحان الاونلاين والاساي في الجامعة لازم عشان تعرف تدخل انجلش ٢)",
+        "likes": 0,
+        "relevant": true,
+        "matched_categories": [
+          "universities",
+          "education_nouns",
+          "career_nouns"
+        ],
+        "matched_keywords": [
+          "الجامعة",
+          "جامعة",
+          "امتحان",
+          "دخل"
+        ]
+      },
+      {
+        "text": "حاول يبقا عندك بيزكس كالكولاس بردو عشان اما تتمتحن الامتحان تجيب مجموع ماث ١ بدل متدخل بري كالك وتضيع وقت ذاكره احسن مش هياخد منك وقت ومجهود اوي",
+        "likes": 0,
+        "relevant": true,
+        "matched_categories": [
+          "education_nouns",
+          "career_nouns"
+        ],
+        "matched_keywords": [
+          "امتحان",
+          "مجموع",
+          "دخل"
+        ]
+      }
+    ]
+  },
+  {
+    "post_text": "طالما اميركان اظن الانجلش بتاعك حلو ودي اول ستيب حلوة عشان تتجنب انك تدخل انجلش ١ وتدخل انجلش ٢ على طول (اتاكد تمتحن الامتحان الاونلاين والاساي في الجامعة لازم عشان تعرف تدخل انجلش ٢)",
+    "post_likes": 0,
+    "date_str": "unknown",
+    "source_group": "Nile University Friends in Egypt",
+    "source_university": "Nile University",
+    "scraped_at": "2026-06-17T23:55:21.595443",
+    "matched_categories": [
+      "universities",
+      "education_nouns",
+      "career_nouns"
+    ],
+    "matched_keywords": [
+      "الجامعة",
+      "جامعة",
+      "امتحان",
+      "دخل"
+    ],
+    "translated_text": "As long as you think your English is good, this is the first step to avoid entering English 1 and then English 2 (make sure you pass the online exam and the university's assessment because it's necessary for you to enter English 2). Try to keep a calculator like Coca-Cola with you so that if you take the exam, you'll get a score of MATH 1 instead of being a dropout and wasting your time.",
+    "swot_type": "WEAKNESS",
+    "theme": "Academic Pressure",
+    "signal": "Students are at risk of academic failure due to inadequate preparation for exams.",
+    "confidence": 0.8,
+    "relevant_comments": [
+      {
+        "text": "طالما اميركان اظن الانجلش بتاعك حلو ودي اول ستيب حلوة عشان تتجنب انك تدخل انجلش ١ وتدخل انجلش ٢ على طول (اتاكد تمتحن الامتحان الاونلاين والاساي في الجامعة لازم عشان تعرف تدخل انجلش ٢)",
+        "likes": 0,
+        "relevant": true,
+        "matched_categories": [
+          "universities",
+          "education_nouns",
+          "career_nouns"
+        ],
+        "matched_keywords": [
+          "الجامعة",
+          "جامعة",
+          "امتحان",
+          "دخل"
+        ]
+      },
+      {
+        "text": "حاول يبقا عندك بيزكس كالكولاس بردو عشان اما تتمتحن الامتحان تجيب مجموع ماث ١ بدل متدخل بري كالك وتضيع وقت ذاكره احسن مش هياخد منك وقت ومجهود اوي",
+        "likes": 0,
+        "relevant": true,
+        "matched_categories": [
+          "education_nouns",
+          "career_nouns"
+        ],
+        "matched_keywords": [
+          "امتحان",
+          "مجموع",
+          "دخل"
+        ]
+      },
+      {
+        "text": "HumbleReindeer7078 ابنى امتحن انجلش اون لاين كده فيه امتحانات تانيه؟",
+        "likes": 0,
+        "relevant": true,
+        "matched_categories": [
+          "education_nouns"
+        ],
+        "matched_keywords": [
+          "امتحان"
+        ]
+      },
+      {
+        "text": "يبني أنت ثانوية وركز تجيب مجموع عالي تجيب إن شاء الله هندسة حكومي وخد إجازتك مش وقته",
+        "likes": 0,
+        "relevant": true,
+        "matched_categories": [
+          "education_nouns"
+        ],
+        "matched_keywords": [
+          "مجموع"
+        ]
+      }
+    ]
+  },
+  {
+    "post_text": "لا خالص بس مذاكره علطول عشان هو شهر بس",
+    "post_likes": 1,
+    "date_str": "unknown",
+    "source_group": "Nile University Friends in Egypt",
+    "source_university": "Nile University",
+    "scraped_at": "2026-06-17T23:55:21.719997",
+    "matched_categories": [],
+    "matched_keywords": [],
+    "translated_text": "Not just that, but we're arguing for a long time because it's only one month.",
+    "swot_type": "WEAKNESS",
+    "theme": "Student-Parent Disagreement",
+    "signal": "Students and parents disagreeing on the university's performance after short period of study",
+    "confidence": 0.8,
+    "relevant_comments": []
+  },
+  {
+    "post_text": "نصحه منى باليش باص جامعه",
+    "post_likes": 0,
+    "date_str": "unknown",
+    "source_group": "Nile University Friends in Egypt",
+    "source_university": "Nile University",
+    "scraped_at": "2026-06-17T23:55:28.944650",
+    "matched_categories": [],
+    "matched_keywords": [],
+    "translated_text": "I advise you to be patient with your university's administration.",
+    "swot_type": "STRENGTH",
+    "theme": "Strong Faculty/Staff",
+    "signal": "Student advising the administration to be patient, implying a positive relationship and trust in their abilities.",
     "confidence": 0.8,
     "relevant_comments": []
   }
