@@ -27,7 +27,7 @@ from langchain_community.embeddings import OllamaEmbeddings
 from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import BaseModel
 
-from core.llm import JSON_GUARDRAIL, local_brain
+from core.llm import JSON_GUARDRAIL, local_brain, safe_embed_documents
 
 from .config import (
     ACTION_CORE_DEDUP_THRESHOLD,
@@ -335,6 +335,10 @@ def _should_merge(c: dict, k: dict, full_c, full_k, core_c, core_k) -> bool:
     return _cosine(full_c, full_k) >= OBJECTIVE_DEDUP_THRESHOLD
 
 
+def _safe_embed(emb: OllamaEmbeddings, texts: list[str]) -> list[list[float]]:
+    return safe_embed_documents(emb, texts)
+
+
 def _dedup_objectives(goals: list[dict]) -> list[dict]:
     """Plan-wide dedup. Walks every objective in plan order; if it matches an
     already-kept objective (same backbone, same-pillar action-core, or near-verbatim
@@ -346,8 +350,8 @@ def _dedup_objectives(goals: list[dict]) -> list[dict]:
         return goals
 
     emb        = OllamaEmbeddings(model=EMBED_MODEL)
-    full_vecs  = emb.embed_documents([o["text"] for _, o in flat])
-    core_vecs  = emb.embed_documents([_action_core(o["text"]) for _, o in flat])
+    full_vecs  = _safe_embed(emb, [o["text"] for _, o in flat])
+    core_vecs  = _safe_embed(emb, [_action_core(o["text"]) for _, o in flat])
 
     kept: list[tuple[dict, dict, list, list]] = []   # (goal, obj, full_vec, core_vec)
     merged = 0
@@ -396,4 +400,8 @@ def draft_all_goals(clusters: list[dict]) -> list[dict]:
         except Exception as exc:
             print(f"[drafting] cluster {cluster.get('cluster_id')} failed ({exc}); skipping.")
 
-    return _dedup_objectives(goals)
+    try:
+        return _dedup_objectives(goals)
+    except Exception as exc:
+        print(f"[drafting] dedup failed ({exc}); returning goals without dedup.")
+        return goals

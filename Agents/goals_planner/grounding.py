@@ -14,10 +14,13 @@ Alignment levels (stored on each pair):
 
 from __future__ import annotations
 
+import math
 import os
 
 from langchain_community.embeddings import OllamaEmbeddings
 from neo4j import GraphDatabase
+
+from core.llm import safe_embed_documents
 from neo4j.exceptions import ConfigurationError
 
 from .config import (
@@ -146,8 +149,7 @@ def ground_pairs(pairs: list[dict]) -> list[dict]:
     driver   = _get_driver()
 
     # Single batch call — replaces N sequential embed_query calls
-    texts      = [f"{p['internal_text']} {p['external_text']}" for p in pairs]
-    embeddings = embedder.embed_documents(texts)
+    embeddings = safe_embed_documents(embedder, [f"{p['internal_text']} {p['external_text']}" for p in pairs])
 
     # Fast-fail: if Neo4j is unreachable, don't fire N retrying queries (which can
     # take tens of minutes on a flaky link). Degrade every pair to pillar_only now.
@@ -203,11 +205,14 @@ def ground_pairs(pairs: list[dict]) -> list[dict]:
                     pair["indicator_text"]        = None
                     continue
 
-                score        = row["score"]
+                raw_score    = row["score"]
+                # Neo4j can return NaN for zero-vector embeddings; replace with None
+                # so it never enters JSON serialization as an unrepresentable float.
+                score        = raw_score if (isinstance(raw_score, (int, float)) and math.isfinite(raw_score)) else None
                 indicator_id = row["indicator_id"]   # None if chunk not under Indicator
                 chunk_text   = (row["chunk_content"] or "")[:500]
 
-                if score >= GROUND_THRESHOLD and indicator_id:
+                if score is not None and score >= GROUND_THRESHOLD and indicator_id:
                     pair["alignment"]             = "indicator"
                     pair["grounded_indicator_id"] = indicator_id
                     pair["grounding_score"]       = score

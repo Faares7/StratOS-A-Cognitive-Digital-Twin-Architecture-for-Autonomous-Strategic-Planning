@@ -28,7 +28,7 @@ from __future__ import annotations
 import numpy as np
 from langchain_community.embeddings import OllamaEmbeddings
 
-from core.llm import JSON_GUARDRAIL, local_brain
+from core.llm import JSON_GUARDRAIL, local_brain, safe_embed_documents
 
 from .config import (
     CLUSTER_KNN,
@@ -49,7 +49,8 @@ _STABLE_MIN = 2
 def _embed_internal(pairs: list[dict]) -> np.ndarray:
     """Embed each pair by its INTERNAL text only, L2-normalised so dot == cosine."""
     texts = [(p.get("internal_text") or p.get("external_text") or "") for p in pairs]
-    X = np.asarray(OllamaEmbeddings(model=EMBED_MODEL).embed_documents(texts), dtype=float)
+    X = np.asarray(safe_embed_documents(OllamaEmbeddings(model=EMBED_MODEL), texts), dtype=float)
+    np.nan_to_num(X, copy=False, nan=0.0, posinf=0.0, neginf=0.0)
     norms = np.linalg.norm(X, axis=1, keepdims=True)
     norms[norms == 0] = 1.0
     return X / norms

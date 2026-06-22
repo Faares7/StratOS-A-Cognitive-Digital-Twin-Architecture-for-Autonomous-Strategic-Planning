@@ -132,6 +132,8 @@ def monotonic_ratio(ints: list[int | None]) -> float:
     if len(valid) < 2:
         return 0.0
     pairs = list(zip(valid, valid[1:]))
+    if not pairs:
+        return 0.0
     return sum(1 for a, b in pairs if b >= a) / len(pairs)
 
 

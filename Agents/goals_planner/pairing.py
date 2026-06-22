@@ -11,6 +11,7 @@ import uuid
 
 from langchain_community.embeddings import OllamaEmbeddings
 
+from core.llm import safe_embed_documents, safe_embed_texts
 from .config import EMBED_MODEL, PAIR_THRESHOLD, TOP_K_EXTERNAL
 from .mock_improvements import get_improvement_for_weakness
 
@@ -22,7 +23,8 @@ def _cosine(a: list[float], b: list[float]) -> float:
     norm_b = math.sqrt(sum(x * x for x in b))
     if norm_a == 0.0 or norm_b == 0.0:
         return 0.0
-    return dot / (norm_a * norm_b)
+    result = dot / (norm_a * norm_b)
+    return result if math.isfinite(result) else 0.0
 
 
 def _item_text(item: dict) -> str:
@@ -71,8 +73,8 @@ def build_pairs(swot_items: list[dict]) -> list[dict]:
     int_texts = [_item_text(i) for i in internal]
     ext_texts = [_item_text(e) for e in external]
 
-    int_embeds = embedder.embed_documents(int_texts)
-    ext_embeds = embedder.embed_documents(ext_texts)
+    int_embeds = safe_embed_documents(embedder, int_texts)
+    ext_embeds = safe_embed_documents(embedder, ext_texts)
 
     # ── Build ALL raw scores (no filtering yet) ──────────────────────────────
     # raw_all: list of (internal_item, external_item, score) for every combination
