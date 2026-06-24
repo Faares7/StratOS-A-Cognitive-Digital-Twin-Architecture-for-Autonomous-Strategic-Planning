@@ -25,7 +25,7 @@ from .provenance import ref_plan_prov, agent_prov, mixed_prov
 
 
 def _uid() -> str:
-    return str(uuid.uuid4())[:12]
+    return uuid.uuid4().hex
 
 
 def _para(text: str, prov: ProvenanceModel) -> ParagraphBlockModel:
@@ -137,18 +137,28 @@ _PLACEHOLDER_WORDS = {
 
 
 def _filter_placeholder_bullets(bullets: list[str]) -> list[str]:
-    """Remove LLM-generated placeholder bullets that carry no real content."""
+    """Remove LLM-generated placeholder bullets that carry no real content.
+    Also drops truncated sentences (LLM hit token limit mid-output)."""
+    _TRUNCATION_ENDINGS = ("(", ",", " and", " or", " the", " a", " an")
     return [
         b for b in bullets
         if b.strip().lower().rstrip(".") not in _PLACEHOLDER_WORDS
         and len(b.strip()) > 3
+        and not any(b.strip().endswith(suf) for suf in _TRUNCATION_ENDINGS)
     ]
 
 
 def _item_text(it: dict) -> str:
+    """Full verbatim text for provenance/finding storage."""
     title = (it.get("title") or "").strip()
     desc  = (it.get("description") or "").strip()
     return f"{title}: {desc}" if title and desc else (title or desc or "")
+
+
+def _display_text(it: dict) -> str:
+    """Title for table cell display — matches what the gap analysis page shows in chips.
+    Falls back to full description if title is absent (no truncation in plan tables)."""
+    return (it.get("title") or "").strip() or (it.get("description") or "").strip()
 
 
 def _fuzzy_get(d: dict, pname: str):
@@ -171,17 +181,11 @@ def _fuzzy_get(d: dict, pname: str):
     return None
 
 
-def build_swot_blocks(
-    swot_items:   list[dict],
-    sw_condensed: dict[str, tuple[list[str], list[str]]] | None = None,
-    ot_condensed: tuple[list[str], list[str]] | None = None,
-) -> list[BlockModel]:
-    """SWOT as two tables:
-    • SW table — one row per NAQAAE pillar (all 7 always present): [Pillar | Strengths | Weaknesses]
-    • OT table — two rows:  [Opportunities | <bullets>] and [Threats | <bullets>]
-    Prepended by a fixed methodology intro paragraph.
-    When sw_condensed/ot_condensed are provided (from llm.condense_swot_*), those
-    bullets replace verbatim item-text; originals are retained in provenance evidence."""
+def build_swot_blocks(swot_items: list[dict]) -> list[BlockModel]:
+    """SWOT as two tables using approved consolidation items verbatim — no LLM condensing.
+    • SW table — one row per NAQAAE pillar: [Pillar | Strengths | Weaknesses]
+    • OT table — two rows: [Opportunities | bullets] [Threats | bullets]
+    Prepended by a fixed methodology intro paragraph."""
     strengths:     dict[str, list[dict]] = {}
     weaknesses:    dict[str, list[dict]] = {}
     opportunities: list[dict] = []
@@ -206,7 +210,7 @@ def build_swot_blocks(
     )
     blocks: list[BlockModel] = [_para(_SWOT_METHODOLOGY_INTRO, methodology_prov)]
 
-    # ── Strengths / Weaknesses table — all 7 NAQAAE pillars always shown ─────
+    # ── Strengths / Weaknesses table — all 7 NAQAAE pillars always shown ──────
     all_pillars = list(dict.fromkeys(
         _NAQAAE_PILLAR_ORDER
         + [p for p in strengths if p not in _NAQAAE_PILLAR_ORDER]
@@ -216,7 +220,7 @@ def build_swot_blocks(
     sw_provs = [
         agent_prov(
             agent=it.get("agent_id") or "swot_runner",
-            finding=_item_text(it),                              # VERBATIM
+            finding=_item_text(it),
             source=str(it.get("source_metadata") or "swot_items"),
             category=cat,  # type: ignore[arg-type]
             pillar_tag=pname,
@@ -226,25 +230,14 @@ def build_swot_blocks(
         for pname, items in grp.items()
         for it in items
     ]
-    if sw_condensed:
-        sw_provs.append(agent_prov(
-            agent="chief_editor",
-            finding="LLM-condensed strengths and weaknesses per NAQAAE pillar",
-            source="swot_items+llm:gemini-2.5-flash",
-            evidence={"editorRefined": True},
-        ))
     sw_prov = mixed_prov(sw_provs) if len(sw_provs) > 1 else (
         sw_provs[0] if sw_provs else agent_prov("swot_runner", "SW analysis", "swot_items")
     )
 
     sw_rows = []
     for pname in all_pillars:
-        condensed_pair = _fuzzy_get(sw_condensed, pname) if sw_condensed else None
-        if condensed_pair:
-            s_bullets, w_bullets = condensed_pair
-        else:
-            s_bullets = [_item_text(it) for it in strengths.get(pname, []) if _item_text(it)]
-            w_bullets = [_item_text(it) for it in weaknesses.get(pname, []) if _item_text(it)]
+        s_bullets = [_display_text(it) for it in (_fuzzy_get(strengths, pname) or []) if _display_text(it)]
+        w_bullets = [_display_text(it) for it in (_fuzzy_get(weaknesses, pname) or []) if _display_text(it)]
         s_bullets = _filter_placeholder_bullets(s_bullets)
         w_bullets = _filter_placeholder_bullets(w_bullets)
         sw_rows.append([
@@ -260,51 +253,37 @@ def build_swot_blocks(
         caption="Internal Environment — Strengths and Weaknesses by NAQAAE Pillar",
     ))
 
-    # ── Opportunities / Threats table — two rows (one per category) ───────────
+    # ── Opportunities / Threats table ─────────────────────────────────────────
     ot_provs = [
         agent_prov(
             agent=it.get("agent_id") or "swot_runner",
-            finding=_item_text(it),                              # VERBATIM
+            finding=_item_text(it),
             source=str(it.get("source_metadata") or "swot_items"),
             category=cat,  # type: ignore[arg-type]
         )
         for cat, grp in [("opportunity", opportunities), ("threat", threats)]
         for it in grp
     ]
-    if ot_condensed:
-        ot_provs.append(agent_prov(
-            agent="chief_editor",
-            finding="LLM-condensed opportunities and threats",
-            source="swot_items+llm:gemini-2.5-flash",
-            evidence={"editorRefined": True},
-        ))
     ot_prov = mixed_prov(ot_provs) if len(ot_provs) > 1 else (
         ot_provs[0] if ot_provs else agent_prov("swot_runner", "OT analysis", "swot_items")
     )
 
-    if ot_condensed:
-        o_bullets, t_bullets = ot_condensed
-    else:
-        o_bullets = [_item_text(it) for it in opportunities if _item_text(it)]
-        t_bullets = [_item_text(it) for it in threats if _item_text(it)]
+    o_bullets = _filter_placeholder_bullets([_display_text(it) for it in opportunities if _display_text(it)])
+    t_bullets = _filter_placeholder_bullets([_display_text(it) for it in threats     if _display_text(it)])
 
-    o_bullets = _filter_placeholder_bullets(o_bullets)
-    t_bullets = _filter_placeholder_bullets(t_bullets)
-
-    # Two-row table: Opportunities row, then Threats row
+    # Two-column layout: Opportunities | Threats — one item per row, padded with "—"
+    max_len = max(len(o_bullets), len(t_bullets), 1)
+    ot_rows = [
+        [
+            make_pm_text(o_bullets[i] if i < len(o_bullets) else "—"),
+            make_pm_text(t_bullets[i] if i < len(t_bullets) else "—"),
+        ]
+        for i in range(max_len)
+    ]
     blocks.append(TableBlockModel(
         id=f"b-{_uid()}", provenance=ot_prov,
-        header=["Category", "Details"],
-        rows=[
-            [
-                make_pm_text("Opportunities"),
-                make_pm_bullets(o_bullets) if o_bullets else make_pm_text("—"),
-            ],
-            [
-                make_pm_text("Threats"),
-                make_pm_bullets(t_bullets) if t_bullets else make_pm_text("—"),
-            ],
-        ],
+        header=["Opportunities", "Threats"],
+        rows=ot_rows,
         caption="External Environment — Opportunities and Threats",
     ))
 
@@ -350,17 +329,28 @@ def _bold_para(text: str, prov: ProvenanceModel) -> ParagraphBlockModel:
 def build_gap_blocks_llm(
     gap_items:     list[dict],
     input_pillars: dict[str, dict],
-    sw_condensed:  dict[str, tuple[list[str], list[str]]] | None = None,
+    swot_items:    list[dict] | None = None,
 ) -> list[BlockModel]:
     """5-column gap table — all 7 NAQAAE pillars always present as baseline rows:
     [Pillar | Strengths | Weaknesses | Target State | Improvement Suggestions]
 
-    S/W: uses sw_condensed (shared with SWOT table) when provided, else input_pillars prose.
+    S/W: uses approved swot_items (same source as SWOT table) grouped by pillar.
+         Falls back to input_pillars prose only when no SWOT items exist for a pillar.
     Target state: taken directly from input_pillars.target_state (pre-resolved by generator).
     Suggestions: verbatim from gap_analysis_items, never LLM-condensed.
     Pillar name matching is case-insensitive to tolerate minor DB/JSON key divergence.
-    input_pillars key is "pillar" (not "pillar_name").
     """
+    # Group SWOT items by pillar for S/W column lookup
+    strengths_by:  dict[str, list[dict]] = {}
+    weaknesses_by: dict[str, list[dict]] = {}
+    for item in (swot_items or []):
+        t     = (item.get("type") or "").lower()
+        pname = (item.get("pillar_name") or "").strip() or "General"
+        if t == "strength":
+            strengths_by.setdefault(pname, []).append(item)
+        elif t == "weakness":
+            weaknesses_by.setdefault(pname, []).append(item)
+
     suggestions_by_pillar: dict[str, list[str]] = {}
     per_item_provs: list = []
 
@@ -373,7 +363,7 @@ def build_gap_blocks_llm(
         per_item_provs.append(
             agent_prov(
                 agent="gap_analysis",
-                finding=g,                      # VERBATIM
+                finding=g,
                 source="gap_analysis_items",
                 pillar_tag=pname,
                 evidence={
@@ -383,19 +373,9 @@ def build_gap_blocks_llm(
             )
         )
 
-    table_prov_sources = list(per_item_provs)
-    if sw_condensed:
-        table_prov_sources.append(
-            agent_prov(
-                agent="chief_editor",
-                finding="SWOT S/W condensed per NAQAAE pillar (shared with SWOT table)",
-                source="swot_items+llm:gemini-2.5-flash",
-                evidence={"editorRefined": True},
-            )
-        )
     table_prov = (
-        mixed_prov(table_prov_sources) if len(table_prov_sources) > 1
-        else (table_prov_sources[0] if table_prov_sources
+        mixed_prov(per_item_provs) if len(per_item_provs) > 1
+        else (per_item_provs[0] if per_item_provs
               else agent_prov("gap_analysis", "Gap analysis", "gap_analysis_items"))
     )
 
@@ -409,20 +389,19 @@ def build_gap_blocks_llm(
 
     rows: list = []
     for pname in all_gap_pillars:
-        pd         = _fuzzy_get(input_pillars, pname) or {}
-        sugg_list  = _fuzzy_get(suggestions_by_pillar, pname) or []
+        pd        = _fuzzy_get(input_pillars, pname) or {}
+        sugg_list = _fuzzy_get(suggestions_by_pillar, pname) or []
 
-        # Target state: already resolved by generator._resolve_target_states
-        # (summary if hash matches, user's text if edited, raw if no summary).
-        t_bullets = _text_to_bullets(pd.get("target_state") or "")
-
-        # Suggestions: verbatim from DB — never LLM-condensed.
+        t_bullets  = _text_to_bullets(pd.get("target_state") or "")
         sg_bullets = sugg_list
 
-        # S/W: shared condensed output (from SWOT table) takes precedence
-        sw_pair = _fuzzy_get(sw_condensed, pname) if sw_condensed else None
-        if sw_pair:
-            s_bullets, w_bullets = sw_pair
+        # S/W: use approved SWOT consolidation items verbatim; fall back to
+        # input_pillars prose only when no approved items exist for this pillar.
+        s_items = _fuzzy_get(strengths_by, pname) or []
+        w_items = _fuzzy_get(weaknesses_by, pname) or []
+        if s_items or w_items:
+            s_bullets = [_display_text(it) for it in s_items if _display_text(it)]
+            w_bullets = [_display_text(it) for it in w_items if _display_text(it)]
         else:
             s_bullets = _text_to_bullets(pd.get("strengths") or "")
             w_bullets = _text_to_bullets(pd.get("weaknesses") or "")

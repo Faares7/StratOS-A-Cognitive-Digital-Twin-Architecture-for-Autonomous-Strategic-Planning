@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useCallback, useEffect, useContext } from "react";
+import React, { useState, useRef, useCallback, useEffect, useLayoutEffect, useContext } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import { StarterKit } from "@tiptap/starter-kit";
 import {
@@ -24,6 +24,18 @@ export function humanProv() {
 export function rtToText(rt: RichText): string {
   if (!rt) return "";
   if (rt.type === "text") return rt.text ?? "";
+  if (rt.type === "bulletList") {
+    return (rt.content ?? [])
+      .map(item => { const t = rtToText(item); return t ? `• ${t}` : ""; })
+      .filter(Boolean)
+      .join("\n");
+  }
+  if (rt.type === "orderedList") {
+    return (rt.content ?? [])
+      .map((item, i) => { const t = rtToText(item); return t ? `${i + 1}. ${t}` : ""; })
+      .filter(Boolean)
+      .join("\n");
+  }
   return (rt.content ?? []).map(rtToText).join("");
 }
 
@@ -83,9 +95,10 @@ interface AddBlockProps {
   chapterId: string;
   subId: string | null;
   afterBlockId?: string;
+  atStart?: boolean;
 }
 
-export function AddBlockAffordance({ editorApi, chapterId, subId, afterBlockId }: AddBlockProps) {
+export function AddBlockAffordance({ editorApi, chapterId, subId, afterBlockId, atStart }: AddBlockProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -120,7 +133,7 @@ export function AddBlockAffordance({ editorApi, chapterId, subId, afterBlockId }
               onMouseDown={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                editorApi.addBlock(chapterId, subId, kind, afterBlockId);
+                editorApi.addBlock(chapterId, subId, kind, afterBlockId, atStart);
                 setOpen(false);
               }}
               className="flex flex-col items-center gap-1 rounded-md px-3 py-2 text-xs text-slate-400 hover:bg-white/5 hover:text-slate-200 transition-colors"
@@ -328,6 +341,44 @@ export function ListEditor({ block, onUpdate }: ListEditorProps) {
   );
 }
 
+// ── Auto-sizing cell textarea ──────────────────────────────────────────────────
+
+interface CellAreaProps {
+  value: string;
+  onChange: (v: string) => void;
+  onMouseDown: (e: React.MouseEvent) => void;
+  onClick: (e: React.MouseEvent) => void;
+  placeholder: string;
+  className?: string;
+  style?: React.CSSProperties;
+}
+
+function CellArea({ value, onChange, onMouseDown, onClick, placeholder, className, style }: CellAreaProps) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+
+  // Runs after every render — keeps height == content height with no scrollbar.
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  });
+
+  return (
+    <textarea
+      ref={ref}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      onMouseDown={onMouseDown}
+      onClick={onClick}
+      rows={1}
+      placeholder={placeholder}
+      className={cn("w-full resize-none overflow-hidden bg-transparent outline-none", className)}
+      style={{ fontFamily: "Georgia, 'Times New Roman', serif", display: "block", ...style }}
+    />
+  );
+}
+
 // ── Table editor ───────────────────────────────────────────────────────────────
 
 interface TableEditorProps {
@@ -386,24 +437,31 @@ export function TableEditor({ block, onUpdate }: TableEditorProps) {
       </div>
 
       {/* Table grid */}
-      <div className="overflow-x-auto rounded-lg border border-[#b8922f]/30">
-        <table className="min-w-full text-sm">
+      <div className="rounded-lg border border-[#b8922f]/30">
+        <table className="w-full text-sm" style={{ tableLayout: "fixed", borderCollapse: "collapse" }}>
+          <colgroup>
+            {Array.from({ length: colCount }, (_, i) => {
+              const firstPct = colCount >= 5 ? 14 : colCount >= 3 ? 18 : 50;
+              const otherPct = ((100 - firstPct) / Math.max(colCount - 1, 1)).toFixed(1);
+              return <col key={i} style={{ width: i === 0 ? `${firstPct}%` : `${otherPct}%` }} />;
+            })}
+          </colgroup>
           {hasHeader && (
             <thead style={{ background: "#1e293b" }}>
               <tr>
                 {block.header!.map((h, ci) => (
-                  <th key={ci} className="p-0 min-w-[6rem]">
-                    <div className="flex items-center">
-                      <input
-                        type="text" value={h}
-                        onChange={(e) => setHeaderCell(ci, e.target.value)}
+                  <th key={ci} className="p-0 align-top" style={{ wordBreak: "break-word" }}>
+                    <div className="flex items-start">
+                      <CellArea
+                        value={h}
+                        onChange={(v) => setHeaderCell(ci, v)}
                         onMouseDown={(e) => e.stopPropagation()}
                         onClick={(e) => e.stopPropagation()}
+                        placeholder="Header"
                         className={cn(
-                          "flex-1 bg-transparent px-3 py-2.5 text-left font-semibold text-white outline-none",
+                          "flex-1 px-3 py-2.5 text-left font-semibold text-white focus:bg-white/5",
                           colCount > 5 ? "text-[10px]" : colCount > 3 ? "text-xs" : "text-sm",
                         )}
-                        placeholder="Header"
                       />
                       {colCount > 1 && (
                         <button
@@ -414,7 +472,7 @@ export function TableEditor({ block, onUpdate }: TableEditorProps) {
                               rows: block.rows.map((r) => r.filter((_, i) => i !== ci)),
                             });
                           }}
-                          className="pr-2 text-white/40 hover:text-white/70 transition-colors"
+                          className="mt-2.5 pr-2 text-white/40 hover:text-white/70 transition-colors"
                         >
                           <Trash2 className="h-3 w-3" />
                         </button>
@@ -430,19 +488,19 @@ export function TableEditor({ block, onUpdate }: TableEditorProps) {
             {block.rows.map((row, ri) => (
               <tr key={ri} className="border-b border-[#b8922f]/20 last:border-b-0">
                 {row.map((cell, ci) => (
-                  <td key={ci} className="p-0">
-                    <input
-                      type="text" value={rtToText(cell)}
-                      onChange={(e) => setCell(ri, ci, e.target.value)}
+                  <td key={ci} className="p-0 align-top" style={{ wordBreak: "break-word" }}>
+                    <CellArea
+                      value={rtToText(cell)}
+                      onChange={(v) => setCell(ri, ci, v)}
                       onMouseDown={(e) => e.stopPropagation()}
                       onClick={(e) => e.stopPropagation()}
-                      className="w-full bg-transparent px-4 py-3 text-[#334155] outline-none focus:bg-[#b8922f]/5"
-                      style={{ fontFamily: "Georgia, 'Times New Roman', serif", minWidth: "5rem" }}
                       placeholder="Cell"
+                      className="px-3 py-2.5 text-[#334155] focus:bg-[#b8922f]/5"
+                      style={{ fontSize: colCount > 4 ? "11px" : "13px" }}
                     />
                   </td>
                 ))}
-                <td className="w-6 p-0">
+                <td className="w-6 p-0 align-middle">
                   {block.rows.length > 1 && (
                     <button
                       onClick={(e) => {

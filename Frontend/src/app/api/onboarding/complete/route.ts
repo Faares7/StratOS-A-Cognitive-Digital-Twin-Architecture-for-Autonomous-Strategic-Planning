@@ -4,12 +4,20 @@ import { authOptions } from "@/lib/auth";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+interface PillarBudget {
+  pillarId: number;
+  name: string;
+  budget: number;
+}
+
 interface CompleteBody {
   faculty: string;
   strategicPeriod: string;
   selectedPriorities: string[];
   selectedPrograms: string[];
   selectedResearch: string[];
+  totalBudget?: number;
+  pillarBudgets?: PillarBudget[];
 }
 
 // ── Supabase REST helpers ─────────────────────────────────────────────────────
@@ -22,6 +30,43 @@ const BASE_HEADERS   = {
   "Content-Type":  "application/json",
   Prefer:          "return=minimal",
 } as const;
+
+async function saveBudget(totalBudget: number, pillarBudgets: PillarBudget[]) {
+  // Upsert the workspace total (single row at id=1, seeded by migration 006).
+  const budgetRes = await fetch(
+    `${SUPABASE_URL}/rest/v1/strategic_budget?id=eq.1`,
+    {
+      method:  "PATCH",
+      headers: BASE_HEADERS,
+      body:    JSON.stringify({ total_budget_egp: totalBudget, updated_at: new Date().toISOString() }),
+      cache:   "no-store",
+    }
+  );
+  // If no row exists yet (migration not yet run), silently skip — the agent
+  // will fall back to its equal-split default at generation time.
+  if (!budgetRes.ok && budgetRes.status !== 404 && budgetRes.status !== 406) {
+    const text = await budgetRes.text().catch(() => "");
+    console.warn(`[onboarding] budget upsert warning (${budgetRes.status}): ${text}`);
+  }
+
+  // Upsert each pillar allocation.
+  for (const p of pillarBudgets) {
+    if (p.pillarId < 1 || p.pillarId > 7) continue;
+    const pillarRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/budget_pillar_allocation?pillar_id=eq.${p.pillarId}`,
+      {
+        method:  "PATCH",
+        headers: BASE_HEADERS,
+        body:    JSON.stringify({ allocated_egp: p.budget, updated_at: new Date().toISOString() }),
+        cache:   "no-store",
+      }
+    );
+    if (!pillarRes.ok && pillarRes.status !== 404 && pillarRes.status !== 406) {
+      const text = await pillarRes.text().catch(() => "");
+      console.warn(`[onboarding] pillar ${p.pillarId} upsert warning (${pillarRes.status}): ${text}`);
+    }
+  }
+}
 
 async function markProfilingDone(organizationId: string, data: CompleteBody) {
   const url = `${SUPABASE_URL}/rest/v1/organizations?id=eq.${organizationId}`;
@@ -67,6 +112,12 @@ export async function POST(request: Request) {
 
   try {
     await markProfilingDone(session.user.organizationId, body);
+
+    // Persist budget only when the user actually entered a value (step is optional).
+    if (body.totalBudget && body.totalBudget > 0 && body.pillarBudgets?.length) {
+      await saveBudget(body.totalBudget, body.pillarBudgets);
+    }
+
     return NextResponse.json({ ok: true });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";

@@ -2,7 +2,6 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useSession, signIn, signOut } from "next-auth/react";
 import { useRole } from "@/hooks/useRole";
 import {
   Sparkles,
@@ -13,8 +12,6 @@ import {
   Check,
   ClipboardList,
   CheckCircle2,
-  Unlink,
-  Link2,
   ExternalLink,
   Upload,
   ArrowRight,
@@ -37,7 +34,6 @@ import { cn } from "@/lib/utils";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
-type WorkspaceState = "disconnected" | "connected";
 type Phase = "idle" | "generating" | "editing" | "publishing" | "published";
 type TemplateData = Record<string, string[]>;
 
@@ -106,68 +102,6 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
     <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
       {children}
     </p>
-  );
-}
-
-// ── 1. Google Workspace Card ───────────────────────────────────────────────────
-
-function WorkspaceCard({
-  state,
-  onToggle,
-  isLoading,
-  readOnly,
-}: {
-  state: WorkspaceState;
-  onToggle: () => void;
-  isLoading?: boolean;
-  readOnly?: boolean;
-}) {
-  return (
-    <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-white/5 bg-[#0d1117] px-5 py-4">
-      <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/5 bg-white/5">
-          <GoogleIcon className="h-5 w-5" />
-        </div>
-        <div>
-          <p className="text-sm font-semibold text-slate-200">Google Workspace</p>
-          <p className="text-xs text-slate-500">Publish surveys directly to Google Forms</p>
-        </div>
-      </div>
-
-      {isLoading ? (
-        <div className="flex items-center gap-2 text-xs text-slate-500">
-          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          Checking session…
-        </div>
-      ) : state === "disconnected" ? (
-        readOnly ? null : (
-          <Button
-            variant="outline"
-            onClick={onToggle}
-            className="gap-2 border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 hover:text-slate-100"
-          >
-            <Link2 className="h-3.5 w-3.5" />
-            Connect Google Workspace
-          </Button>
-        )
-      ) : (
-        <div className="flex items-center gap-3">
-          <Badge variant="live" className="gap-1.5 px-3 py-1 text-xs font-medium">
-            <span className="text-base leading-none">✅</span>
-            Google Forms Linked
-          </Badge>
-          {!readOnly && (
-            <button
-              onClick={onToggle}
-              className="flex items-center gap-1.5 text-xs text-slate-600 transition-colors hover:text-slate-400"
-            >
-              <Unlink className="h-3 w-3" />
-              Disconnect
-            </button>
-          )}
-        </div>
-      )}
-    </div>
   );
 }
 
@@ -467,7 +401,6 @@ function QuestionRow({ q, idx, onUpdate, onUpdateType, onDelete, onRegenerate, r
 interface EditorPanelProps {
   phase: Phase;
   questions: Question[];
-  workspace: WorkspaceState;
   onUpdateQuestion: (id: string, text: string) => void;
   onUpdateAnswerType: (id: string, type: AnswerType) => void;
   onDeleteQuestion: (id: string) => void;
@@ -484,7 +417,6 @@ interface EditorPanelProps {
 function EditorPanel({
   phase,
   questions,
-  workspace,
   onUpdateQuestion,
   onUpdateAnswerType,
   onDeleteQuestion,
@@ -646,7 +578,7 @@ function EditorPanel({
         )}
         <Button
           onClick={onPublish}
-          disabled={workspace === "disconnected" || isPublishing || questions.length === 0 || readOnly}
+          disabled={isPublishing || questions.length === 0 || readOnly}
           className="w-full gap-2 bg-emerald-600 font-semibold text-white hover:bg-emerald-500 disabled:opacity-40"
         >
           {isPublishing ? (
@@ -661,11 +593,6 @@ function EditorPanel({
             </>
           )}
         </Button>
-        {workspace === "disconnected" && !isPublishing && (
-          <p className="mt-2 text-center text-xs text-slate-600">
-            Connect Google Workspace above to enable publishing
-          </p>
-        )}
       </div>
     </div>
   );
@@ -689,9 +616,7 @@ interface CsvStats {
 }
 
 export default function SurveysPage() {
-  const { data: session, status } = useSession();
   const { canMutate } = useRole();
-  const workspace: WorkspaceState = session ? "connected" : "disconnected";
 
   // ── Template data ──────────────────────────────────────────────────────────
   const [templateData, setTemplateData] = useState<TemplateData>({});
@@ -900,17 +825,6 @@ export default function SurveysPage() {
       />
 
       <div className="flex flex-col gap-5 p-6">
-        <WorkspaceCard
-          state={workspace}
-          isLoading={status === "loading"}
-          readOnly={!canMutate}
-          onToggle={() =>
-            workspace === "connected"
-              ? signOut({ redirect: false })
-              : signIn("google")
-          }
-        />
-
         {generateError && (
           <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-400">
             <span className="font-semibold">Generation failed: </span>
@@ -944,7 +858,6 @@ export default function SurveysPage() {
             <EditorPanel
               phase={phase}
               questions={questions}
-              workspace={workspace}
               onUpdateQuestion={updateQuestion}
               onUpdateAnswerType={updateAnswerType}
               onDeleteQuestion={deleteQuestion}

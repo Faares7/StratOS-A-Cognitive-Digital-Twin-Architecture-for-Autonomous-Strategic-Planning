@@ -14,6 +14,7 @@ import {
   checkFeasibility,
   deleteGoal,
   deleteObjective,
+  fetchLatestRunId,
   fetchPlan,
   patchGoal,
   patchObjective,
@@ -949,28 +950,18 @@ export default function StrategyPage() {
   const [restoring, setRestoring] = useState(false);
   const [error,     setError]     = useState<string | null>(null);
 
-  // ── Session persistence ────────────────────────────────────────────────────
-  // Reload the last viewed plan on refresh instead of starting from zero.
+  // ── Load latest run from DB on mount ─────────────────────────────────────
   useEffect(() => {
-    const last = typeof window !== "undefined"
-      ? window.localStorage.getItem("stratos:lastRunId")
-      : null;
-    if (!last) return;
     let cancelled = false;
     setRestoring(true);
-    fetchPlan(last)
+    fetchLatestRunId()
+      .then((runId) => runId ? fetchPlan(runId) : Promise.reject())
       .then((p) => { if (!cancelled) { setPlan(p); setPhase("editing"); } })
-      .catch(() => window.localStorage.removeItem("stratos:lastRunId"))
+      .catch(() => { /* no completed run yet — stay on idle screen */ })
       .finally(() => { if (!cancelled) setRestoring(false); });
     return () => { cancelled = true; };
   }, []);
 
-  // Remember the current plan so a refresh can restore it.
-  useEffect(() => {
-    if (plan?.run_id && typeof window !== "undefined") {
-      window.localStorage.setItem("stratos:lastRunId", plan.run_id);
-    }
-  }, [plan?.run_id]);
 
   // ── Generate ──────────────────────────────────────────────────────────────
 

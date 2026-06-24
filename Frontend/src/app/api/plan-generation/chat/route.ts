@@ -15,7 +15,10 @@ export async function POST(req: NextRequest) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(30_000),
+      // 60s: the first Vertex AI call after a server restart pays a cold-start
+      // cost (auth token + gRPC client init) that can exceed 30s. Warm calls
+      // return in ~1s.
+      signal: AbortSignal.timeout(60_000),
     });
 
     const data = await upstream.json();

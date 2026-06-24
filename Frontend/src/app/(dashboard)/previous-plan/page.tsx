@@ -516,12 +516,10 @@ export default function PreviousPlanPage() {
                   <span className="text-xs text-slate-500">Extraction engine:</span>
                   <span className={cn(
                     "rounded-full px-2.5 py-0.5 text-[11px] font-medium",
-                    result.mode === "gemini+pdfium" && "bg-emerald-500/15 text-emerald-400",
                     result.mode === "docai+pdfium"  && "bg-cyan-500/15    text-cyan-400",
                     result.mode === "pdfium_only"   && "bg-slate-500/15   text-slate-400",
                     result.mode === "md_parse"      && "bg-violet-500/15  text-violet-400",
                   )}>
-                    {result.mode === "gemini+pdfium" && "Gemini 2.5 Pro"}
                     {result.mode === "docai+pdfium"  && "Google Document AI + pypdfium2"}
                     {result.mode === "pdfium_only"   && "pypdfium2 (native PDF text)"}
                     {result.mode === "md_parse"      && "Test mode — pre-extracted .md"}

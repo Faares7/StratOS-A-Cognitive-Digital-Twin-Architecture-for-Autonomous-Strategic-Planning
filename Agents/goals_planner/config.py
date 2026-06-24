@@ -7,7 +7,7 @@ without touching pipeline logic.
 
 # ── Pairing (Node 1) ──────────────────────────────────────────────────────────
 PAIR_THRESHOLD: float = 0.45   # minimum cosine similarity to keep a TOWS pair
-TOP_K_EXTERNAL: int   = 3      # max external items to pair with each internal item
+TOP_K_EXTERNAL: int   = 2      # max external items to pair with each internal item
 
 # ── Grounding (Node 2) ────────────────────────────────────────────────────────
 GROUND_THRESHOLD: float = 0.50  # cosine ≥ this → alignment='indicator'; below → 'pillar_only'

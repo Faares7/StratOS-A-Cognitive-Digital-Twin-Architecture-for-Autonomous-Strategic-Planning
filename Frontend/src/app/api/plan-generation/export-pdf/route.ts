@@ -84,8 +84,10 @@ async function resolveDocImages(
 //   • <img> tags are unreliable in the template context — use CSS background-image
 //     on a sized <div> instead; that renders consistently with data URIs
 
-// top margin is 1.35in = 129.6px — keep in sync with margin.top in page.pdf() below
-// and with A4_CONTENT_H in render-plan-html.ts
+// top margin is 1.0in = 96px (0.7in cream header band + 0.3in gap strip) —
+// keep in sync with margin.top in page.pdf() below and with A4_CONTENT_H in
+// render-plan-html.ts. The gap strip is transparent so the @page cream shows,
+// giving visible separation between the header and content on every page.
 
 function logoBgDiv(dataUri: string, h: number, w: number, pos = 'left center'): string {
   const safe = dataUri.replace(/'/g, '%27')
@@ -100,11 +102,11 @@ function headerTemplate(doc: PlanDocument): string {
   // Logos are pinned to left/right edges with position:absolute.
 
   const mainLogoDiv = meta.orgLogoUrl
-    ? logoBgDiv(meta.orgLogoUrl, 96, 260, 'left center')
+    ? logoBgDiv(meta.orgLogoUrl, 52, 180, 'left center')
     : ''
 
   const partnerLogoDivs = meta.partnerLogoUrls
-    .map(u => logoBgDiv(u, 96, 96, 'right center'))
+    .map(u => logoBgDiv(u, 52, 52, 'right center'))
     .join('')
 
   const orgName = meta.orgName
@@ -112,16 +114,21 @@ function headerTemplate(doc: PlanDocument): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
 
+  // Outer div fills the full 0.85in top margin but is transparent. The cream
+  // band (with the divider line) is only the top 0.7in (67.2px); the remaining
+  // 0.15in below stays transparent so the @page cream shows as a clean gap.
   return `
-<div style="-webkit-print-color-adjust:exact;print-color-adjust:exact;background-color:#f5f4ef;position:relative;width:100%;height:100%;border-bottom:1px solid rgba(184,146,47,0.35);overflow:hidden;font-size:0;">
-  <div style="position:absolute;left:0;right:0;top:0;bottom:0;display:flex;align-items:center;justify-content:center;padding:0 8px;">
-    <span style="font-family:Georgia,'Times New Roman',serif;font-size:16px;font-weight:600;color:#b8922f;text-align:center;line-height:1.4;word-break:break-word;overflow-wrap:break-word;-webkit-print-color-adjust:exact;print-color-adjust:exact;">${orgName}</span>
-  </div>
-  <div style="position:absolute;left:81.6px;top:0;height:100%;display:flex;align-items:center;">
-    ${mainLogoDiv}
-  </div>
-  <div style="position:absolute;right:81.6px;top:0;height:100%;display:flex;align-items:center;gap:12px;">
-    ${partnerLogoDivs}
+<div style="position:relative;width:100%;height:100%;font-size:0;">
+  <div style="-webkit-print-color-adjust:exact;print-color-adjust:exact;background-color:#f5f4ef;position:absolute;left:0;right:0;top:0;height:67.2px;border-bottom:1px solid rgba(184,146,47,0.35);overflow:hidden;">
+    <div style="position:absolute;left:0;right:0;top:0;bottom:0;display:flex;align-items:center;justify-content:center;padding:0 8px;">
+      <span style="font-family:Georgia,'Times New Roman',serif;font-size:16px;font-weight:600;color:#b8922f;text-align:center;line-height:1.4;word-break:break-word;overflow-wrap:break-word;-webkit-print-color-adjust:exact;print-color-adjust:exact;">${orgName}</span>
+    </div>
+    <div style="position:absolute;left:43.2px;top:0;height:100%;display:flex;align-items:center;">
+      ${mainLogoDiv}
+    </div>
+    <div style="position:absolute;right:43.2px;top:0;height:100%;display:flex;align-items:center;gap:12px;">
+      ${partnerLogoDivs}
+    </div>
   </div>
 </div>`
 }
@@ -242,8 +249,8 @@ export async function POST(req: NextRequest) {
       headerTemplate: headerTemplate(resolvedDoc),
       footerTemplate: footerTemplate(),
       margin: {
-        top: '1.35in',    // ← must match A4_CONTENT_H derivation in render-plan-html.ts
-        bottom: '0.45in', // ← must match A4_CONTENT_H derivation in render-plan-html.ts
+        top: '1.0in',     // ← must match A4_CONTENT_H derivation in render-plan-html.ts
+        bottom: '0.6in',  // ← must match A4_CONTENT_H derivation in render-plan-html.ts
         left: '0',
         right: '0',
       },

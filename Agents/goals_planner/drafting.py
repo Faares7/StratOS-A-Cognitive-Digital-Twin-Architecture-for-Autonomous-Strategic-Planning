@@ -257,6 +257,10 @@ _RESULT_CUES = (
     ", resulting in", ", achieving", ", ensuring", ", leading to", ", reducing",
     ", increasing", " within the next", " within two", " within three",
     " within the", " by increasing", " by reducing", " by achieving",
+    # SO/ST objectives follow "Leverage X to seize the opportunity: [specific content]"
+    # Trim at the separator so the action core is just "Leverage X", making
+    # objectives from the same strength embed identically and collapse correctly.
+    " to seize the opportunity", " to address the threat", " to mitigate the threat",
 )
 
 

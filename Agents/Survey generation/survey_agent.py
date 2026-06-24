@@ -85,11 +85,9 @@ SurveyDraft.model_rebuild()
 
 def _load_last_swot_items() -> list[dict]:
     """
-    Return all SWOT items from the most recent non-survey agent run.
-
-    Each dict has: type, title, description, pillar_id, pillar_name, impact_level.
-    Items are ordered S → W → O → T, then HIGH → MEDIUM → LOW impact within each type.
-    Returns [] if the DB is not configured or no qualifying run exists.
+    Return approved SWOT consolidation candidates ordered S → W → O → T,
+    then by salience_score DESC within each type.
+    Returns [] if the DB is not configured or no approved run exists.
     """
     if not _DB_DSN:
         return []
@@ -98,36 +96,29 @@ def _load_last_swot_items() -> list[dict]:
         with conn:
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
                 cur.execute("""
-                    SELECT s.type, s.title, s.description,
-                           s.pillar_id, s.pillar_name, s.impact_level
-                    FROM   swot_items s
-                    WHERE  s.run_id = (
-                        SELECT r.run_id
-                        FROM   agent_runs r
-                        JOIN   swot_items  si ON si.run_id = r.run_id
-                        WHERE  r.agent_id != 'survey'
-                        ORDER  BY r.run_timestamp DESC
-                        LIMIT  1
-                    )
+                    SELECT type, title, description,
+                           pillar_id, pillar_name,
+                           salience_score AS impact_level
+                    FROM   swot_consolidation_candidates
+                    WHERE  approved = true
                     ORDER BY
-                        CASE s.type
+                        CASE type
                             WHEN 'strength'    THEN 1
                             WHEN 'weakness'    THEN 2
                             WHEN 'opportunity' THEN 3
                             WHEN 'threat'      THEN 4
                             ELSE 5
                         END,
-                        CASE UPPER(COALESCE(s.impact_level, ''))
-                            WHEN 'HIGH'   THEN 1
-                            WHEN 'MEDIUM' THEN 2
-                            WHEN 'LOW'    THEN 3
-                            ELSE 4
-                        END
+                        salience_score DESC
                 """)
                 rows = cur.fetchall()
         conn.close()
         items = [dict(r) for r in rows]
-        print(f"[survey] Loaded {len(items)} SWOT item(s) from last run.")
+        if not items:
+            print("[survey] WARNING: no approved SWOT consolidation run found — "
+                  "approve a consolidation run before generating surveys.")
+        else:
+            print(f"[survey] Loaded {len(items)} approved SWOT candidate(s).")
         return items
     except Exception as exc:
         print(f"[survey] SWOT load from DB failed: {exc}")

@@ -131,15 +131,17 @@ function useEditorApi(setDoc: React.Dispatch<React.SetStateAction<PlanDocument>>
       }));
     },
 
-    addBlock(chapterId, subId, kind, afterBlockId) {
+    addBlock(chapterId, subId, kind, afterBlockId, atStart) {
       const nb = newBlock(kind);
       setDoc(doc => ({
         ...doc,
         chapters: doc.chapters.map(ch => {
           if (ch.id !== chapterId) return ch;
           const insertInto = (blocks: Block[]): Block[] => {
+            if (atStart) return [nb, ...blocks];
             if (!afterBlockId) return [...blocks, nb];
             const idx = blocks.findIndex(b => b.id === afterBlockId);
+            if (idx === -1) return [...blocks, nb];
             const next = [...blocks]; next.splice(idx + 1, 0, nb); return next;
           };
           if (subId === null) return { ...ch, intro: insertInto(ch.intro ?? []) };

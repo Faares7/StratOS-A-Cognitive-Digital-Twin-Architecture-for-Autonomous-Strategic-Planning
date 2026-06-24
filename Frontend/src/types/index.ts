@@ -1,17 +1,12 @@
 // ─── NAQAAE Pillars ────────────────────────────────────────────────────────────
 export const NAQAAE_PILLARS = [
-  "Pillar 1: Leadership & Governance",
-  "Pillar 2: Strategic Planning",
-  "Pillar 3: Quality Assurance Systems",
-  "Pillar 4: Faculty Development",
-  "Pillar 5: Student Learning Outcomes",
-  "Pillar 6: Curriculum Design",
-  "Pillar 7: Research & Innovation",
-  "Pillar 8: Community Engagement",
-  "Pillar 9: International Partnerships",
-  "Pillar 10: Physical Infrastructure",
-  "Pillar 11: Financial Sustainability",
-  "Pillar 12: Digital Transformation",
+  "Pillar 1: Program Mission and Management",
+  "Pillar 2: Program Design",
+  "Pillar 3: Teaching, Learning and Assessment",
+  "Pillar 4: Students and Graduates",
+  "Pillar 5: Faculty and Teaching Assistants",
+  "Pillar 6: Resources and Learning Facilities",
+  "Pillar 7: Quality Assurance and Program Evaluation",
 ] as const;
 
 export type NaqaaePillar = (typeof NAQAAE_PILLARS)[number];

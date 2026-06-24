@@ -144,12 +144,19 @@ html.light .hover\:bg-\[\#0d1117\]:hover { background-color: #ede9e0 !important;
 html.light .hover\:bg-\[\#0b0e1a\]:hover { background-color: #ede9e0 !important; }
 
 /* White-at-opacity backgrounds (badges, dividers, subtle fills) */
+html.light .bg-white\/\[0\.02\] { background-color: rgba(0, 0, 0, 0.02) !important; }
 html.light .bg-white\/\[0\.03\] { background-color: rgba(0, 0, 0, 0.03) !important; }
 html.light .bg-white\/\[0\.04\] { background-color: rgba(0, 0, 0, 0.04) !important; }
 html.light .bg-white\/\[0\.05\] { background-color: rgba(0, 0, 0, 0.05) !important; }
 html.light .bg-white\/\[0\.06\] { background-color: rgba(0, 0, 0, 0.06) !important; }
 html.light .bg-white\/\[0\.07\] { background-color: rgba(0, 0, 0, 0.07) !important; }
 html.light .bg-white\/5        { background-color: rgba(0, 0, 0, 0.05) !important; }
+html.light .bg-white\/10       { background-color: rgba(0, 0, 0, 0.06) !important; }
+
+/* Hover bg variants */
+html.light .hover\:bg-white\/\[0\.03\]:hover { background-color: rgba(0, 0, 0, 0.04) !important; }
+html.light .hover\:bg-white\/\[0\.04\]:hover { background-color: rgba(0, 0, 0, 0.05) !important; }
+html.light .hover\:bg-white\/10:hover        { background-color: rgba(0, 0, 0, 0.06) !important; }
 
 /* ── Text colours ────────────────────────────────────────────────────────── */
 html.light .text-\[\#e0e4ef\]              { color: #0f1422 !important; }
@@ -169,8 +176,18 @@ html.light .border-white\/\[0\.06\]       { border-color: rgba(15, 20, 34, 0.07)
 html.light .border-white\/\[0\.07\]       { border-color: rgba(15, 20, 34, 0.09) !important; }
 html.light .border-white\/\[0\.08\]       { border-color: rgba(15, 20, 34, 0.10) !important; }
 html.light .border-white\/\[0\.09\]       { border-color: rgba(15, 20, 34, 0.12) !important; }
+html.light .border-white\/\[0\.10\]       { border-color: rgba(15, 20, 34, 0.13) !important; }
+html.light .border-white\/\[0\.12\]       { border-color: rgba(15, 20, 34, 0.14) !important; }
+html.light .border-white\/10              { border-color: rgba(15, 20, 34, 0.13) !important; }
+html.light .border-white\/20              { border-color: rgba(15, 20, 34, 0.16) !important; }
 html.light .divide-white\/\[0\.05\] > * + * { border-color: rgba(15, 20, 34, 0.06) !important; }
 html.light .divide-white\/\[0\.06\] > * + * { border-color: rgba(15, 20, 34, 0.07) !important; }
+
+/* Hover border variants (onboarding buttons) */
+html.light .hover\:border-white\/\[0\.10\]:hover { border-color: rgba(15, 20, 34, 0.16) !important; }
+html.light .hover\:border-white\/\[0\.14\]:hover { border-color: rgba(15, 20, 34, 0.18) !important; }
+html.light .hover\:border-white\/\[0\.16\]:hover { border-color: rgba(15, 20, 34, 0.20) !important; }
+html.light .hover\:border-white\/\[0\.20\]:hover { border-color: rgba(15, 20, 34, 0.22) !important; }
 
 /* ── Tailwind named slate colours (used across SWOT, meetings, surveys, etc.) ── */
 /* Light-on-dark → dark-on-light for the near-white shades that become invisible */
@@ -184,6 +201,10 @@ html.light .text-slate-400  { color: #475569 !important; }
 html.light .hover\:text-slate-100:hover { color: #0f1422 !important; }
 html.light .hover\:text-slate-200:hover { color: #1e293b !important; }
 html.light .hover\:text-slate-300:hover { color: #334155 !important; }
+
+/* Select/focus variants — Radix UI SelectItem uses focus: pseudo-class for hover highlight */
+html.light .focus\:text-slate-100:focus { color: #0f1422 !important; }
+html.light .focus\:bg-white\/5:focus     { background-color: rgba(0, 0, 0, 0.07) !important; }
 
 /* Dark slate backgrounds → light */
 html.light .bg-slate-900 { background-color: #f8f7f4 !important; }
@@ -401,6 +422,10 @@ body.plan-editor-open [class*="bottom-5"][class*="right-5"][class*="fixed"] {
 body.plan-editor-open [class*="bottom-20"][class*="right-5"][class*="fixed"] {
   display: none !important;
 }
+/* Lock the dashboard <main> so it never scrolls during editor textarea reflows */
+body.plan-editor-open main {
+  overflow: hidden !important;
+}
 
 /* ── Print layout ─────────────────────────────────────────────────────────── */
 @media print {
@@ -461,4 +486,78 @@ body.plan-editor-open [class*="bottom-20"][class*="right-5"][class*="fixed"] {
     background-size: 400% 100%;
     animation: shimmer 1.4s ease infinite;
   }
+}
+
+/* ── Budget allocation slider ────────────────────────────────────────────── */
+.budget-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  border-radius: 9999px;
+  outline: none;
+  cursor: pointer;
+  background: linear-gradient(
+    to right,
+    #b8922f var(--pct, 0%),
+    rgba(255, 255, 255, 0.06) var(--pct, 0%)
+  );
+  transition: background 0.15s ease;
+}
+
+.budget-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #b8922f;
+  border: 2px solid #070911;
+  box-shadow: 0 0 0 1px rgba(184, 146, 47, 0.4);
+  cursor: pointer;
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.budget-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #b8922f;
+  border: 2px solid #070911;
+  box-shadow: 0 0 0 1px rgba(184, 146, 47, 0.4);
+  cursor: pointer;
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.budget-slider:hover::-webkit-slider-thumb {
+  box-shadow: 0 0 0 4px rgba(184, 146, 47, 0.18);
+  transform: scale(1.1);
+}
+
+.budget-slider:hover::-moz-range-thumb {
+  box-shadow: 0 0 0 4px rgba(184, 146, 47, 0.18);
+  transform: scale(1.1);
+}
+
+.budget-slider:focus::-webkit-slider-thumb {
+  box-shadow: 0 0 0 4px rgba(184, 146, 47, 0.25);
+}
+
+.budget-slider:focus::-moz-range-thumb {
+  box-shadow: 0 0 0 4px rgba(184, 146, 47, 0.25);
+}
+
+html.light .budget-slider {
+  background: linear-gradient(
+    to right,
+    #b8922f var(--pct, 0%),
+    rgba(0, 0, 0, 0.08) var(--pct, 0%)
+  );
+}
+
+html.light .budget-slider::-webkit-slider-thumb {
+  border-color: #f5f3ee;
+}
+
+html.light .budget-slider::-moz-range-thumb {
+  border-color: #f5f3ee;
 }

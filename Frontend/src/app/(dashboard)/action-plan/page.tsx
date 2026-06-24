@@ -61,8 +61,9 @@ interface ActionItem {
   activity_rationale: string; activity_text: string; kpi_name: string;
   timeline_reasoning: string; start_quarter: string; end_quarter: string;
   responsible_exec: string; responsible_monitor: string;
-  classification_reasoning: string; assigned_archetype: string; duration_multiplier: number;
-  base_cost_egp: number; inflated_cost_egp: number; cost_driver: string; funding_source: string;
+  classification_reasoning: string; assigned_archetype: string;
+  relative_cost_weight: number | null;
+  inflated_cost_egp: number;  // = allocated EGP (top-down distribution); user-editable
   cost_explanation: string; budget_display: string; edited_by_user: boolean;
 }
 interface Objective {
@@ -70,8 +71,24 @@ interface Objective {
   pillar_id: number | null; pillar_name: string | null; actions: ActionItem[];
 }
 interface Goal { goal_id: string; title: string; description: string; objectives: Objective[]; }
-interface YearEnvelope { year: number; faculty_opex_spend_egp: number; ceiling_egp: number; within_envelope: boolean; }
-interface BudgetSummary { per_year: YearEnvelope[]; central_capex_total_egp: number; faculty_opex_total_egp: number; warnings: string[]; }
+
+// Top-down budget types
+interface PillarRow {
+  pillar_id: number; pillar_name: string;
+  allocated_egp: number; assigned_egp: number;
+  num_items: number; within_allocation: boolean;
+}
+interface CashFlowYear { year: number; assigned_egp: number; }
+interface BudgetSummary {
+  pillars: PillarRow[];
+  total_budget_egp: number;
+  total_allocated_egp: number;
+  total_assigned_egp: number;
+  unallocated_egp: number;
+  cashflow_by_year: CashFlowYear[];
+  warnings: string[];
+}
+
 interface ActionPlan { run_id: string; generated: boolean; goals: Goal[]; budget_summary: BudgetSummary | null; totals: { goals: number; objectives: number; actions: number }; }
 interface RunMeta { run_id: string; plan_status: string | null; created_at: string | null; goals: number; objectives: number; has_action_plan: boolean; }
 interface ArchetypeMeta { key: string; label: string; description: string; base_cost_egp: number | null; cost_driver: string | null; funding_source: string | null; }
@@ -186,39 +203,91 @@ function WhyPopover({ title, sections, align = "left" }: { title: string; sectio
   );
 }
 
-// ── Budget header ─────────────────────────────────────────────────────────────────
+// ── Budget header (top-down pillar allocation view) ───────────────────────────────
 function BudgetHeader({ summary, totals }: { summary: BudgetSummary; totals: ActionPlan["totals"] }) {
+  const activePillars = summary.pillars.filter((p) => p.num_items > 0);
   return (
-    <div className="rounded-xl border border-cyan-500/15 bg-gradient-to-br from-cyan-500/[0.07] to-transparent p-5 animate-fade-in">
+    <div className="rounded-xl border border-cyan-500/15 bg-gradient-to-br from-cyan-500/[0.07] to-transparent p-5 animate-fade-in space-y-4">
+      {/* Header row */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-cyan-500/15"><Wallet className="h-5 w-5 text-cyan-400" /></div>
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-cyan-500/15">
+            <Wallet className="h-5 w-5 text-cyan-400" />
+          </div>
           <div>
-            <h3 className="text-sm font-semibold text-slate-100">Budget Reconciliation</h3>
-            <p className="text-xs text-slate-500">{totals.goals} goals · {totals.objectives} objectives · {totals.actions} activities</p>
+            <h3 className="text-sm font-semibold text-slate-100">Budget Allocation</h3>
+            <p className="text-xs text-slate-500">
+              {totals.goals} goals · {totals.objectives} objectives · {totals.actions} activities
+            </p>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="live" className="px-3 py-1">Faculty OpEx {fmt(summary.faculty_opex_total_egp)}</Badge>
-          <Badge variant="mock" className="px-3 py-1">Central CapEx {fmt(summary.central_capex_total_egp)}</Badge>
+          <Badge variant="live" className="px-3 py-1">Total {fmt(summary.total_budget_egp)}</Badge>
+          <Badge variant="mock" className="px-3 py-1">Assigned {fmt(summary.total_assigned_egp)}</Badge>
+          {summary.unallocated_egp > 0 && (
+            <Badge variant="default" className="px-3 py-1 text-slate-400">
+              Unspent {fmt(summary.unallocated_egp)}
+            </Badge>
+          )}
         </div>
       </div>
-      <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {summary.per_year.map((y) => (
-          <div key={y.year} className={cn("rounded-lg border px-3 py-2.5", y.within_envelope ? "border-white/5 bg-white/[0.02]" : "border-rose-500/30 bg-rose-500/10")}>
-            <div className="flex items-center justify-between">
+
+      {/* Per-pillar progress bars */}
+      {activePillars.length > 0 && (
+        <div className="space-y-2">
+          {activePillars.map((p) => {
+            const pct = p.allocated_egp > 0
+              ? Math.min(100, (p.assigned_egp / p.allocated_egp) * 100)
+              : 0;
+            return (
+              <div key={p.pillar_id} className="rounded-lg border border-white/5 bg-white/[0.02] px-3 py-2">
+                <div className="mb-1.5 flex items-center justify-between gap-2">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-[#b8922f]/30 text-[10px] font-bold text-[#b8922f]">
+                      {p.pillar_id}
+                    </span>
+                    <span className="truncate text-xs font-medium text-slate-200">{p.pillar_name}</span>
+                    <span className="text-[10px] text-slate-600">{p.num_items} items</span>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <span className="text-xs text-slate-300">{fmt(p.assigned_egp)}</span>
+                    <span className="text-[10px] text-slate-500">/ {fmt(p.allocated_egp)}</span>
+                    {p.within_allocation
+                      ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+                      : <AlertTriangle className="h-3.5 w-3.5 text-rose-400" />}
+                  </div>
+                </div>
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/5">
+                  <div
+                    className={cn("h-full rounded-full transition-all", p.within_allocation ? "bg-cyan-500" : "bg-rose-400")}
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Year-by-year cash-flow (scheduling view, no inflation) */}
+      {summary.cashflow_by_year.length > 0 && (
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {summary.cashflow_by_year.map((y) => (
+            <div key={y.year} className="rounded-lg border border-white/5 bg-white/[0.02] px-3 py-2.5">
               <span className="text-xs font-semibold text-slate-300">{y.year}</span>
-              {y.within_envelope ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" /> : <AlertTriangle className="h-3.5 w-3.5 text-rose-400" />}
+              <p className="mt-1 text-sm font-medium text-slate-200">{fmt(y.assigned_egp)}</p>
+              <p className="text-[10px] text-slate-500">cash out</p>
             </div>
-            <p className="mt-1 text-sm font-medium text-slate-200">{fmt(y.faculty_opex_spend_egp)}</p>
-            <p className="text-[10px] text-slate-500">ceiling {fmt(y.ceiling_egp)}</p>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
+
       {summary.warnings.length > 0 && (
-        <div className="mt-3 space-y-1">
+        <div className="space-y-1">
           {summary.warnings.map((w, i) => (
-            <p key={i} className="flex items-start gap-1.5 text-xs text-rose-300"><AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" /> {w}</p>
+            <p key={i} className="flex items-start gap-1.5 text-xs text-rose-300">
+              <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" /> {w}
+            </p>
           ))}
         </div>
       )}
@@ -248,26 +317,26 @@ function ActionCard({ a, index, onChanged, roles, archetypes }: { a: ActionItem;
   const [err, setErr] = useState<string | null>(null);
 
   // Vocab for the edit dropdowns — from /vocab, with hardcoded fallback.
-  const roleOptions = roles.length ? roles : ROLE_VOCAB;
-  const archetypeKeys = archetypes.length ? archetypes.map((x) => x.key) : ARCHETYPE_KEYS;
+  const roleOptions    = roles.length ? roles : ROLE_VOCAB;
+  const archetypeKeys  = archetypes.length ? archetypes.map((x) => x.key) : ARCHETYPE_KEYS;
   const archLabelMap: Record<string, string> = {};
-  for (const x of archetypes) archLabelMap[x.key] = x.base_cost_egp ? `${x.label} (≈${Math.round(x.base_cost_egp / 1000)}k)` : x.label;
+  for (const x of archetypes) archLabelMap[x.key] = x.label || archLabel(x.key);
   const fmtArch = (k: string) => archLabelMap[k] || archLabel(k);
 
   // edit form state
   const [activity, setActivity] = useState(a.activity_text);
-  const [kpi, setKpi] = useState(a.kpi_name);
-  const [startQ, setStartQ] = useState(a.start_quarter);
-  const [endQ, setEndQ] = useState(a.end_quarter);
-  const [exec, setExec] = useState(a.responsible_exec);
-  const [monitor, setMonitor] = useState(a.responsible_monitor);
+  const [kpi,      setKpi]      = useState(a.kpi_name);
+  const [startQ,   setStartQ]   = useState(a.start_quarter);
+  const [endQ,     setEndQ]     = useState(a.end_quarter);
+  const [exec,     setExec]     = useState(a.responsible_exec);
+  const [monitor,  setMonitor]  = useState(a.responsible_monitor);
   const [archetype, setArchetype] = useState(a.assigned_archetype);
-  const [duration, setDuration] = useState(String(a.duration_multiplier));
+  const [cost,     setCost]     = useState(String(Math.round(a.inflated_cost_egp)));
 
   const beginEdit = () => {
     setActivity(a.activity_text); setKpi(a.kpi_name); setStartQ(a.start_quarter); setEndQ(a.end_quarter);
     setExec(a.responsible_exec); setMonitor(a.responsible_monitor); setArchetype(a.assigned_archetype);
-    setDuration(String(a.duration_multiplier)); setErr(null); setEditing(true);
+    setCost(String(Math.round(a.inflated_cost_egp))); setErr(null); setEditing(true);
   };
 
   const save = async () => {
@@ -276,9 +345,14 @@ function ActionCard({ a, index, onChanged, roles, archetypes }: { a: ActionItem;
       const res = await fetch(`${BACKEND}/api/action-plan/action/${a.action_id}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          activity_text: activity, kpi_name: kpi, start_quarter: startQ, end_quarter: endQ,
-          responsible_exec: exec, responsible_monitor: monitor,
-          assigned_archetype: archetype, duration_multiplier: Number(duration),
+          activity_text:     activity,
+          kpi_name:          kpi,
+          start_quarter:     startQ,
+          end_quarter:       endQ,
+          responsible_exec:  exec,
+          responsible_monitor: monitor,
+          assigned_archetype: archetype,
+          inflated_cost_egp: cost ? Number(cost) : undefined,
         }),
       });
       if (!res.ok) throw new Error((await res.json().catch(() => ({})))?.detail || `Save failed (${res.status})`);
@@ -296,8 +370,6 @@ function ActionCard({ a, index, onChanged, roles, archetypes }: { a: ActionItem;
     } catch (e) { setErr(e instanceof Error ? e.message : "Reset failed."); } finally { setBusy(false); }
   };
 
-  const isCentral = a.funding_source === "central_capex";
-
   // ── Edit mode ──────────────────────────────────────────────────────────────────
   if (editing) {
     return (
@@ -308,13 +380,26 @@ function ActionCard({ a, index, onChanged, roles, archetypes }: { a: ActionItem;
           className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-200 focus:border-cyan-500/40 focus:outline-none" placeholder="KPI…" />
         <div className="grid grid-cols-2 gap-2.5">
           <FieldSelect label="Start" value={startQ} options={QUARTERS} onChange={setStartQ} />
-          <FieldSelect label="End" value={endQ} options={QUARTERS} onChange={setEndQ} />
-          <FieldSelect label="Exec owner" value={exec} options={roleOptions} onChange={setExec} />
+          <FieldSelect label="End"   value={endQ}   options={QUARTERS} onChange={setEndQ} />
+          <FieldSelect label="Exec owner"    value={exec}    options={roleOptions} onChange={setExec} />
           <FieldSelect label="Monitor owner" value={monitor} options={roleOptions} onChange={setMonitor} />
-          <FieldSelect label="Cost archetype" value={archetype} options={archetypeKeys} onChange={setArchetype} fmtOpt={fmtArch} />
-          <FieldSelect label="Duration ×" value={duration} options={["1", "2", "3", "4"]} onChange={setDuration} />
+          <FieldSelect label="Category (reporting)" value={archetype} options={archetypeKeys} onChange={setArchetype} fmtOpt={fmtArch} />
+          {/* Direct cost input — top-down model: user sets the number */}
+          <div className="space-y-1">
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Cost (EGP)</span>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={cost}
+              onChange={(e) => setCost(e.target.value.replace(/[^0-9]/g, ""))}
+              placeholder="0"
+              className="flex h-8 w-full rounded-md border border-input bg-background px-2 text-xs text-slate-200 outline-none focus:border-cyan-500/40"
+            />
+          </div>
         </div>
-        <p className="text-[10px] text-slate-500">Budget is recomputed server-side from archetype × duration × start-year inflation.</p>
+        <p className="text-[10px] text-slate-500">
+          Cost is user-adjustable. Category is for reporting only — it no longer drives the budget.
+        </p>
         {err && <p className="text-xs text-rose-400">{err}</p>}
         <div className="flex items-center gap-2">
           <Button onClick={save} disabled={busy} className="h-8 gap-1.5 text-xs">
@@ -364,13 +449,15 @@ function ActionCard({ a, index, onChanged, roles, archetypes }: { a: ActionItem;
         </span>
         <span className="inline-flex items-center rounded-md border border-violet-500/20 bg-violet-500/10 px-2 py-1 text-[11px] font-medium text-violet-300">Exec: {a.responsible_exec}</span>
         <span className="inline-flex items-center rounded-md border border-amber-500/20 bg-amber-500/10 px-2 py-1 text-[11px] font-medium text-amber-300">Monitor: {a.responsible_monitor}</span>
-        <span className={cn("inline-flex items-center rounded-md border px-2 py-1 text-[11px] font-semibold",
-          isCentral ? "border-slate-500/30 bg-slate-500/10 text-slate-300" : "border-emerald-500/20 bg-emerald-500/10 text-emerald-300")}>
+        <span className="inline-flex items-center rounded-md border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-[11px] font-semibold text-emerald-300">
           <Wallet className="mr-1.5 h-3 w-3" />{a.budget_display}
-          <WhyPopover title="Why this cost" align="right"
-            sections={[{ label: "Reasoning", text: a.classification_reasoning }, { label: "Computation", text: a.cost_explanation }]} />
+          <WhyPopover title="Budget allocation" align="right"
+            sections={[
+              { label: "Category", text: archLabel(a.assigned_archetype) },
+              { label: "Allocation", text: a.cost_explanation },
+              { label: "Reasoning", text: a.classification_reasoning },
+            ]} />
         </span>
-        <span className="text-[10px] text-slate-600">{archLabel(a.assigned_archetype)}</span>
       </div>
     </div>
   );

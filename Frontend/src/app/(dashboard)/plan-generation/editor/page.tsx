@@ -6,7 +6,7 @@ import type { Editor } from "@tiptap/react";
 import {
   Printer, RotateCcw, Globe, Bold, Italic, Link2,
   AlignLeft, List as ListIcon, Table as TableIcon, Image as ImageIcon,
-  ArrowLeft,
+  ArrowLeft, PanelRightClose, PanelRightOpen, PanelLeftClose, PanelLeftOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -154,50 +154,70 @@ function useEditorApi(
       });
     },
 
-    addBlock(chapterId, subId, kind, afterBlockId) {
+    addBlock(chapterId, subId, kind, afterBlockId, atStart) {
       const nb = newBlock(kind);
-      setDoc(doc => ({
-        ...doc,
-        chapters: doc.chapters.map(ch => {
-          if (ch.id !== chapterId) return ch;
-          const insertInto = (blocks: Block[]): Block[] => {
-            if (!afterBlockId) return [...blocks, nb];
-            const idx = blocks.findIndex(b => b.id === afterBlockId);
-            const next = [...blocks];
-            next.splice(idx + 1, 0, nb);
-            return next;
-          };
-          if (subId === null) {
-            return { ...ch, intro: insertInto(ch.intro ?? []) };
-          }
+      const insertInto = (blocks: Block[]): Block[] => {
+        if (atStart) return [nb, ...blocks];
+        if (!afterBlockId) return [...blocks, nb];
+        const idx = blocks.findIndex(b => b.id === afterBlockId);
+        if (idx === -1) return [...blocks, nb];
+        const next = [...blocks];
+        next.splice(idx + 1, 0, nb);
+        return next;
+      };
+      setDoc(doc => {
+        if (chapterId === "preface") {
           return {
-            ...ch,
-            sections: ch.sections.map(sub => {
+            ...doc,
+            preface: (doc.preface ?? []).map(sub => {
               if (sub.id !== subId) return sub;
-              return { ...sub, status: sub.status === "auto" ? "edited" : sub.status, blocks: insertInto(sub.blocks) };
+              return { ...sub, status: (sub.status === "auto" ? "edited" : sub.status) as Subchapter["status"], blocks: insertInto(sub.blocks) };
             }),
           };
-        }),
-      }));
+        }
+        return {
+          ...doc,
+          chapters: doc.chapters.map(ch => {
+            if (ch.id !== chapterId) return ch;
+            if (subId === null) return { ...ch, intro: insertInto(ch.intro ?? []) };
+            return {
+              ...ch,
+              sections: ch.sections.map(sub => {
+                if (sub.id !== subId) return sub;
+                return { ...sub, status: sub.status === "auto" ? "edited" : sub.status, blocks: insertInto(sub.blocks) };
+              }),
+            };
+          }),
+        };
+      });
     },
 
     deleteBlock(chapterId, subId, blockId) {
-      setDoc(doc => ({
-        ...doc,
-        chapters: doc.chapters.map(ch => {
-          if (ch.id !== chapterId) return ch;
-          if (subId === null) {
-            return { ...ch, intro: (ch.intro ?? []).filter(b => b.id !== blockId) };
-          }
+      setDoc(doc => {
+        if (chapterId === "preface") {
           return {
-            ...ch,
-            sections: ch.sections.map(sub => {
+            ...doc,
+            preface: (doc.preface ?? []).map(sub => {
               if (sub.id !== subId) return sub;
-              return { ...sub, blocks: sub.blocks.filter(b => b.id !== blockId) };
+              return { ...sub, status: (sub.status === "auto" ? "edited" : sub.status) as Subchapter["status"], blocks: sub.blocks.filter(b => b.id !== blockId) };
             }),
           };
-        }),
-      }));
+        }
+        return {
+          ...doc,
+          chapters: doc.chapters.map(ch => {
+            if (ch.id !== chapterId) return ch;
+            if (subId === null) return { ...ch, intro: (ch.intro ?? []).filter(b => b.id !== blockId) };
+            return {
+              ...ch,
+              sections: ch.sections.map(sub => {
+                if (sub.id !== subId) return sub;
+                return { ...sub, blocks: sub.blocks.filter(b => b.id !== blockId) };
+              }),
+            };
+          }),
+        };
+      });
     },
 
     moveBlock(chapterId, subId, blockId, dir) {
@@ -210,17 +230,28 @@ function useEditorApi(
         [next[i], next[j]] = [next[j], next[i]];
         return next;
       };
-      setDoc(doc => ({
-        ...doc,
-        chapters: doc.chapters.map(ch => {
-          if (ch.id !== chapterId) return ch;
-          if (subId === null) return { ...ch, intro: swap(ch.intro ?? []) };
+      setDoc(doc => {
+        if (chapterId === "preface") {
           return {
-            ...ch,
-            sections: ch.sections.map(sub => sub.id !== subId ? sub : { ...sub, blocks: swap(sub.blocks) }),
+            ...doc,
+            preface: (doc.preface ?? []).map(sub => {
+              if (sub.id !== subId) return sub;
+              return { ...sub, blocks: swap(sub.blocks) };
+            }),
           };
-        }),
-      }));
+        }
+        return {
+          ...doc,
+          chapters: doc.chapters.map(ch => {
+            if (ch.id !== chapterId) return ch;
+            if (subId === null) return { ...ch, intro: swap(ch.intro ?? []) };
+            return {
+              ...ch,
+              sections: ch.sections.map(sub => sub.id !== subId ? sub : { ...sub, blocks: swap(sub.blocks) }),
+            };
+          }),
+        };
+      });
     },
 
     setHeading(chapterId, subId, text) {
@@ -428,7 +459,9 @@ export default function PlanEditorPage() {
 
   const [selectedBlock, setSelectedBlock] = useState<SelectedBlockInfo | null>(null);
   const [exporting, setExporting] = useState(false);
-  const [marginPreset, setMarginPreset] = useState<"narrow" | "normal">("normal");
+  const [marginPreset, setMarginPreset] = useState<"narrow" | "normal">("narrow");
+  const [chatOpen, setChatOpen] = useState(true);
+  const [outlineOpen, setOutlineOpen] = useState(true);
 
   const chatPanelRef = useRef<ChatPanelHandle>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -649,30 +682,21 @@ export default function PlanEditorPage() {
               <span className="text-xs">Plans</span>
             </button>
 
+            <button
+              onClick={() => setOutlineOpen(v => !v)}
+              title={outlineOpen ? "Hide outline" : "Show outline"}
+              className="flex items-center gap-1.5 rounded-md px-2 py-1 text-slate-500 transition-colors hover:bg-white/5 hover:text-slate-300"
+            >
+              {outlineOpen
+                ? <PanelLeftClose className="h-3.5 w-3.5" />
+                : <PanelLeftOpen className="h-3.5 w-3.5" />}
+            </button>
+
             <div className="h-3.5 w-px bg-white/10" />
 
             <span className="text-xs font-semibold text-slate-300 truncate max-w-[220px]">
               {doc.meta.title}
             </span>
-
-            {/* Margin presets */}
-            <div className="flex items-center gap-0.5 rounded-md border border-white/5 bg-[#080a14] p-0.5">
-              <span className="px-1 text-[10px] text-slate-600">Margins:</span>
-              {(["narrow", "normal"] as const).map((m) => (
-                <button
-                  key={m}
-                  onClick={() => setMarginPreset(m)}
-                  className={cn(
-                    "rounded px-2 py-0.5 text-xs font-medium capitalize transition-colors",
-                    marginPreset === m
-                      ? "bg-[#b8922f]/15 text-[#b8922f]"
-                      : "text-slate-500 hover:text-slate-300",
-                  )}
-                >
-                  {m}
-                </button>
-              ))}
-            </div>
 
             {/* Language toggle */}
             <div className="flex items-center gap-0.5 rounded-md border border-white/5 bg-[#080a14] p-0.5">
@@ -695,6 +719,16 @@ export default function PlanEditorPage() {
           </div>
 
           <div className="flex shrink-0 items-center gap-2">
+            <button
+              onClick={() => setChatOpen(v => !v)}
+              title={chatOpen ? "Hide assistant" : "Show assistant"}
+              className="flex items-center gap-1.5 rounded-md px-2 py-1 text-slate-500 transition-colors hover:bg-white/5 hover:text-slate-300"
+            >
+              {chatOpen
+                ? <PanelRightClose className="h-3.5 w-3.5" />
+                : <PanelRightOpen className="h-3.5 w-3.5" />}
+              <span className="text-xs">Assistant</span>
+            </button>
             <Button
               size="sm"
               variant="outline"
@@ -753,7 +787,12 @@ export default function PlanEditorPage() {
               disabled={!activeChapterId}
               onMouseDown={() => {
                 if (activeChapterId) {
-                  editorApi.addBlock(activeChapterId, activeSubId as string | null ?? null, kind);
+                  editorApi.addBlock(
+                    activeChapterId,
+                    activeSubId as string | null ?? null,
+                    kind,
+                    selectedBlock?.blockId,
+                  );
                 }
               }}
               title={`Insert ${label}`}
@@ -772,10 +811,12 @@ export default function PlanEditorPage() {
         {/* ── 3-zone layout ── */}
         <div className="flex flex-1 overflow-hidden">
 
-          {/* Left — Outline */}
-          <div className="no-print shrink-0">
-            <OutlinePanel doc={doc} editorApi={editorApi} />
-          </div>
+          {/* Left — Outline (collapsible) */}
+          {outlineOpen && (
+            <div className="no-print shrink-0 h-full">
+              <OutlinePanel doc={doc} editorApi={editorApi} />
+            </div>
+          )}
 
           {/* Center — Template canvas */}
           <div ref={canvasRef} className="flex-1 overflow-y-auto bg-[#f5f4ef]">
@@ -788,10 +829,12 @@ export default function PlanEditorPage() {
             />
           </div>
 
-          {/* Right — Chat panel */}
-          <div className="no-print shrink-0 h-full">
-            <ChatPanel ref={chatPanelRef} selectedBlock={selectedBlock} doc={doc} onApplyDraft={handleApplyDraft} />
-          </div>
+          {/* Right — Chat panel (collapsible) */}
+          {chatOpen && (
+            <div className="no-print shrink-0 h-full">
+              <ChatPanel ref={chatPanelRef} selectedBlock={selectedBlock} doc={doc} onApplyDraft={handleApplyDraft} />
+            </div>
+          )}
 
         </div>
       </div>

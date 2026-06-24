@@ -9,8 +9,16 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="dark">
-      <body className="min-h-screen bg-[#080a14] antialiased">{children}</body>
+    <html lang="en" className="dark" suppressHydrationWarning>
+      <body className="min-h-screen bg-[#080a14] antialiased">
+        {/* Runs before React hydrates — prevents flash of wrong theme */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{var t=localStorage.getItem('stratos-theme');if(t==='light'){document.documentElement.classList.remove('dark');document.documentElement.classList.add('light');}}catch(e){}`,
+          }}
+        />
+        {children}
+      </body>
     </html>
   );
 }

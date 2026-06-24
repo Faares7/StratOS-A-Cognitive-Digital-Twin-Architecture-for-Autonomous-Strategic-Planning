@@ -177,6 +177,7 @@ export const authOptions: NextAuthOptions = {
       if (account?.access_token) {
         token.accessToken  = account.access_token;
         token.refreshToken = account.refresh_token ?? token.refreshToken;
+        token.expiresAt    = account.expires_at; // Unix seconds from Google
       }
 
       if (account && token.email) {
@@ -200,15 +201,75 @@ export const authOptions: NextAuthOptions = {
             // middleware will hold the user at /pending-approval safely.
             console.error('[StratOS Auth] Silent registration failed:', err);
           }
-          token.accountStatus = 'pending' satisfies AccountStatus;
-          token.role           = 'None'    satisfies UserRole;
-          token.profilingDone  = false;
+          token.accountStatus       = 'pending' satisfies AccountStatus;
+          token.role                 = 'None'    satisfies UserRole;
+          token.profilingDone        = false;
+          token.profilingRefreshedAt = Date.now();
         } else {
           // ── Known user: bake current DB state into token ─────────────
-          token.accountStatus  = existingUser.account_status;
-          token.role            = existingUser.role;
-          token.organizationId  = existingUser.organization_id;
-          token.profilingDone   = existingUser.organizations?.profiling_done ?? false;
+          token.accountStatus        = existingUser.account_status;
+          token.role                  = existingUser.role;
+          token.organizationId        = existingUser.organization_id;
+          token.profilingDone         = existingUser.organizations?.profiling_done ?? false;
+          token.profilingRefreshedAt  = Date.now();
+        }
+      }
+
+      // ── Periodic re-check of profilingDone (no re-login required) ───────────
+      // Re-reads profiling_done from the DB at most once every 30 seconds so
+      // manual DB changes (or onboarding completion) propagate without a
+      // sign-out/sign-in cycle. The TTL keeps the middleware from hitting the
+      // DB on every single request.
+      const PROFILING_TTL_MS = 30_000;
+      if (
+        !account &&
+        token.email &&
+        (
+          typeof token.profilingRefreshedAt !== 'number' ||
+          Date.now() - token.profilingRefreshedAt > PROFILING_TTL_MS
+        )
+      ) {
+        try {
+          const freshUser = await fetchUserByEmail(token.email);
+          if (freshUser) {
+            token.profilingDone        = freshUser.organizations?.profiling_done ?? false;
+            token.accountStatus        = freshUser.account_status;
+            token.role                  = freshUser.role;
+          }
+        } catch (err) {
+          console.error('[StratOS Auth] Periodic profiling re-check failed:', err);
+        }
+        token.profilingRefreshedAt = Date.now();
+      }
+
+      // ── Silent refresh: runs on every session read after first sign-in ───────
+      // Refresh when the token is within 5 minutes of expiry OR when expiresAt
+      // is absent (sessions that pre-date this fix never had it baked in).
+      if (
+        !account &&
+        token.refreshToken &&
+        (typeof token.expiresAt !== 'number' || Date.now() / 1000 > token.expiresAt - 300)
+      ) {
+        try {
+          const res = await fetch('https://oauth2.googleapis.com/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+              client_id:     process.env.GOOGLE_CLIENT_ID!,
+              client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+              refresh_token: token.refreshToken as string,
+              grant_type:    'refresh_token',
+            }),
+          });
+          if (res.ok) {
+            const refreshed = await res.json() as { access_token: string; expires_in?: number };
+            token.accessToken = refreshed.access_token;
+            token.expiresAt   = Math.floor(Date.now() / 1000) + (refreshed.expires_in ?? 3600);
+          } else {
+            console.error('[StratOS Auth] Token refresh HTTP', res.status);
+          }
+        } catch (err) {
+          console.error('[StratOS Auth] Silent token refresh failed:', err);
         }
       }
 

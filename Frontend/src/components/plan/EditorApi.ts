@@ -4,7 +4,7 @@ import type { Block, PlanMeta } from "@/types/plan-document";
 export interface EditorApi {
   // Block ops — subId null targets chapter intro
   updateBlock(chapterId: string, subId: string | null, blockId: string, next: Block): void;
-  addBlock(chapterId: string, subId: string | null, kind: Block["type"], afterBlockId?: string): void;
+  addBlock(chapterId: string, subId: string | null, kind: Block["type"], afterBlockId?: string, atStart?: boolean): void;
   deleteBlock(chapterId: string, subId: string | null, blockId: string): void;
   moveBlock(chapterId: string, subId: string | null, blockId: string, dir: "up" | "down"): void;
   // Heading edit — subId null = chapter title

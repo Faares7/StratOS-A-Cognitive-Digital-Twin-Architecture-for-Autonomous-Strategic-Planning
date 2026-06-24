@@ -270,9 +270,23 @@ def _fail(job_id: str, error: str) -> None:
 app = FastAPI(title="StratOS CDT API", version="1.0.0", docs_url="/api/docs")
 
 
+def _warmup_vertex() -> None:
+    """Pre-initialise the Vertex AI client so the first /api/plan-chat call
+    doesn't pay the cold-start cost (auth token + gRPC client init), which can
+    exceed the frontend's request timeout."""
+    try:
+        from chief_editor.llm import get_chat_model
+        from langchain_core.messages import HumanMessage
+        get_chat_model(model="gemini-2.5-flash").invoke([HumanMessage(content="ping")])
+        print("[warmup] Vertex AI chat model ready")
+    except Exception as exc:
+        print(f"[warmup] Vertex AI warmup skipped: {exc}")
+
+
 @app.on_event("startup")
 def startup_event():
     _db_init()
+    threading.Thread(target=_warmup_vertex, daemon=True, name="vertex-warmup").start()
 
 
 app.add_middleware(
@@ -418,7 +432,9 @@ def google_auth_handoff(body: _TokenHandoff):
         "access_token":  body.access_token,
         "refresh_token": body.refresh_token or "",
         "email":         body.email or "",
-        "expires_at":    time.time() + 3500,   # ~1 h; refresh logic handles expiry
+        # Mark as already expired so _get_valid_access_token() always does one
+        # refresh via the refresh_token, guaranteeing a definitely-fresh token.
+        "expires_at":    time.time() - 1,
     }
     _db_save_tokens(_google_tokens["primary"])
     return {"ok": True, "email": body.email}
@@ -558,10 +574,13 @@ def schedule_meeting(req: ScheduleMeetingRequest):
     meeting_id = f"cal-{uuid.uuid4().hex[:10]}"
 
     meet_link = calendar_event_id = html_link = ""
+    calendar_error: str | None = None
 
-    # Prefer the user's own Google token (forwarded from NextAuth session);
-    # fall back to the shared admin token for backward compatibility.
-    access_token = req.access_token or _get_valid_access_token()
+    # Always use the backend's own refreshable token. The frontend hands the
+    # token off on page load (via /api/auth/google/handoff); _get_valid_access_token()
+    # then refreshes it via the stored refresh_token if needed, so we never
+    # rely on a potentially-stale token forwarded directly from the client.
+    access_token = _get_valid_access_token()
 
     if access_token:
         try:
@@ -578,8 +597,10 @@ def schedule_meeting(req: ScheduleMeetingRequest):
             meet_link = cal.get("meet_link", "")
             html_link = cal.get("html_link", "")
         except Exception as exc:
-            # Log but don't fail — meeting is still stored locally
+            calendar_error = str(exc)
             print(f"[meetings] Google Calendar error: {exc}")
+    else:
+        calendar_error = "No Google account connected — visit the Meetings page to link your account."
 
     try:
         start_dt = datetime.fromisoformat(req.start_iso.replace("Z", "+00:00"))
@@ -624,6 +645,7 @@ def schedule_meeting(req: ScheduleMeetingRequest):
         "calendar_event_id": calendar_event_id,
         "html_link": html_link,
         "fathom_warning": fathom_warning,
+        "calendar_error": calendar_error,
     }
 
 
@@ -1341,86 +1363,6 @@ def run_kpi(req: KPIRequest, background_tasks: BackgroundTasks):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  KPI GENERATION AGENT
-#  Planning Phase: maps measurable KPIs to the 7 NAQAAE Programmatic Standards.
-#  Uses Nile University's KPI style (عدد/نسبة/وجود prefixes, internal entities).
-#  Does NOT assign data sources — that is handled by a separate agent downstream.
-# ══════════════════════════════════════════════════════════════════════════════
-
-KPI_AGENT_PATH: Path = AGENTS_DIR / "kpi_generation" / "agent.py"
-
-
-class KPIRequest(BaseModel):
-    program_name: str = "علوم الحاسب"
-    college_name: str = "كلية تكنولوجيا المعلومات وعلوم الحاسب"
-    university_name: str = "جامعة النيل الأهلية"
-    # Year range that sets the planning horizon and default timeframe label.
-    planning_horizon: str = "2025-2028"
-    # KPIs generated per NAQAAE standard (1–7 recommended; 3 is a good default).
-    kpis_per_standard: int = 3
-
-
-def _task_kpi(job_id: str, req: KPIRequest) -> None:
-    try:
-        if str(ROOT_DIR) not in sys.path:
-            sys.path.insert(0, str(ROOT_DIR))
-
-        sys.modules.pop("kpi_agent", None)
-
-        if not KPI_AGENT_PATH.exists():
-            raise FileNotFoundError(f"KPI agent not found: {KPI_AGENT_PATH}")
-
-        mod = _load_module("kpi_agent", KPI_AGENT_PATH)
-
-        result: dict = mod.compile_and_run(
-            program_name=req.program_name,
-            college_name=req.college_name,
-            university_name=req.university_name,
-            planning_horizon=req.planning_horizon,
-            kpis_per_standard=req.kpis_per_standard,
-        )
-
-        if result.get("error"):
-            _fail(job_id, result["error"])
-            return
-
-        _finish(job_id, result)
-    except Exception as exc:
-        _fail(job_id, str(exc))
-
-
-@app.post("/api/agents/kpi/run", status_code=202)
-def run_kpi(req: KPIRequest, background_tasks: BackgroundTasks):
-    """
-    Trigger the KPI Generation Agent.
-
-    Generates measurable KPIs for each of the 7 NAQAAE Programmatic Standards
-    in the style of Nile University's strategic plan. This is the Planning Phase
-    only — KPIs are text/target drafts without data-source assignments.
-
-    Poll GET /api/jobs/{job_id} for the result:
-        {
-          "kpis": [
-            {
-              "standard_id":        "1"–"7",
-              "kpi_name":           "<Arabic name starting with عدد/نسبة/وجود/مدى>",
-              "target_description": "<specific quantified target in Arabic>",
-              "responsible_entity": "<internal NU role in Arabic>",
-              "timeframe":          "<Arabic timeframe>"
-            },
-            ...
-          ],
-          "metadata": { "program", "college", "university",
-                        "planning_horizon", "kpis_per_standard",
-                        "total_kpis", "standards_covered" }
-        }
-    """
-    job_id = _new_job()
-    background_tasks.add_task(_task_kpi, job_id, req)
-    return {"job_id": job_id}
-
-
-# ══════════════════════════════════════════════════════════════════════════════
 #  HITL GAP ANALYSIS
 #  Phase 1 — GET  /api/gap-analysis/draft     → fetch editable draft data
 #  Phase 2 — POST /api/gap-analysis/calculate → LangGraph QA agent → job_id
@@ -1782,8 +1724,8 @@ def _query_target_state(pillar: str) -> str | None:
 
 def _fetch_swot_by_pillar() -> dict[int, dict[str, list[dict]]]:
     """
-    Return the most recent SWOT items per agent, grouped by pillar_id (1–7)
-    and type. Each item is a structured dict with full metadata for traceability.
+    Return approved SWOT consolidation candidates grouped by pillar_id (1–7) and type.
+    Returns {} with a warning if no approved consolidation run exists.
     """
     conn = _get_db_conn()
     if not conn:
@@ -1792,26 +1734,26 @@ def _fetch_swot_by_pillar() -> dict[int, dict[str, list[dict]]]:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(
                 """
-                WITH latest_runs AS (
-                    SELECT DISTINCT ON (agent_id) run_id, agent_id
-                    FROM agent_runs
-                    ORDER BY agent_id, run_timestamp DESC
-                )
-                SELECT si.item_id::text, si.type, si.title, si.description,
-                       si.pillar_id, si.pillar_name, si.impact_level,
-                       si.evidence, si.source_metadata,
-                       lr.agent_id
-                FROM swot_items si
-                JOIN latest_runs lr ON si.run_id = lr.run_id
-                WHERE si.pillar_id IS NOT NULL
-                  AND si.description IS NOT NULL
-                  AND si.description != ''
+                SELECT candidate_id::text AS item_id,
+                       type, title, description,
+                       pillar_id, pillar_name,
+                       salience_score
+                FROM   swot_consolidation_candidates
+                WHERE  approved = true
+                  AND  pillar_id IS NOT NULL
+                  AND  description IS NOT NULL
+                  AND  description != ''
+                ORDER  BY pillar_id, type, salience_score DESC
                 """
             )
             rows = cur.fetchall()
     except Exception as exc:
-        print(f"[gap-analysis] swot query failed: {exc}")
+        print(f"[gap-analysis] swot consolidation query failed: {exc}")
         return {}
+
+    if not rows:
+        print("[gap-analysis] WARNING: no approved SWOT consolidation run found — "
+              "approve a consolidation run before running Gap Analysis.")
 
     result: dict[int, dict[str, list[dict]]] = {}
     for row in rows:
@@ -1827,11 +1769,11 @@ def _fetch_swot_by_pillar() -> dict[int, dict[str, list[dict]]]:
                 "item_id":         row["item_id"],
                 "title":           (row["title"] or "").replace("\x00", "") or desc[:60],
                 "description":     desc,
-                "agent_id":        row["agent_id"] or "",
-                "impact_level":    row["impact_level"] or "medium",
+                "agent_id":        "swot_consolidation",
+                "impact_level":    "medium",
                 "pillar_name":     row["pillar_name"] or "",
-                "evidence":        row["evidence"],
-                "source_metadata": row["source_metadata"],
+                "evidence":        None,
+                "source_metadata": None,
             })
     return result
 
@@ -1961,17 +1903,29 @@ def get_latest_agent_results():
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  SWOT CONSOLIDATION
+#  SWOT Consolidation — review gate (rank-all; human is the sole keep/cut filter)
 # ══════════════════════════════════════════════════════════════════════════════
+# The pipeline ranks every canonical SWOT item by salience and writes them to
+# swot_consolidation_candidates (migration 003). These endpoints let the SWOT UI
+# trigger a run, load the latest run, and edit / delete / add / keep-cut the items
+# that the REST of the architecture (gap analysis, goals) will consume.
+
+_SWOT_CAND_COLS = """
+    candidate_id::text, consolidation_run_id::text, branch, type,
+    pillar_id, pillar_name, title, description,
+    salience_score, lifecycle_state, selected, reviewer_decision,
+    selection_reason, factor_breakdown, member_item_ids, created_at,
+    approved, approved_at
+"""
+
 
 def _task_swot_consolidation(job_id: str) -> None:
     try:
-        sys.path.insert(0, str(BASE_DIR))
-        from Agents.swot_consolidation.pipeline import consolidate  # noqa: PLC0415
-        result = consolidate()
+        from Agents.swot_consolidation import consolidate
+        out = consolidate(persist=True)
         _finish(job_id, {
-            "consolidation_run_id": result["consolidation_run_id"],
-            "candidate_count": len(result["candidates"]),
+            "consolidation_run_id": out.get("consolidation_run_id"),
+            "candidate_count": len(out.get("candidates", [])),
         })
     except Exception as exc:
         _fail(job_id, str(exc))
@@ -1979,231 +1933,166 @@ def _task_swot_consolidation(job_id: str) -> None:
 
 @app.post("/api/swot-consolidation/run", status_code=202)
 def run_swot_consolidation(background_tasks: BackgroundTasks):
-    """Trigger the SWOT consolidation pipeline (dedup + lifecycle + scoring + selection)."""
+    """Queue a consolidation run (normalize → dedup → lifecycle → score → rank → persist)."""
     job_id = _new_job()
     background_tasks.add_task(_task_swot_consolidation, job_id)
     return {"job_id": job_id}
 
 
 @app.get("/api/swot-consolidation/latest")
-def get_latest_consolidation(include_carried: bool = False):
-    """Return the most recent consolidation run's candidates from the DB."""
-    dsn = os.getenv("DB_CONNECTION_STRING", "")
-    if not dsn:
-        return JSONResponse(status_code=404, content={"detail": "No database configured"})
-    try:
-        conn = psycopg2.connect(dsn)
-    except Exception as exc:
-        return JSONResponse(status_code=503, content={"detail": str(exc)})
-    try:
-        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute(
-                """
-                SELECT consolidation_run_id, MAX(created_at) AS run_ts,
-                       BOOL_OR(approved) AS approved, MAX(approved_at) AS approved_at
-                FROM swot_consolidation_candidates
-                GROUP BY consolidation_run_id
-                ORDER BY MAX(created_at) DESC
-                LIMIT 1
-                """
-            )
-            run = cur.fetchone()
-            if not run:
-                return {"consolidation_run_id": None, "candidates": [], "approved_at": None}
-
-            run_id = str(run["consolidation_run_id"])
-            approved_at = run["approved_at"].isoformat() if run["approved_at"] else None
-
-            lifecycle_filter = "" if include_carried else "AND lifecycle_state != 'carried_forward'"
-            cur.execute(
-                f"""
-                SELECT candidate_id::text, consolidation_run_id::text, branch, type,
-                       pillar_id, pillar_name, title, description,
-                       salience_score, lifecycle_state, selected, reviewer_decision,
-                       selection_reason, factor_breakdown,
-                       member_item_ids::text[], created_at, approved, approved_at
-                FROM swot_consolidation_candidates
-                WHERE consolidation_run_id = %s {lifecycle_filter}
-                ORDER BY salience_score DESC
-                """,
-                (run_id,),
-            )
-            rows = []
-            for r in cur.fetchall():
-                row = dict(r)
-                if row.get("created_at"):
-                    row["created_at"] = row["created_at"].isoformat()
-                if row.get("approved_at"):
-                    row["approved_at"] = row["approved_at"].isoformat()
-                rows.append(row)
-    except Exception as exc:
-        conn.close()
-        return JSONResponse(status_code=500, content={"detail": str(exc)})
-    finally:
-        conn.close()
-    return {"consolidation_run_id": run_id, "candidates": rows, "approved_at": approved_at}
+def latest_swot_consolidation(include_carried: bool = False):
+    """The most recent consolidation run's candidates, ranked. carried_forward items
+    (previous-plan concerns with no current signal) are excluded unless include_carried."""
+    conn = _get_db_conn()
+    if not conn:
+        return {"consolidation_run_id": None, "candidates": []}
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute("""
+            SELECT consolidation_run_id::text AS rid
+            FROM swot_consolidation_candidates
+            ORDER BY created_at DESC LIMIT 1
+        """)
+        row = cur.fetchone()
+        if not row:
+            return {"consolidation_run_id": None, "candidates": []}
+        rid = row["rid"]
+        carried_clause = "" if include_carried else "AND lifecycle_state <> 'carried_forward'"
+        cur.execute(f"""
+            SELECT {_SWOT_CAND_COLS}
+            FROM swot_consolidation_candidates
+            WHERE consolidation_run_id = %s {carried_clause}
+            ORDER BY branch, type, salience_score DESC
+        """, (rid,))
+        candidates = cur.fetchall()
+        approved_at = next(
+            (c["approved_at"] for c in candidates if c.get("approved")),
+            None,
+        )
+        return {"consolidation_run_id": rid, "candidates": candidates, "approved_at": approved_at}
 
 
-@app.patch("/api/swot-consolidation/candidates/{candidate_id}", status_code=200)
-def patch_consolidation_candidate(candidate_id: str, body: dict):
-    """Update reviewer_decision, selected, title, description, type, pillar_id, or pillar_name."""
-    allowed = {"title", "description", "type", "pillar_id", "pillar_name", "reviewer_decision", "selected"}
-    updates = {k: v for k, v in body.items() if k in allowed}
-    if not updates:
-        return JSONResponse(status_code=400, content={"detail": "No valid fields to update"})
-    dsn = os.getenv("DB_CONNECTION_STRING", "")
-    if not dsn:
-        return JSONResponse(status_code=503, content={"detail": "No database"})
-    try:
-        conn = psycopg2.connect(dsn)
-    except Exception as exc:
-        return JSONResponse(status_code=503, content={"detail": str(exc)})
-    try:
-        with conn.cursor() as cur:
-            set_clause = ", ".join(f"{k} = %s" for k in updates)
-            values = list(updates.values()) + [candidate_id]
-            cur.execute(
-                f"UPDATE swot_consolidation_candidates SET {set_clause} WHERE candidate_id = %s",
-                values,
-            )
-            if cur.rowcount == 0:
-                conn.close()
-                return JSONResponse(status_code=404, content={"detail": "Candidate not found"})
-        conn.commit()
-    except Exception as exc:
-        conn.rollback()
-        conn.close()
-        return JSONResponse(status_code=500, content={"detail": str(exc)})
-    finally:
-        conn.close()
-    return {"ok": True}
+class SwotApprove(BaseModel):
+    consolidation_run_id: str
 
 
-@app.delete("/api/swot-consolidation/candidates/{candidate_id}", status_code=200)
-def delete_consolidation_candidate(candidate_id: str):
-    """Hard-delete a candidate from the consolidation run."""
-    dsn = os.getenv("DB_CONNECTION_STRING", "")
-    if not dsn:
-        return JSONResponse(status_code=503, content={"detail": "No database"})
-    try:
-        conn = psycopg2.connect(dsn)
-    except Exception as exc:
-        return JSONResponse(status_code=503, content={"detail": str(exc)})
-    try:
-        with conn.cursor() as cur:
-            cur.execute(
-                "DELETE FROM swot_consolidation_candidates WHERE candidate_id = %s",
-                (candidate_id,),
-            )
-            if cur.rowcount == 0:
-                conn.close()
-                return JSONResponse(status_code=404, content={"detail": "Candidate not found"})
-        conn.commit()
-    except Exception as exc:
-        conn.rollback()
-        conn.close()
-        return JSONResponse(status_code=500, content={"detail": str(exc)})
-    finally:
-        conn.close()
-    return {"ok": True}
+@app.post("/api/swot-consolidation/approve")
+def approve_swot_consolidation(req: SwotApprove):
+    """Mark a consolidation run's reviewed SWOT as approved for downstream use.
+    Clears any previously approved run first so only one run is ever active."""
+    conn = _get_db_conn()
+    if not conn:
+        raise HTTPException(status_code=503, detail="Database not configured.")
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute(
+            "UPDATE swot_consolidation_candidates SET approved = false, approved_at = NULL WHERE approved = true"
+        )
+        cur.execute(
+            """
+            UPDATE swot_consolidation_candidates
+            SET approved = true, approved_at = NOW()
+            WHERE consolidation_run_id = %s
+            RETURNING approved_at
+            """,
+            (req.consolidation_run_id,),
+        )
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="No candidates found for this run.")
+        approved_at = row["approved_at"]
+    return {"status": "approved", "consolidation_run_id": req.consolidation_run_id,
+            "approved_at": approved_at}
+
+
+class SwotCandidatePatch(BaseModel):
+    title: str | None = None
+    description: str | None = None
+    type: str | None = None
+    pillar_id: int | None = None
+    pillar_name: str | None = None
+    reviewer_decision: str | None = None   # 'keep' | 'cut' | 'pending'
+    selected: bool | None = None
+
+
+@app.patch("/api/swot-consolidation/candidates/{candidate_id}")
+def patch_swot_candidate(candidate_id: str, req: SwotCandidatePatch):
+    """Edit a candidate and/or set the human keep/cut decision."""
+    conn = _get_db_conn()
+    if not conn:
+        raise HTTPException(status_code=503, detail="Database not configured.")
+    sets, vals = [], []
+    for col in ("title", "description", "type", "pillar_id", "pillar_name",
+                "reviewer_decision", "selected"):
+        v = getattr(req, col)
+        if v is not None:
+            sets.append(f"{col} = %s")
+            vals.append(v)
+    if not sets:
+        raise HTTPException(status_code=400, detail="Nothing to update.")
+    if req.reviewer_decision is not None:
+        sets.append("reviewed_at = NOW()")
+        if req.selected is None:
+            sets.append("selected = %s")
+            vals.append(req.reviewer_decision == "keep")
+    vals.append(candidate_id)
+    with conn.cursor() as cur:
+        cur.execute(
+            f"UPDATE swot_consolidation_candidates SET {', '.join(sets)} WHERE candidate_id = %s",
+            vals,
+        )
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Candidate not found.")
+    return {"status": "updated", "candidate_id": candidate_id}
+
+
+@app.delete("/api/swot-consolidation/candidates/{candidate_id}")
+def delete_swot_candidate(candidate_id: str):
+    conn = _get_db_conn()
+    if not conn:
+        raise HTTPException(status_code=503, detail="Database not configured.")
+    with conn.cursor() as cur:
+        cur.execute(
+            "DELETE FROM swot_consolidation_candidates WHERE candidate_id = %s",
+            (candidate_id,),
+        )
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Candidate not found.")
+    return {"status": "deleted", "candidate_id": candidate_id}
+
+
+class SwotCandidateCreate(BaseModel):
+    consolidation_run_id: str
+    branch: str
+    type: str
+    description: str
+    title: str | None = None
+    pillar_id: int | None = None
+    pillar_name: str | None = None
 
 
 @app.post("/api/swot-consolidation/candidates", status_code=201)
-def add_consolidation_candidate(body: dict):
-    """Add a manually authored candidate to an existing consolidation run."""
-    required = {"consolidation_run_id", "branch", "type", "description"}
-    missing = required - body.keys()
-    if missing:
-        return JSONResponse(status_code=400, content={"detail": f"Missing fields: {missing}"})
-    dsn = os.getenv("DB_CONNECTION_STRING", "")
-    if not dsn:
-        return JSONResponse(status_code=503, content={"detail": "No database"})
+def add_swot_candidate(req: SwotCandidateCreate):
+    """Add a manual SWOT item to a consolidation run (kept by default)."""
+    conn = _get_db_conn()
+    if not conn:
+        raise HTTPException(status_code=503, detail="Database not configured.")
     candidate_id = str(uuid.uuid4())
-    try:
-        conn = psycopg2.connect(dsn)
-    except Exception as exc:
-        return JSONResponse(status_code=503, content={"detail": str(exc)})
-    try:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                INSERT INTO swot_consolidation_candidates
-                    (candidate_id, consolidation_run_id, branch, type, pillar_id, pillar_name,
-                     title, description, member_item_ids, contributing_agents, snapshot_count,
-                     factor_breakdown, salience_score, lifecycle_state, selected, selection_reason,
-                     reviewer_decision)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                """,
-                (
-                    candidate_id,
-                    body["consolidation_run_id"],
-                    body["branch"],
-                    body["type"],
-                    body.get("pillar_id"),
-                    body.get("pillar_name"),
-                    body.get("title"),
-                    body["description"],
-                    [],
-                    [],
-                    None,
-                    psycopg2.extras.Json({}),
-                    0.0,
-                    "new",
-                    True,
-                    "manual",
-                    "keep",
-                ),
-            )
-        conn.commit()
-    except Exception as exc:
-        conn.rollback()
-        conn.close()
-        return JSONResponse(status_code=500, content={"detail": str(exc)})
-    finally:
-        conn.close()
-    return {"candidate_id": candidate_id}
-
-
-@app.post("/api/swot-consolidation/approve", status_code=200)
-def approve_swot_consolidation(body: dict):
-    """Mark all candidates of a consolidation run as approved, clearing prior approvals."""
-    run_id = body.get("consolidation_run_id")
-    if not run_id:
-        return JSONResponse(status_code=400, content={"detail": "consolidation_run_id required"})
-    dsn = os.getenv("DB_CONNECTION_STRING", "")
-    if not dsn:
-        return JSONResponse(status_code=503, content={"detail": "No database"})
-    try:
-        conn = psycopg2.connect(dsn)
-    except Exception as exc:
-        return JSONResponse(status_code=503, content={"detail": str(exc)})
-    try:
-        with conn.cursor() as cur:
-            cur.execute(
-                "UPDATE swot_consolidation_candidates SET approved = false, approved_at = NULL WHERE approved = true"
-            )
-            cur.execute(
-                """
-                UPDATE swot_consolidation_candidates
-                SET approved = true, approved_at = NOW()
-                WHERE consolidation_run_id = %s
-                """,
-                (run_id,),
-            )
-            if cur.rowcount == 0:
-                conn.close()
-                return JSONResponse(status_code=404, content={"detail": "Run not found"})
-            cur.execute("SELECT MAX(approved_at) FROM swot_consolidation_candidates WHERE consolidation_run_id = %s", (run_id,))
-            approved_at_row = cur.fetchone()
-        conn.commit()
-    except Exception as exc:
-        conn.rollback()
-        conn.close()
-        return JSONResponse(status_code=500, content={"detail": str(exc)})
-    finally:
-        conn.close()
-    approved_at = approved_at_row[0].isoformat() if approved_at_row and approved_at_row[0] else datetime.utcnow().isoformat()
-    return {"approved_at": approved_at}
+    with conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO swot_consolidation_candidates
+                (candidate_id, consolidation_run_id, branch, type, pillar_id, pillar_name,
+                 title, description, member_item_ids, contributing_agents, snapshot_count,
+                 factor_breakdown, salience_score, lifecycle_state, selected,
+                 selection_reason, reviewer_decision, reviewed_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s::uuid[], %s, %s,
+                    %s, %s, %s, %s, %s, %s, NOW())
+        """, (
+            candidate_id, req.consolidation_run_id, req.branch, req.type,
+            req.pillar_id, req.pillar_name, req.title, req.description,
+            [], [], None,
+            psycopg2.extras.Json({"manual": True}), 0.0, "new", True,
+            "manually added by user", "keep",
+        ))
+    return {"status": "created", "candidate_id": candidate_id}
 
 
 # ── Phase 1: Fetch draft ──────────────────────────────────────────────────────
@@ -2407,33 +2296,28 @@ def _fetch_swot_items(
     conn, swot_run_id: str | None
 ) -> tuple[list[dict], str | None]:
     """
-    Pull SWOT rows from the DB and return (items, swot_day_iso).
-    When swot_run_id is None, selects all items from the MOST RECENT day
-    that has any rows (UTC date of MAX created_at).
+    Pull approved SWOT consolidation candidates and return (items, approved_day_iso).
+    swot_run_id is ignored — the approved consolidation run is always the source of truth.
+    Returns ([], None) with a warning if no approved run exists.
     """
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-        if swot_run_id:
-            cur.execute(
-                "SELECT * FROM swot_items WHERE run_id = %s ORDER BY created_at",
-                (swot_run_id,),
-            )
-        else:
-            # Take the most recent run_id for each agent independently.
-            # e.g. tech ran 2 weeks ago, workforce ran yesterday → both are included.
-            cur.execute(
-                """
-                WITH latest_runs AS (
-                    SELECT DISTINCT ON (agent_id) agent_id, run_id
-                    FROM swot_items
-                    ORDER BY agent_id, created_at DESC
-                )
-                SELECT si.*
-                FROM swot_items si
-                JOIN latest_runs lr ON si.run_id = lr.run_id
-                ORDER BY si.created_at
-                """
-            )
+        cur.execute(
+            """
+            SELECT candidate_id::text AS item_id,
+                   type, title, description,
+                   pillar_id, pillar_name,
+                   salience_score,
+                   approved_at AS created_at
+            FROM   swot_consolidation_candidates
+            WHERE  approved = true
+            ORDER  BY type, salience_score DESC
+            """
+        )
         items = [dict(r) for r in cur.fetchall()]
+
+    if not items:
+        print("[strategy] WARNING: no approved SWOT consolidation run found — "
+              "approve a consolidation run before running the Goals Planner.")
 
     swot_day: str | None = None
     if items:
@@ -2826,6 +2710,29 @@ class StrategyRunRequest(BaseModel):
     swot_run_id: str | None = None  # override: restrict to one run; None = latest day
 
 
+@app.get("/api/strategy/latest-run-id")
+def get_latest_strategy_run_id():
+    """Return the run_id of the most recent goals_planner run that has saved goals."""
+    conn = _get_db_conn()
+    if not conn:
+        raise HTTPException(status_code=503, detail="Database not configured.")
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute("""
+            SELECT sg.run_id::text
+            FROM   strategic_goals sg
+            JOIN   agent_runs ar ON ar.run_id = sg.run_id
+            WHERE  ar.agent_id = 'goals_planner'
+            GROUP  BY sg.run_id, ar.run_timestamp
+            HAVING COUNT(*) > 0
+            ORDER  BY ar.run_timestamp DESC
+            LIMIT  1 OFFSET 1
+        """)
+        row = cur.fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="No strategy run with goals found.")
+    return {"run_id": row["run_id"]}
+
+
 @app.post("/api/agents/strategy/run", status_code=202)
 def run_strategy(req: StrategyRunRequest, background_tasks: BackgroundTasks):
     """
@@ -2925,9 +2832,9 @@ def get_strategy_goals(run_id: str):
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(
                 """
-                SELECT item_id, type, title, description, pillar_name
-                FROM swot_items
-                WHERE item_id = ANY(%s::uuid[])
+                SELECT candidate_id::text AS item_id, type, title, description, pillar_name
+                FROM swot_consolidation_candidates
+                WHERE candidate_id = ANY(%s::uuid[])
                 """,
                 (id_arr,),
             )
@@ -3544,7 +3451,15 @@ class ActionPatchRequest(BaseModel):
     responsible_exec: str | None = None
     responsible_monitor: str | None = None
     assigned_archetype: str | None = None
+    # Top-down model: cost is directly user-editable (Decision 1).
+    inflated_cost_egp: float | None = None
+    # duration_multiplier kept for backwards-compat but no longer drives pricing.
     duration_multiplier: int | None = None
+
+
+class WorkspaceBudgetRequest(BaseModel):
+    total_budget_egp: float
+    pillar_allocations: list[dict]  # [{pillar_id: int, allocated_egp: float}]
 
 
 @app.get("/api/action-plan/runs")
@@ -3585,18 +3500,20 @@ def get_action_plan_runs():
 
 @app.get("/api/action-plan/vocab")
 def get_action_plan_vocab():
-    """Return controlled vocabularies (roles + cost archetypes) for the edit dropdowns."""
+    """Return controlled vocabularies (roles + cost archetypes) for the edit dropdowns.
+    Archetypes are categorisation-only in the top-down model; base_cost_egp is not used for pricing."""
     try:
         from Agents.action_planner.action_planner import ROLE_VOCAB, load_catalog
         catalog = load_catalog()
         archetypes = [
             {
-                "key": k,
-                "label": k.replace("_", " ").title(),
+                "key":         k,
+                "label":       v.get("label", k.replace("_", " ").title()),
                 "description": v.get("description", ""),
-                "base_cost_egp": v.get("base_cost_egp"),
-                "cost_driver": v.get("cost_driver"),
-                "funding_source": v.get("funding_source"),
+                # Included for reference only — no longer drives cost in the top-down model.
+                "base_cost_egp":  None,
+                "cost_driver":    None,
+                "funding_source": None,
             }
             for k, v in catalog.items()
         ]
@@ -3663,7 +3580,8 @@ def get_action_plan(run_id: str):
 
     generated = len(actions_rows) > 0
 
-    # Index actions by objective_id
+    # Index actions by objective_id; also build pillar lookup from objectives.
+    obj_pillar_map = {str(o["objective_id"]): int(o.get("pillar_id") or 0) for o in objs_rows}
     actions_by_obj: dict[str, list] = {}
     priced_for_budget = []
     for a in actions_rows:
@@ -3672,7 +3590,7 @@ def get_action_plan(run_id: str):
         priced_for_budget.append({
             "start_year_index": int(a.get("start_year_index") or 0),
             "inflated_cost_egp": float(a.get("inflated_cost_egp") or 0),
-            "funding_source": a.get("funding_source") or "faculty_opex",
+            "pillar_id": obj_pillar_map.get(oid, 0),
         })
 
     # Index objectives by goal_id
@@ -3732,10 +3650,16 @@ def get_action_plan(run_id: str):
     budget_summary = None
     if generated and priced_for_budget:
         try:
-            from Agents.action_planner.action_planner import load_revenue, reconcile_budget
-            budget_summary = reconcile_budget(priced_for_budget, load_revenue())
-        except Exception:
-            pass
+            from Agents.action_planner.action_planner import (
+                _fetch_workspace_budget, reconcile_pillars, build_cashflow_by_year,
+            )
+            workspace_budget = _fetch_workspace_budget(conn)
+            budget_summary = {
+                **reconcile_pillars(priced_for_budget, workspace_budget),
+                "cashflow_by_year": build_cashflow_by_year(priced_for_budget),
+            }
+        except Exception as _e:
+            print(f"[action_plan API] budget_summary failed: {_e}")
 
     return {
         "run_id":         run_id,
@@ -3772,7 +3696,12 @@ def run_action_plan(req: ActionPlanRunRequest):
 
 @app.patch("/api/action-plan/action/{action_id}")
 def patch_action(action_id: str, req: ActionPatchRequest):
-    """Edit one action item. Re-prices automatically if archetype or duration changes."""
+    """Edit one action item (top-down model).
+
+    Cost is now a direct user input (inflated_cost_egp). Archetype is categorisation-only.
+    Schedule changes update start_year_index for cash-flow display but do not trigger
+    catalog re-pricing — that engine has been removed.
+    """
     conn = _get_db_conn()
     if not conn:
         raise HTTPException(status_code=503, detail="Database unavailable")
@@ -3784,35 +3713,23 @@ def patch_action(action_id: str, req: ActionPatchRequest):
             raise HTTPException(status_code=404, detail="Action not found")
         row = dict(row)
 
-        archetype_changed = req.assigned_archetype is not None and req.assigned_archetype != row["assigned_archetype"]
-        duration_changed  = req.duration_multiplier is not None and req.duration_multiplier != row["duration_multiplier"]
+        # Normalize schedule and update start_year_index when quarters change.
+        new_start_q      = None
+        new_end_q        = None
+        new_start_yr_idx = None
+        if req.start_quarter is not None:
+            from Agents.action_planner.action_planner import normalize_schedule
+            sched            = normalize_schedule(req.start_quarter, req.end_quarter or row["end_quarter"])
+            new_start_q      = sched["start_quarter"]
+            new_end_q        = sched["end_quarter"]
+            new_start_yr_idx = sched["start_year_index"]
 
-        # Re-price whenever archetype, duration, or start quarter changes
-        if archetype_changed or duration_changed or req.start_quarter is not None:
-            from Agents.action_planner.action_planner import (
-                load_catalog, normalize_schedule, price_activity, render_cost_explanation
-            )
-            catalog   = load_catalog()
-            archetype = req.assigned_archetype or row["assigned_archetype"]
-            duration  = req.duration_multiplier or int(row["duration_multiplier"])
-            sched     = normalize_schedule(
-                req.start_quarter or row["start_quarter"],
-                req.end_quarter   or row["end_quarter"],
-            )
-            pricing = price_activity(archetype, duration, sched["start_year_index"], catalog)
-            new_cost   = pricing["inflated_cost_egp"]
-            new_base   = pricing["base_cost_egp"]
-            new_driver = pricing["cost_driver"]
-            new_fund   = pricing["funding_source"]
-            new_expl   = render_cost_explanation(pricing["pricing_provenance"], new_cost)
-            new_prov   = pricing["pricing_provenance"]
-        else:
-            new_cost   = float(row["inflated_cost_egp"])
-            new_base   = float(row["base_cost_egp"])
-            new_driver = row["cost_driver"]
-            new_fund   = row["funding_source"]
-            new_expl   = row["cost_explanation"]
-            new_prov   = row["pricing_provenance"]
+        # Direct cost edit — user enters the number (Decision 1).
+        new_cost = req.inflated_cost_egp if req.inflated_cost_egp is not None else None
+        new_expl = (
+            f"Manually set to {round(req.inflated_cost_egp):,} EGP by user."
+            if req.inflated_cost_egp is not None else None
+        )
 
         with conn.cursor() as cur:
             cur.execute(
@@ -3822,25 +3739,21 @@ def patch_action(action_id: str, req: ActionPatchRequest):
                     kpi_name            = COALESCE(%s, kpi_name),
                     start_quarter       = COALESCE(%s, start_quarter),
                     end_quarter         = COALESCE(%s, end_quarter),
+                    start_year_index    = COALESCE(%s, start_year_index),
                     responsible_exec    = COALESCE(%s, responsible_exec),
                     responsible_monitor = COALESCE(%s, responsible_monitor),
                     assigned_archetype  = COALESCE(%s, assigned_archetype),
-                    duration_multiplier = COALESCE(%s, duration_multiplier),
-                    inflated_cost_egp   = %s,
-                    base_cost_egp       = %s,
-                    cost_driver         = %s,
-                    funding_source      = %s,
-                    cost_explanation    = %s,
-                    pricing_provenance  = %s,
+                    inflated_cost_egp   = COALESCE(%s, inflated_cost_egp),
+                    cost_explanation    = COALESCE(%s, cost_explanation),
                     edited_by_user      = TRUE
                 WHERE action_id = %s
                 """,
                 (
-                    req.activity_text, req.kpi_name, req.start_quarter, req.end_quarter,
+                    req.activity_text, req.kpi_name,
+                    new_start_q, new_end_q, new_start_yr_idx,
                     req.responsible_exec, req.responsible_monitor,
-                    req.assigned_archetype, req.duration_multiplier,
-                    new_cost, new_base, new_driver, new_fund, new_expl,
-                    psycopg2.extras.Json(new_prov),
+                    req.assigned_archetype,
+                    new_cost, new_expl,
                     action_id,
                 ),
             )
@@ -3853,7 +3766,11 @@ def patch_action(action_id: str, req: ActionPatchRequest):
 
 @app.post("/api/action-plan/action/{action_id}/reset")
 def reset_action(action_id: str):
-    """Reset an edited action back to its original AI-generated values and recompute pricing."""
+    """Reset an edited action back to its original AI-generated values (top-down model).
+
+    Cost is restored from original_inflated_cost_egp — no catalog re-pricing.
+    Falls back to the current inflated_cost_egp if original is null (pre-migration rows).
+    """
     conn = _get_db_conn()
     if not conn:
         raise HTTPException(status_code=503, detail="Database unavailable")
@@ -3865,15 +3782,16 @@ def reset_action(action_id: str):
             raise HTTPException(status_code=404, detail="Action not found")
         row = dict(row)
 
-        from Agents.action_planner.action_planner import (
-            load_catalog, normalize_schedule, price_activity, render_cost_explanation
+        from Agents.action_planner.action_planner import normalize_schedule
+        sched = normalize_schedule(row["original_start_quarter"], row["original_end_quarter"])
+
+        original_cost = float(
+            row.get("original_inflated_cost_egp") or row.get("inflated_cost_egp") or 0
         )
-        catalog   = load_catalog()
-        archetype = row["original_assigned_archetype"]
-        duration  = int(row["original_duration_multiplier"])
-        sched     = normalize_schedule(row["original_start_quarter"], row["original_end_quarter"])
-        pricing   = price_activity(archetype, duration, sched["start_year_index"], catalog)
-        cost_expl = render_cost_explanation(pricing["pricing_provenance"], pricing["inflated_cost_egp"])
+        cost_expl = (
+            f"Reset to AI allocation: {round(original_cost):,} EGP "
+            f"(original top-down pillar distribution)."
+        )
 
         with conn.cursor() as cur:
             cur.execute(
@@ -3883,25 +3801,16 @@ def reset_action(action_id: str):
                     kpi_name            = original_kpi_name,
                     start_quarter       = original_start_quarter,
                     end_quarter         = original_end_quarter,
+                    start_year_index    = %s,
                     responsible_exec    = original_responsible_exec,
                     responsible_monitor = original_responsible_monitor,
                     assigned_archetype  = original_assigned_archetype,
-                    duration_multiplier = original_duration_multiplier,
                     inflated_cost_egp   = %s,
-                    base_cost_egp       = %s,
-                    cost_driver         = %s,
-                    funding_source      = %s,
                     cost_explanation    = %s,
-                    pricing_provenance  = %s,
                     edited_by_user      = FALSE
                 WHERE action_id = %s
                 """,
-                (
-                    pricing["inflated_cost_egp"], pricing["base_cost_egp"],
-                    pricing["cost_driver"], pricing["funding_source"],
-                    cost_expl, psycopg2.extras.Json(pricing["pricing_provenance"]),
-                    action_id,
-                ),
+                (sched["start_year_index"], original_cost, cost_expl, action_id),
             )
     except HTTPException:
         raise
@@ -3910,16 +3819,85 @@ def reset_action(action_id: str):
     return {"ok": True}
 
 
+# ── Workspace budget (read/write) ─────────────────────────────────────────────
+
+@app.get("/api/workspace/budget")
+def get_workspace_budget():
+    """Return the workspace-level strategic budget and per-pillar allocations."""
+    conn = _get_db_conn()
+    if not conn:
+        raise HTTPException(status_code=503, detail="Database unavailable")
+    try:
+        from Agents.action_planner.action_planner import _fetch_workspace_budget
+        budget = _fetch_workspace_budget(conn)
+        return {
+            "total_budget_egp": budget["total_budget_egp"],
+            "pillar_allocations": [
+                {
+                    "pillar_id":    pid,
+                    "allocated_egp": amt,
+                    "pillar_name":  _PILLAR_NAMES.get(pid),
+                }
+                for pid, amt in sorted(budget["pillar_allocations"].items())
+            ],
+        }
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+    finally:
+        conn.close()
+
+
+@app.put("/api/workspace/budget")
+def put_workspace_budget(req: WorkspaceBudgetRequest):
+    """Update workspace budget and pillar allocations (idempotent upsert)."""
+    conn = _get_db_conn()
+    if not conn:
+        raise HTTPException(status_code=503, detail="Database unavailable")
+    try:
+        with conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO strategic_budget (id, total_budget_egp, updated_at)
+                    VALUES (1, %s, NOW())
+                    ON CONFLICT (id) DO UPDATE SET
+                        total_budget_egp = EXCLUDED.total_budget_egp,
+                        updated_at       = NOW()
+                    """,
+                    (req.total_budget_egp,),
+                )
+                for alloc in req.pillar_allocations:
+                    pid = int(alloc.get("pillar_id", 0))
+                    amt = float(alloc.get("allocated_egp", 0))
+                    if 1 <= pid <= 7:
+                        cur.execute(
+                            """
+                            INSERT INTO budget_pillar_allocation (pillar_id, allocated_egp, updated_at)
+                            VALUES (%s, %s, NOW())
+                            ON CONFLICT (pillar_id) DO UPDATE SET
+                                allocated_egp = EXCLUDED.allocated_egp,
+                                updated_at    = NOW()
+                            """,
+                            (pid, amt),
+                        )
+        return {"ok": True}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+    finally:
+        conn.close()
+
+
 # ── Plan Generation (Chief Editor) ───────────────────────────────────────────
 
 class PlanGenerationRequest(BaseModel):
+    org_id:  str
     use_llm: bool = True
 
 
-def _task_plan_generation(job_id: str, use_llm: bool) -> None:
+def _task_plan_generation(job_id: str, org_id: str, use_llm: bool) -> None:
     try:
         from chief_editor.generator import generate_plan
-        plan_id = generate_plan(use_llm=use_llm, job_id=job_id)
+        plan_id = generate_plan(org_id=org_id, use_llm=use_llm, job_id=job_id)
         _finish(job_id, {"plan_id": plan_id})
     except Exception as exc:
         _fail(job_id, str(exc))
@@ -3929,7 +3907,11 @@ def _task_plan_generation(job_id: str, use_llm: bool) -> None:
 def run_plan_generation(req: PlanGenerationRequest):
     """Start a Chief Editor plan generation run. Returns job_id to poll."""
     job_id = _new_job()
-    t = threading.Thread(target=_task_plan_generation, args=(job_id, req.use_llm), daemon=True)
+    t = threading.Thread(
+        target=_task_plan_generation,
+        args=(job_id, req.org_id, req.use_llm),
+        daemon=True,
+    )
     t.start()
     return {"job_id": job_id}
 
@@ -3948,3 +3930,93 @@ def get_generated_plan(plan_id: str):
     if not row:
         raise HTTPException(status_code=404, detail="Plan not found")
     return row
+
+
+# ── Plan Chat (Chief Editor assistant) ───────────────────────────────────────
+
+class ChatTurn(BaseModel):
+    role: str  # "user" | "assistant"
+    content: str
+
+
+class PlanChatRequest(BaseModel):
+    message: str
+    # Prior conversation turns for multi-turn memory (oldest → newest).
+    history: list[ChatTurn] = []
+    # Optional base64 data URL (data:image/...;base64,...) for the assistant to read.
+    image: str | None = None
+    # These arrive as null from the frontend when no block is selected, so they
+    # must accept None (a bare `str` field rejects null → 422 Unprocessable Entity).
+    blockHeading: str | None = ""
+    blockContent: str | None = ""
+    provenanceDesc: str | None = ""
+    docTitle: str | None = ""
+    orgName: str | None = ""
+
+
+@app.post("/api/plan-chat")
+def plan_chat(req: PlanChatRequest):
+    """
+    Answer a user question about a specific block in the strategic plan document.
+    Uses Gemini via Vertex AI (same model as the Chief Editor pipeline).
+    Returns {reply: str}.
+    """
+    try:
+        from chief_editor.llm import get_chat_model
+        from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+
+        system = (
+            "You are the Chief Editor assistant for a university strategic plan document. "
+            "You help the human editor understand, refine, and rewrite content blocks.\n\n"
+            "RULES:\n"
+            "- Never invent facts, figures, or names not present in the context below.\n"
+            "- When asked to rewrite or revise, output ONLY the replacement text — no preamble.\n"
+            "- When asked to explain, be concise (3–5 sentences).\n"
+            "- Formal academic English. Third-person where applicable."
+        )
+
+        context_parts = []
+        if req.docTitle:
+            context_parts.append(f"Document: {req.docTitle}")
+        if req.orgName:
+            context_parts.append(f"Organisation: {req.orgName}")
+        if req.blockHeading:
+            context_parts.append(f"Section: {req.blockHeading}")
+        if req.blockContent:
+            context_parts.append(f"Current content:\n{req.blockContent}")
+        if req.provenanceDesc:
+            context_parts.append(f"Content source: {req.provenanceDesc}")
+
+        context_block = "\n".join(context_parts)
+        user_prompt = f"{context_block}\n\nUser question: {req.message}" if context_block else req.message
+
+        # System rules → prior turns (multi-turn memory) → current question.
+        msgs: list = [SystemMessage(content=system)]
+        for turn in req.history[-20:]:
+            content = (turn.content or "").strip()
+            if not content:
+                continue
+            if turn.role == "assistant":
+                msgs.append(AIMessage(content=content))
+            else:
+                msgs.append(HumanMessage(content=content))
+
+        # Current turn: multimodal if an image is attached, else plain text.
+        if req.image and req.image.startswith("data:image"):
+            msgs.append(HumanMessage(content=[
+                {"type": "text", "text": user_prompt},
+                {"type": "image_url", "image_url": {"url": req.image}},
+            ]))
+        else:
+            msgs.append(HumanMessage(content=user_prompt))
+
+        llm = get_chat_model(model="gemini-2.5-flash")
+        resp = llm.invoke(msgs)
+        reply = (getattr(resp, "content", None) or "").strip()
+        if not reply:
+            raise ValueError("Empty response from model")
+        return {"reply": reply}
+
+    except Exception as exc:
+        print(f"[plan-chat] error: {exc}")
+        raise HTTPException(status_code=503, detail="Chat service unavailable")

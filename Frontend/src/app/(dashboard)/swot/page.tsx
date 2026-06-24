@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Sparkles, Filter, Loader2, Play, ClipboardCheck } from "lucide-react";
+import { Sparkles, Filter, Loader2, Play, ClipboardCheck, Trash2, Pencil, Check, X } from "lucide-react";
 import { Header } from "@/components/layout/Header";
 import { useSWOT } from "@/hooks/useSWOT";
 import { NAQAAE_PILLARS } from "@/types";
@@ -103,12 +103,34 @@ function EvidenceDialog({ card, open, onClose }: { card: InsightCard; open: bool
 }
 
 // ── Insight card ───────────────────────────────────────────────────────────────
-function InsightCardComponent({ card }: { card: InsightCard }) {
+function InsightCardComponent({
+  card,
+  onDelete,
+  onEditSave,
+}: {
+  card: InsightCard;
+  onDelete?: () => void;
+  onEditSave?: (title: string, description: string) => void;
+}) {
   const [evidenceOpen, setEvidenceOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState(card.title);
+  const [editDesc, setEditDesc] = useState(card.description);
   const cfg = CAT[card.category];
   const Icon = cfg.icon;
   const impactVariant: Record<string, "critical" | "high" | "medium" | "low"> = {
     critical: "critical", high: "high", medium: "medium", low: "low",
+  };
+
+  const handleSave = () => {
+    onEditSave?.(editTitle.trim() || card.title, editDesc.trim() || card.description);
+    setEditing(false);
+  };
+
+  const handleCancel = () => {
+    setEditTitle(card.title);
+    setEditDesc(card.description);
+    setEditing(false);
   };
 
   return (
@@ -127,16 +149,76 @@ function InsightCardComponent({ card }: { card: InsightCard }) {
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
             {card.data_source === "mock" && <Badge variant="mock">Mock</Badge>}
-            <Badge variant={impactVariant[card.impact_level] ?? "low"} className="capitalize">
-              {card.impact_level}
-            </Badge>
+            {!editing && (
+              <Badge variant={impactVariant[card.impact_level] ?? "low"} className="capitalize">
+                {card.impact_level}
+              </Badge>
+            )}
+            {editing ? (
+              <>
+                <button
+                  onClick={handleSave}
+                  title="Save"
+                  className="flex h-6 w-6 items-center justify-center rounded-md text-emerald-400 transition-colors hover:bg-emerald-500/10"
+                >
+                  <Check className="h-3 w-3" />
+                </button>
+                <button
+                  onClick={handleCancel}
+                  title="Cancel"
+                  className="flex h-6 w-6 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-white/5"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </>
+            ) : (
+              <>
+                {onEditSave && (
+                  <button
+                    onClick={() => setEditing(true)}
+                    title="Edit"
+                    className="flex h-6 w-6 items-center justify-center rounded-md text-slate-600 transition-colors hover:bg-white/10 hover:text-slate-300"
+                  >
+                    <Pencil className="h-3 w-3" />
+                  </button>
+                )}
+                {onDelete && (
+                  <button
+                    onClick={onDelete}
+                    title="Delete"
+                    className="flex h-6 w-6 items-center justify-center rounded-md text-slate-600 transition-colors hover:bg-rose-500/10 hover:text-rose-400"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                )}
+              </>
+            )}
           </div>
         </div>
 
         {/* Title & description */}
         <div>
-          <h4 className="text-sm font-semibold text-slate-100">{card.title}</h4>
-          <p className="mt-1 text-xs text-slate-500 leading-relaxed">{card.description}</p>
+          {editing ? (
+            <>
+              <input
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") handleSave(); if (e.key === "Escape") handleCancel(); }}
+                className="mb-1.5 w-full rounded-md border border-cyan-500/40 bg-white/5 px-2 py-1 text-sm font-semibold text-slate-100 outline-none"
+              />
+              <textarea
+                value={editDesc}
+                onChange={(e) => setEditDesc(e.target.value)}
+                rows={3}
+                className="w-full resize-none rounded-md border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-400 outline-none focus:border-cyan-500/40"
+              />
+            </>
+          ) : (
+            <>
+              <h4 className="text-sm font-semibold text-slate-100">{card.title}</h4>
+              <p className="mt-1 text-xs text-slate-500 leading-relaxed">{card.description}</p>
+            </>
+          )}
         </div>
 
         {/* Pillar tag */}
@@ -147,25 +229,27 @@ function InsightCardComponent({ card }: { card: InsightCard }) {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between border-t border-white/5 pt-2">
-          <div className="flex items-center gap-3 text-[10px] text-slate-600">
-            <span className="flex items-center gap-1">
-              <FileText className="h-3 w-3" />
-              {card.reference_count} refs
-            </span>
-            <span className="flex items-center gap-1">
-              <Sparkles className="h-3 w-3" />
-              {card.confidence_score}% confidence
-            </span>
+        {!editing && (
+          <div className="flex items-center justify-between border-t border-white/5 pt-2">
+            <div className="flex items-center gap-3 text-[10px] text-slate-600">
+              <span className="flex items-center gap-1">
+                <FileText className="h-3 w-3" />
+                {card.reference_count} refs
+              </span>
+              <span className="flex items-center gap-1">
+                <Sparkles className="h-3 w-3" />
+                {card.confidence_score}% confidence
+              </span>
+            </div>
+            <button
+              onClick={() => setEvidenceOpen(true)}
+              className="flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium text-cyan-400 transition-colors hover:bg-cyan-500/10"
+            >
+              <Eye className="h-3 w-3" />
+              View Evidence
+            </button>
           </div>
-          <button
-            onClick={() => setEvidenceOpen(true)}
-            className="flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium text-cyan-400 transition-colors hover:bg-cyan-500/10"
-          >
-            <Eye className="h-3 w-3" />
-            View Evidence
-          </button>
-        </div>
+        )}
       </div>
 
       <EvidenceDialog card={card} open={evidenceOpen} onClose={() => setEvidenceOpen(false)} />
@@ -174,7 +258,17 @@ function InsightCardComponent({ card }: { card: InsightCard }) {
 }
 
 // ── Column ─────────────────────────────────────────────────────────────────────
-function SwotColumn({ category, items }: { category: SwotCategory; items: InsightCard[] }) {
+function SwotColumn({
+  category,
+  items,
+  onDelete,
+  onEditSave,
+}: {
+  category: SwotCategory;
+  items: InsightCard[];
+  onDelete?: (id: string) => void;
+  onEditSave?: (id: string, title: string, description: string) => void;
+}) {
   const cfg = CAT[category];
   const Icon = cfg.icon;
 
@@ -190,7 +284,12 @@ function SwotColumn({ category, items }: { category: SwotCategory; items: Insigh
       </div>
       {/* Cards */}
       {items.map((card) => (
-        <InsightCardComponent key={card.id} card={card} />
+        <InsightCardComponent
+          key={card.id}
+          card={card}
+          onDelete={onDelete ? () => onDelete(card.id) : undefined}
+          onEditSave={onEditSave ? (title, desc) => onEditSave(card.id, title, desc) : undefined}
+        />
       ))}
       {items.length === 0 && (
         <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-white/10 py-8">
@@ -212,7 +311,22 @@ export default function SWOTPage() {
   const { canMutate } = useRole();
   const router = useRouter();
 
-  const totalInsights = Object.values(byCategory).flat().length;
+  const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
+  const [edits, setEdits] = useState<Record<string, { title: string; description: string }>>({});
+
+  const applyEdits = (cards: InsightCard[]) =>
+    cards
+      .filter((c) => !deletedIds.has(c.id))
+      .map((c) => (edits[c.id] ? { ...c, ...edits[c.id] } : c));
+
+  const displayByCategory = {
+    strength:    applyEdits(byCategory.strength),
+    weakness:    applyEdits(byCategory.weakness),
+    opportunity: applyEdits(byCategory.opportunity),
+    threat:      applyEdits(byCategory.threat),
+  };
+
+  const totalInsights = Object.values(displayByCategory).flat().length;
 
   return (
     <div className="flex min-h-full flex-col">
@@ -347,7 +461,15 @@ export default function SWOTPage() {
         {!loading && !error && (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {(["strength", "weakness", "opportunity", "threat"] as SwotCategory[]).map((cat) => (
-              <SwotColumn key={cat} category={cat} items={byCategory[cat]} />
+              <SwotColumn
+                key={cat}
+                category={cat}
+                items={displayByCategory[cat]}
+                onDelete={(id) => setDeletedIds((prev) => new Set([...prev, id]))}
+                onEditSave={(id, title, description) =>
+                  setEdits((prev) => ({ ...prev, [id]: { title, description } }))
+                }
+              />
             ))}
           </div>
         )}

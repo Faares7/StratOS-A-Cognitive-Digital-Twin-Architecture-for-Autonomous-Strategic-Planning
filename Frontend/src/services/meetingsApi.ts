@@ -39,6 +39,21 @@ export interface ScheduleMeetingResult {
   calendar_event_id: string;
   html_link: string;
   fathom_warning: string | null;
+  calendar_error: string | null;
+}
+
+// ── Token handoff — keeps the FastAPI backend's refresh token in sync ─────────
+
+export async function handoffGoogleToken(
+  accessToken: string,
+  refreshToken: string | undefined,
+  email: string | null | undefined,
+): Promise<void> {
+  await fetch(`${BASE_URL}/api/auth/google/handoff`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ access_token: accessToken, refresh_token: refreshToken ?? null, email: email ?? null }),
+  }).catch(() => {}); // best-effort: never block the UI
 }
 
 // ── Google Calendar auth ──────────────────────────────────────────────────────

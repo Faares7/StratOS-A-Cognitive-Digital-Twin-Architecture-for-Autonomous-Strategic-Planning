@@ -1,6 +1,8 @@
 "use client";
 
 import React from "react";
+import Link from "next/link";
+import { BarChart2, ArrowRight } from "lucide-react";
 import { useDashboard } from "@/hooks/useDashboard";
 import { useMeetings } from "@/hooks/useMeetings";
 import { useAgentResults } from "@/contexts/AgentResultsContext";
@@ -69,6 +71,69 @@ export default function CommandCenterPage() {
       {data && (
         <div className="flex flex-col gap-5 p-6 animate-fade-in">
 
+          {/* Benchmarking card */}
+          <div className="rounded-xl border border-white/[0.07] bg-[#0f1422] px-5 py-4">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#b8922f]/10">
+                  <BarChart2 className="h-4 w-4 text-[#b8922f]" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-[#505672]">
+                    Research Benchmarking
+                  </p>
+                  <p className="text-sm font-semibold text-[#e0e4ef]">
+                    Nile University vs. Egyptian Peers
+                  </p>
+                </div>
+              </div>
+
+              {results.research ? (
+                <>
+                  <div className="flex items-center gap-8">
+                    {[
+                      { label: "Rank", value: results.research.nile_university.rank != null ? `#${results.research.nile_university.rank}` : "—" },
+                      { label: "Publications", value: results.research.nile_university.publications.toLocaleString() },
+                      { label: "H-Index", value: String(results.research.nile_university.h_index) },
+                      { label: "Citations", value: results.research.nile_university.total_citations.toLocaleString() },
+                    ].map(({ label, value }) => (
+                      <div key={label} className="text-center">
+                        <p className="text-lg font-bold text-[#e0e4ef]">{value}</p>
+                        <p className="text-[10px] uppercase tracking-wider text-[#505672]">{label}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-[10px] text-[#505672]">
+                      {results.research.competitors.length} competitors tracked
+                      {results.research.data_source === "live" && (
+                        <span className="ml-1.5 rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[9px] text-emerald-400">Live</span>
+                      )}
+                    </span>
+                    <Link
+                      href="/research"
+                      className="flex items-center gap-1.5 rounded-lg border border-[#b8922f]/30 bg-[#b8922f]/10 px-3 py-1.5 text-xs font-medium text-[#b8922f] transition-colors hover:bg-[#b8922f]/20"
+                    >
+                      View Details <ArrowRight className="h-3 w-3" />
+                    </Link>
+                  </div>
+                </>
+              ) : (
+                <div className="flex items-center gap-3">
+                  <p className="text-xs text-[#505672]">
+                    No benchmark data — run the agent from Research Intelligence
+                  </p>
+                  <Link
+                    href="/research"
+                    className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-[#8d97b8] transition-colors hover:border-[#b8922f]/30 hover:text-[#b8922f]"
+                  >
+                    Go to Research <ArrowRight className="h-3 w-3" />
+                  </Link>
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Row 1: Intelligence feed (2/3) + Attention required (1/3) */}
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
             <div className="lg:col-span-2">
@@ -77,7 +142,6 @@ export default function CommandCenterPage() {
                 threats={threats}
                 weaknesses={weaknesses}
                 opportunities={opportunities}
-                simulation={data.last_simulation}
                 complianceUpdated={data.compliance.last_updated}
               />
             </div>

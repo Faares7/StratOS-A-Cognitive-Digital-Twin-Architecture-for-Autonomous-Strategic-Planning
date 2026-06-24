@@ -16,13 +16,56 @@
  *    - Admins who already completed profiling are bounced to /dashboard
  *    - pending users can't reach it (no JWT for /onboarding would be
  *      possible, but the matcher keeps it safe)
+ *
+ * NOTE: withAuth's getToken() decodes the JWT cookie directly without
+ * calling the jwt() callback from authOptions. This means profilingDone
+ * in the token can be stale after a manual DB change. To avoid requiring
+ * a re-login, active Admins get a live profiling_done check from Supabase
+ * on every request. This is safe in the Edge Runtime and keeps routing
+ * always consistent with the database.
  */
 
 import { withAuth, type NextRequestWithAuth } from 'next-auth/middleware';
 import { NextResponse } from 'next/server';
 
+const SUPABASE_URL    = (process.env.NEXT_PUBLIC_SUPABASE_URL  ?? '').replace(/\/$/, '');
+const SERVICE_KEY     = process.env.SUPABASE_SERVICE_ROLE_KEY  ?? '';
+
+/**
+ * Fetches profiling_done for the user's organization directly from Supabase.
+ * Used only for active Admins so the middleware always reflects the real DB
+ * state without requiring a sign-out/sign-in cycle.
+ * Returns true (safe default) on any network or parse error.
+ */
+async function fetchProfilingDone(email: string): Promise<boolean> {
+  if (!SUPABASE_URL || !SERVICE_KEY) return true;
+  try {
+    const url =
+      `${SUPABASE_URL}/rest/v1/users` +
+      `?email=eq.${encodeURIComponent(email)}` +
+      `&select=organizations(profiling_done)` +
+      `&limit=1`;
+
+    const res = await fetch(url, {
+      headers: {
+        apikey:        SERVICE_KEY,
+        Authorization: `Bearer ${SERVICE_KEY}`,
+      },
+      // Edge Runtime: no Next.js cache layer — always fresh
+      cache: 'no-store',
+    });
+
+    if (!res.ok) return true;
+
+    const rows = (await res.json()) as { organizations: { profiling_done: boolean } | null }[];
+    return rows[0]?.organizations?.profiling_done ?? true;
+  } catch {
+    return true; // fail open — don't block users on a DB hiccup
+  }
+}
+
 export default withAuth(
-  function middleware(req: NextRequestWithAuth) {
+  async function middleware(req: NextRequestWithAuth) {
     const { pathname } = req.nextUrl;
     const token = req.nextauth.token;
 
@@ -30,7 +73,7 @@ export default withAuth(
     // Default to the most restrictive value on any decode failure.
     const accountStatus = token?.accountStatus ?? 'pending';
     const role          = token?.role           ?? 'None';
-    const profilingDone = token?.profilingDone  ?? true; // default true — no accidental loops
+    const email         = token?.email          ?? '';
 
     // ── Pending users: hold at the approval gate ─────────────────────
     if (accountStatus !== 'active') {
@@ -45,6 +88,14 @@ export default withAuth(
     // Active user has no business on the pending-approval page
     if (pathname === '/pending-approval') {
       return NextResponse.redirect(new URL('/dashboard', req.url));
+    }
+
+    // For active Admins: always read profiling_done live from the DB so
+    // manual resets (and onboarding completions) take effect immediately
+    // without requiring a re-login.
+    let profilingDone = token?.profilingDone ?? true;
+    if (role === 'Admin' && email) {
+      profilingDone = await fetchProfilingDone(email);
     }
 
     // Admin who has NOT completed onboarding → force to /onboarding

@@ -1,31 +1,33 @@
 """
-StratOS — Action Plan Agent (الخطة التنفيذية)
-=============================================
+StratOS — Action Plan Agent (الخطة التنفيذية) — TOP-DOWN BUDGET MODEL
+======================================================================
 Extends the strategy hierarchy: Run -> Goal -> Objective -> **Action item**.
 
 For every objective of an *approved* strategy run, this agent drafts 2-4
-executive activities and fills the operational-plan columns:
+executive activities and assigns each a share of its NAQAAE pillar's
+pre-allocated budget.
 
-    activity_text · kpi_name · timeline (start/end quarter) ·
-    responsible_exec · responsible_monitor · budget (computed)
-
-Architecture — "LLM classifies, Python computes":
-  * The LLM (Gemini 2.5 Flash on Vertex AI) generates the English prose,
-    picks responsibilities from a controlled vocabulary, schedules quarters
-    with chain-of-thought reasoning, classifies each activity into an OPEX
-    archetype, and estimates a duration_multiplier (1-4).
-  * The LLM NEVER emits a money value. Python loads the decoupled financial
-    registries (Data/financials/*), looks up the archetype's base cost, applies
-    a compounding inflation multiplier keyed to the cost driver, multiplies by
-    duration, and records full pricing provenance.
-  * A per-plan-year affordability check compares faculty OpEx spend against
-    that year's inflated 5%-of-tuition ceiling and emits soft warnings.
+Architecture — "LLM classifies, Python distributes":
+  * The LLM generates English prose for each activity, assigns a
+    relative_cost_weight (1–10) that reflects resource intensity relative
+    to other activities in the same pillar, and classifies the activity
+    into an OPEX archetype (for reporting/tagging only — NOT for pricing).
+  * The LLM NEVER emits a money value.
+  * Python groups all action items by NAQAAE pillar, then distributes each
+    pillar's pre-allocated EGP envelope proportionally to the weights,
+    rounding to the nearest 1,000 EGP and assigning any remainder to the
+    highest-weight item so the pillar sums exactly to its allocation.
+  * The user's workspace budget (total + 7 pillar allocations) is read from
+    strategic_budget / budget_pillar_allocation at generation time. Budget
+    is entered once during onboarding and updated from Settings.
 
 Guarantees:
   * Lifecycle gate — aborts unless agent_runs.structured_data.plan_status == 'final'.
   * Idempotent — deletes prior actions for the run_id before inserting.
-  * Grounded — tows_type / pillar / SWOT provenance injected so scheduling is
-    urgency-aware (WT/ST threats scheduled earlier).
+  * Grounded — tows_type / pillar / SWOT provenance injected so scheduling
+    is urgency-aware (WT/ST threats scheduled earlier).
+  * Graceful degradation — if budget is unset (0), items receive cost=0 with
+    a warning; the agent never crashes on missing budget.
 
 Entry point:
     compile_and_run(run_id: str, ...) -> dict
@@ -33,7 +35,6 @@ Entry point:
 
 from __future__ import annotations
 
-import csv
 import json
 import os
 import re
@@ -47,7 +48,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_google_vertexai import ChatVertexAI
 from pydantic import BaseModel, Field
 
-# ── Resolve repo root (handles direct run and importlib loading) ───────────────
+# ── Resolve repo root ──────────────────────────────────────────────────────────
 _ROOT = Path(__file__).parent.parent.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
@@ -65,27 +66,13 @@ from core.llm import JSON_GUARDRAIL   # noqa: E402
 
 DB_CONNECTION_STRING = os.getenv("DB_CONNECTION_STRING", "")
 
-FINANCIALS_DIR = _ROOT / "Data" / "financials"
-REVENUE_CSV = FINANCIALS_DIR / "tuition_revenue_2026.csv"
-OPEX_CATALOG_JSON = FINANCIALS_DIR / "activity_opex_catalog.json"
+FINANCIALS_DIR     = _ROOT / "Data" / "financials"
+OPEX_CATALOG_JSON  = FINANCIALS_DIR / "activity_opex_catalog.json"
 
 # Planning horizon: Q1-2026 .. Q4-2029 (16 quarters, 4 plan years).
 PLAN_BASE_YEAR = 2026
-PLAN_END_YEAR = 2029
-PLAN_YEARS = PLAN_END_YEAR - PLAN_BASE_YEAR + 1  # 4
-
-# Frozen, recorded macroeconomic assumptions for the 2026-2029 horizon (also
-# echoed per row in pricing_provenance). Local CPI drives domestic costs; USD/FX
-# drives imported costs. These are APPROXIMATE, conservative planning rates that
-# approximate IMF WEO projections of Egypt's post-2024 inflation stabilization
-# (the IMF path actually declines across the horizon, so a flat rate is a
-# conservative simplification). CONFIRM against the latest IMF WEO / CBE figures
-# before publication, and update here (the change is fully auditable per row).
-LOCAL_CPI_RATE = 0.15   # local CPI — domestic costs (compounded annually)
-USD_FX_RATE = 0.10      # EGP/USD depreciation — imported costs (compounded annually)
-
-# Soft strategic-budget ceiling: share of net tuition revenue per year.
-STRATEGIC_CEILING_PCT = 0.05
+PLAN_END_YEAR  = 2029
+PLAN_YEARS     = PLAN_END_YEAR - PLAN_BASE_YEAR + 1  # 4
 
 # Controlled vocabulary for responsibilities (English, per-college scope).
 ROLE_VOCAB = (
@@ -100,7 +87,7 @@ ROLE_VOCAB = (
     "Student Affairs",
 )
 
-# OPEX archetype keys — MUST stay in sync with activity_opex_catalog.json.
+# OPEX archetype keys — kept for categorization/reporting, no longer drive cost.
 ARCHETYPE_KEYS = (
     "faculty_training_workshop",
     "student_outreach_campaign",
@@ -122,7 +109,7 @@ ARCHETYPE_KEYS = (
     "general_initiative",
 )
 
-# NAQAAE pillar names (mirrors migrations/001 — used to enrich prompt grounding).
+# NAQAAE pillar names (mirrors migrations/001 — used for grounding and budget grouping).
 PILLAR_NAMES = {
     1: "Program Mission and Management",
     2: "Program Design",
@@ -141,12 +128,12 @@ TOWS_URGENCY = {
     "SO": "BUILD-OVER-TIME (strength vs. opportunity) — may schedule later in the horizon.",
 }
 
-# Literal types used to constrain the structured LLM output.
-RoleLiteral = Literal[ROLE_VOCAB]            # type: ignore[valid-type]
+# Literal types used to constrain structured LLM output.
+RoleLiteral      = Literal[ROLE_VOCAB]       # type: ignore[valid-type]
 ArchetypeLiteral = Literal[ARCHETYPE_KEYS]   # type: ignore[valid-type]
 
 
-# ── Gemini / Vertex model — lazy singleton (key/project read after load_dotenv) ─
+# ── Gemini / Vertex model — lazy singleton ────────────────────────────────────
 _llm: Optional[ChatVertexAI] = None
 
 
@@ -162,48 +149,24 @@ def _get_llm() -> ChatVertexAI:
         _llm = ChatVertexAI(
             model_name="gemini-3.1-pro-preview",
             project=project,
-            location="global",   # required for the 3.1 preview models on Vertex
+            location="global",
             temperature=0.2,
         )
     return _llm
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  Financial registries  (loaded once; the LLM never sees the numbers)
+#  Archetype catalog — labels/descriptions only (no pricing)
 # ══════════════════════════════════════════════════════════════════════════════
 
-def load_revenue(path: Path = REVENUE_CSV) -> dict:
-    """Load the tuition revenue baseline and compute the strategic envelope."""
-    programs: list[dict] = []
-    with open(path, newline="", encoding="utf-8") as f:
-        for row in csv.DictReader(f):
-            programs.append(
-                {
-                    "program": row["program"],
-                    "full_annual_fee_egp": float(row["full_annual_fee_egp"]),
-                    "blended_avg_fee_egp": float(row["blended_avg_fee_egp"]),
-                    "estimated_enrollment": int(row["estimated_enrollment"]),
-                }
-            )
-    total_revenue = sum(p["blended_avg_fee_egp"] * p["estimated_enrollment"] for p in programs)
-    base_ceiling = total_revenue * STRATEGIC_CEILING_PCT  # year-0 (2026) envelope
-    return {
-        "programs": programs,
-        "total_students": sum(p["estimated_enrollment"] for p in programs),
-        "total_revenue_egp": total_revenue,
-        "base_ceiling_egp": base_ceiling,
-    }
-
-
 def load_catalog(path: Path = OPEX_CATALOG_JSON) -> dict[str, dict]:
-    """Load + validate the OPEX archetype catalog (must match ARCHETYPE_KEYS)."""
+    """Load the OPEX archetype catalog for categorization labels and descriptions.
+    base_cost_egp values in the JSON are ignored — budget comes from the workspace."""
     with open(path, encoding="utf-8") as f:
         data = json.load(f)
     catalog = data["archetypes"]
-
-    # Guard against registry / code drift — this is the source of subtle bugs.
     missing = set(ARCHETYPE_KEYS) - set(catalog)
-    extra = set(catalog) - set(ARCHETYPE_KEYS)
+    extra   = set(catalog) - set(ARCHETYPE_KEYS)
     if missing or extra:
         raise ValueError(
             f"OPEX catalog out of sync with ARCHETYPE_KEYS. "
@@ -213,133 +176,214 @@ def load_catalog(path: Path = OPEX_CATALOG_JSON) -> dict[str, dict]:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  Pricing engine  (deterministic — Python owns all arithmetic)
+#  Workspace budget reader
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _fetch_workspace_budget(conn) -> dict:
+    """Read workspace budget and pillar allocations from DB.
+    Tolerates empty/unset tables (returns 0 budget with a warning)."""
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT total_budget_egp FROM strategic_budget LIMIT 1")
+            row = cur.fetchone()
+            total = float(row[0]) if row and row[0] is not None else 0.0
+
+            cur.execute(
+                "SELECT pillar_id, allocated_egp FROM budget_pillar_allocation ORDER BY pillar_id"
+            )
+            allocs = {int(r[0]): float(r[1] or 0) for r in cur.fetchall()}
+
+        # If table not yet seeded, equal-split fallback (agent must not crash).
+        if not allocs:
+            per_pillar = total / 7.0 if total > 0 else 0.0
+            allocs = {i: per_pillar for i in range(1, 8)}
+            print(
+                "[action_planner] Warning: budget_pillar_allocation is empty — "
+                "using equal-split fallback. Run migration 006_strategic_budget.sql."
+            )
+
+        return {"total_budget_egp": total, "pillar_allocations": allocs}
+
+    except Exception as exc:
+        print(f"[action_planner] Warning: could not read workspace budget: {exc}. "
+              "All action items will receive cost=0.")
+        return {"total_budget_egp": 0.0, "pillar_allocations": {i: 0.0 for i in range(1, 8)}}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  Top-down budget distribution engine
 # ══════════════════════════════════════════════════════════════════════════════
 
 def _round_to_thousand(x: float) -> int:
     return int(round(x / 1000.0)) * 1000
 
 
-def _rate_for_driver(cost_driver: str) -> float:
-    return USD_FX_RATE if cost_driver == "usd_linked" else LOCAL_CPI_RATE
+def distribute_pillar_budget(items: list[dict], pillar_budget_egp: float) -> list[dict]:
+    """Assign EGP to a set of items from one pillar proportionally to their weights.
 
-
-def price_activity(archetype: str, duration_multiplier: int, start_year_index: int,
-                   catalog: dict[str, dict]) -> dict:
+    Rules (per spec):
+      - item_cost = pillar_budget × (weight / sum_of_weights), rounded to 1,000 EGP.
+      - Rounding remainder assigned to the highest-weight item so the pillar sums
+        exactly to its allocation.
+      - All-zero weights → equal split.
+      - Zero budget → cost=0 for all items.
+    Returns the same list with 'inflated_cost_egp' filled in on each item.
     """
-    Compute the budget for one activity from the catalog.
+    if not items:
+        return items
 
-        inflated = base * duration_multiplier * (1 + rate) ** start_year_index
+    total_weight = sum(float(item.get("relative_cost_weight") or 0) for item in items)
 
-    `rate` is selected by the archetype's cost_driver (local CPI vs USD/FX).
-    Central CapEx items keep their REAL inflated cost here — exclusion from the
-    faculty envelope happens later, in the affordability check.
-    """
-    spec = catalog[archetype]
-    base = float(spec["base_cost_egp"])
-    cost_driver = spec["cost_driver"]
-    funding_source = spec["funding_source"]
-    rate = _rate_for_driver(cost_driver)
-    duration_multiplier = max(1, min(4, int(duration_multiplier)))
-    start_year_index = max(0, min(PLAN_YEARS - 1, int(start_year_index)))
+    if pillar_budget_egp <= 0:
+        for item in items:
+            item["inflated_cost_egp"] = 0
+        return items
 
-    inflation_multiplier = (1.0 + rate) ** start_year_index
-    inflated_raw = base * duration_multiplier * inflation_multiplier
-    inflated = _round_to_thousand(inflated_raw)
+    budget_rounded = _round_to_thousand(pillar_budget_egp)
 
-    provenance = {
-        "archetype": archetype,
-        "base_cost_egp": base,
-        "duration_multiplier": duration_multiplier,
-        "start_year_index": start_year_index,
-        "cost_driver": cost_driver,
-        "inflation_rate": rate,
-        "inflation_multiplier": round(inflation_multiplier, 4),
-        "funding_source": funding_source,
-        "formula": "base * duration_multiplier * (1 + rate) ** start_year_index",
-        "inflated_raw_egp": round(inflated_raw, 2),
-    }
-    return {
-        "base_cost_egp": base,
-        "inflated_cost_egp": inflated,
-        "cost_driver": cost_driver,
-        "funding_source": funding_source,
-        "duration_multiplier": duration_multiplier,
-        "pricing_provenance": provenance,
-    }
+    if total_weight <= 0:
+        # Equal split fallback.
+        per_item = _round_to_thousand(pillar_budget_egp / len(items))
+        for item in items:
+            item["inflated_cost_egp"] = per_item
+        remainder = budget_rounded - per_item * len(items)
+        items[0]["inflated_cost_egp"] += remainder
+        return items
+
+    # Proportional allocation.
+    raw_amounts = [
+        _round_to_thousand(pillar_budget_egp * (float(item.get("relative_cost_weight") or 0) / total_weight))
+        for item in items
+    ]
+    assigned_total = sum(raw_amounts)
+    remainder = budget_rounded - assigned_total
+
+    # Give remainder to highest-weight item (stable: first match on tie).
+    if remainder != 0:
+        max_idx = max(
+            range(len(items)),
+            key=lambda i: float(items[i].get("relative_cost_weight") or 0),
+        )
+        raw_amounts[max_idx] += remainder
+
+    for item, amount in zip(items, raw_amounts):
+        item["inflated_cost_egp"] = amount
+
+    return items
 
 
-def render_cost_explanation(provenance: dict, inflated_cost_egp: float) -> str:
-    """
-    Deterministic, human-readable RECEIPT for the computed cost — rendered purely
-    from the stored provenance (no LLM). This is the factual 'how the number was
-    derived'; the *why* (economic judgement) lives in classification_reasoning.
-    Backfillable onto existing rows straight from pricing_provenance.
-    """
-    arch = provenance.get("archetype", "?")
-    base = float(provenance.get("base_cost_egp", 0) or 0)
-    dur = int(provenance.get("duration_multiplier", 1) or 1)
-    idx = int(provenance.get("start_year_index", 0) or 0)
-    mult = float(provenance.get("inflation_multiplier", 1.0) or 1.0)
-    driver = provenance.get("cost_driver", "local")
-    funding = provenance.get("funding_source", "faculty_opex")
-    year = PLAN_BASE_YEAR + idx
-
-    if base == 0:
-        return (f"Classified as '{arch}': routine, zero-budget governance funded centrally — "
-                f"no marginal cost. Final cost = 0 EGP.")
-
-    driver_lbl = "USD/FX-linked" if driver == "usd_linked" else "local-CPI"
-    central = " (funded centrally, excluded from the faculty 5% envelope)" if funding == "central_capex" else ""
+def render_cost_explanation(
+    item_weight: float,
+    total_pillar_weight: float,
+    pillar_budget_egp: float,
+    allocated_egp: int,
+    pillar_id: int,
+) -> str:
+    """Human-readable derivation receipt for the top-down allocation."""
+    if pillar_budget_egp <= 0:
+        return (
+            f"Pillar {pillar_id} ({PILLAR_NAMES.get(pillar_id, '?')}) has no budget "
+            f"allocation — cost set to 0 EGP. Configure the budget in Settings. "
+            f"User-adjustable."
+        )
+    if total_pillar_weight <= 0:
+        n = "—"
+        pct_str = "equal split (all weights were 0)"
+    else:
+        pct = item_weight / total_pillar_weight * 100.0
+        pct_str = f"weight {item_weight:.1f} / pillar total {total_pillar_weight:.1f} = {pct:.1f}%"
+        n = f"{item_weight:.1f}"
     return (
-        f"Classified as '{arch}' (catalog base {base:,.0f} EGP, {driver_lbl} cost driver){central}. "
-        f"Scaled x{dur} for its duration; activity starts {year} (plan-year index {idx}), so the "
-        f"compounding inflation multiplier is {mult:g}. "
-        f"Computed deterministically: {base:,.0f} x {dur} x {mult:g} = {inflated_cost_egp:,.0f} EGP."
+        f"Allocated {allocated_egp:,} EGP = Pillar {pillar_id} budget "
+        f"{int(pillar_budget_egp):,} EGP × ({pct_str}). "
+        f"User-adjustable."
     )
 
 
-def reconcile_budget(priced_actions: list[dict], revenue: dict) -> dict:
-    """
-    Per-plan-year affordability check (Flaw-1 fix).
+def build_cashflow_by_year(items: list[dict]) -> list[dict]:
+    """Sum assigned cost per plan year (scheduling/cash-flow view, no inflation).
 
-    Sums *faculty_opex* spend by plan year and compares each year to that year's
-    inflated 5% ceiling. Central CapEx is reported separately and never counted
-    against the faculty envelope. Returns totals + soft warnings.
+    Returns a list of {year, assigned_egp} for each plan year 2026..2029.
+    Items are bucketed by start_year_index (0=2026 .. 3=2029).
     """
-    base_ceiling = revenue["base_ceiling_egp"]
-    faculty_by_year = {i: 0.0 for i in range(PLAN_YEARS)}
-    central_total = 0.0
+    by_year: dict[int, float] = {i: 0.0 for i in range(PLAN_YEARS)}
+    for item in items:
+        idx = int(item.get("start_year_index") or 0)
+        idx = max(0, min(PLAN_YEARS - 1, idx))
+        by_year[idx] += float(item.get("inflated_cost_egp") or 0)
+    return [
+        {"year": PLAN_BASE_YEAR + idx, "assigned_egp": by_year[idx]}
+        for idx in range(PLAN_YEARS)
+    ]
 
-    for a in priced_actions:
-        idx = a["start_year_index"]
-        if a["funding_source"] == "central_capex":
-            central_total += a["inflated_cost_egp"]
-        else:
-            faculty_by_year[idx] = faculty_by_year.get(idx, 0.0) + a["inflated_cost_egp"]
+
+def reconcile_pillars(items: list[dict], workspace_budget: dict) -> dict:
+    """Per-pillar allocated vs assigned summary, plus workspace-level totals.
+
+    Returns:
+        pillars            — list of per-pillar rows (all 7 pillars, even empty ones).
+        total_budget_egp   — workspace total from strategic_budget.
+        total_allocated_egp — sum of 7 pillar allocations.
+        total_assigned_egp  — sum of all action item costs.
+        unallocated_egp    — total_allocated_egp − total_assigned_egp (≥ 0).
+        warnings           — list of soft warning strings (never hard-fails).
+    """
+    pillar_allocations: dict[int, float] = workspace_budget.get("pillar_allocations", {})
+    total_budget = float(workspace_budget.get("total_budget_egp", 0))
+
+    assigned_by_pillar: dict[int, float] = {}
+    items_by_pillar: dict[int, int] = {}
+    for item in items:
+        pid = int(item.get("pillar_id") or 0)
+        cost = float(item.get("inflated_cost_egp") or 0)
+        assigned_by_pillar[pid] = assigned_by_pillar.get(pid, 0.0) + cost
+        items_by_pillar[pid] = items_by_pillar.get(pid, 0) + 1
 
     warnings: list[str] = []
-    per_year: list[dict] = []
-    for idx in range(PLAN_YEARS):
-        year = PLAN_BASE_YEAR + idx
-        ceiling = _round_to_thousand(base_ceiling * (1.0 + LOCAL_CPI_RATE) ** idx)
-        spend = faculty_by_year.get(idx, 0.0)
-        over = spend > ceiling
-        if over:
+    pillars_out: list[dict] = []
+
+    for pid in range(1, 8):
+        allocated = float(pillar_allocations.get(pid, 0))
+        assigned  = assigned_by_pillar.get(pid, 0.0)
+        n_items   = items_by_pillar.get(pid, 0)
+        within    = assigned <= allocated
+
+        if n_items > 0 and allocated == 0:
             warnings.append(
-                f"[{year}] Faculty OpEx spend {spend:,.0f} EGP exceeds the "
-                f"5% ceiling {ceiling:,.0f} EGP (over by {spend - ceiling:,.0f})."
+                f"Pillar {pid} ({PILLAR_NAMES.get(pid, '?')}) has {n_items} item(s) "
+                f"but no budget allocation — cost was set to 0."
             )
-        per_year.append(
-            {"year": year, "faculty_opex_spend_egp": spend,
-             "ceiling_egp": ceiling, "within_envelope": not over}
-        )
+        if n_items == 0 and allocated > 0:
+            warnings.append(
+                f"Pillar {pid} ({PILLAR_NAMES.get(pid, '?')}) has {allocated:,.0f} EGP "
+                f"allocated but no action items — budget is unspent."
+            )
+        if not within:
+            warnings.append(
+                f"Pillar {pid} ({PILLAR_NAMES.get(pid, '?')}) assigned "
+                f"{assigned:,.0f} EGP exceeds allocation {allocated:,.0f} EGP "
+                f"(over by {assigned - allocated:,.0f})."
+            )
+
+        pillars_out.append({
+            "pillar_id":          pid,
+            "pillar_name":        PILLAR_NAMES.get(pid, f"Pillar {pid}"),
+            "allocated_egp":      allocated,
+            "assigned_egp":       assigned,
+            "num_items":          n_items,
+            "within_allocation":  within,
+        })
+
+    total_allocated = sum(float(pillar_allocations.get(p, 0)) for p in range(1, 8))
+    total_assigned  = sum(assigned_by_pillar.values())
 
     return {
-        "per_year": per_year,
-        "central_capex_total_egp": central_total,
-        "faculty_opex_total_egp": sum(faculty_by_year.values()),
-        "warnings": warnings,
+        "pillars":            pillars_out,
+        "total_budget_egp":   total_budget,
+        "total_allocated_egp": total_allocated,
+        "total_assigned_egp": total_assigned,
+        "unallocated_egp":    max(0.0, total_allocated - total_assigned),
+        "warnings":           warnings,
     }
 
 
@@ -364,36 +408,30 @@ def _clamp_year(year: int) -> int:
 
 
 def normalize_schedule(start_q_text: str, end_q_text: str) -> dict:
-    """
-    Clamp quarters into the horizon, ensure end >= start, and emit canonical
-    strings + the structured start_year_index used for pricing and storage.
-    """
+    """Clamp quarters into the horizon, ensure end >= start, emit canonical strings."""
     sq, sy = parse_quarter(start_q_text)
     eq, ey = parse_quarter(end_q_text)
     sy, ey = _clamp_year(sy), _clamp_year(ey)
 
-    # Ensure end is not before start (compare on the 0..15 quarter grid).
     start_slot = (sy - PLAN_BASE_YEAR) * 4 + (sq - 1)
-    end_slot = (ey - PLAN_BASE_YEAR) * 4 + (eq - 1)
+    end_slot   = (ey - PLAN_BASE_YEAR) * 4 + (eq - 1)
     if end_slot < start_slot:
         ey, eq = sy, sq
 
     return {
-        "start_quarter": f"Q{sq} {sy}",
-        "end_quarter": f"Q{eq} {ey}",
+        "start_quarter":    f"Q{sq} {sy}",
+        "end_quarter":      f"Q{eq} {ey}",
         "start_year_index": sy - PLAN_BASE_YEAR,
     }
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  Structured LLM output schema  (no money field — Python computes cost)
+#  Structured LLM output schema
 # ══════════════════════════════════════════════════════════════════════════════
 
 class ActionItemDraft(BaseModel):
     """One executive activity for an objective. All fields English."""
 
-    # Reasoning-first (chain-of-thought): each rationale precedes the decision it
-    # justifies, so the model reasons BEFORE it commits.
     activity_rationale: str = Field(
         description="Explain how this activity and its KPI follow from the parent objective "
                     "and its underlying SWOT/threat/opportunity grounding: WHY does this activity "
@@ -410,14 +448,17 @@ class ActionItemDraft(BaseModel):
     )
     timeline_reasoning: str = Field(
         description="Detailed CAUSAL justification for the schedule (2-4 sentences). Explicitly state: "
-                    "(1) the PRIORITY level and WHY — tie it to the objective's TOWS urgency "
-                    "(threat-facing ST/WT objectives are high priority and cannot wait); "
-                    "(2) why THIS specific start_quarter — name the dependencies/prerequisites and the "
-                    "PDCA phase that fix it to that quarter; (3) any concurrency or sequencing with other "
-                    "activities and WHY. Write this BEFORE choosing the quarters."
+                    "(1) the PRIORITY level and WHY — tie it to the objective's TOWS urgency; "
+                    "(2) why THIS specific start_quarter — name dependencies/prerequisites and the "
+                    "PDCA phase that fix it to that quarter; (3) any concurrency or sequencing and WHY. "
+                    "Write this BEFORE choosing the quarters."
     )
-    start_quarter: str = Field(description="Format 'Q<n> <year>', within Q1 2026 .. Q4 2029. E.g. 'Q1 2026'.")
-    end_quarter: str = Field(description="Format 'Q<n> <year>', within Q1 2026 .. Q4 2029, not before start_quarter.")
+    start_quarter: str = Field(
+        description="Format 'Q<n> <year>', within Q1 2026 .. Q4 2029. E.g. 'Q1 2026'."
+    )
+    end_quarter: str = Field(
+        description="Format 'Q<n> <year>', within Q1 2026 .. Q4 2029, not before start_quarter."
+    )
     responsible_exec: RoleLiteral = Field(  # type: ignore[valid-type]
         description="The role accountable for EXECUTING the activity. Choose exactly from the allowed roles."
     )
@@ -425,21 +466,28 @@ class ActionItemDraft(BaseModel):
         description="The role accountable for MONITORING/follow-up. Choose exactly from the allowed roles."
     )
     classification_reasoning: str = Field(
-        description="Explain the activity's economic NATURE and WHY it maps to the chosen archetype "
-                    "and duration_multiplier: is it one-off or recurring/multi-year, and what drives its "
-                    "scale? This is the human-readable 'why it costs what it costs'. "
-                    "Do NOT state or invent any EGP amount — reason ONLY about the category and duration. "
-                    "1-3 sentences. Write this BEFORE choosing the archetype and duration."
+        description="Explain the activity's economic NATURE and WHY it maps to the chosen archetype. "
+                    "Also justify the relative_cost_weight: is this activity trivial/one-off, "
+                    "moderate, substantial, or a major multi-year effort? Compare to the other "
+                    "activities you are generating for this SAME pillar. "
+                    "Do NOT state or invent any EGP amount. 1-3 sentences. "
+                    "Write this BEFORE choosing archetype and weight."
     )
     assigned_archetype: ArchetypeLiteral = Field(  # type: ignore[valid-type]
-        description="Classify the activity into exactly ONE cost archetype key. "
-                    "Use 'general_initiative' only if nothing else fits. Do NOT estimate any money value."
+        description="Classify the activity into exactly ONE cost archetype key (for reporting/tagging "
+                    "only — it no longer drives cost). Use 'general_initiative' only if nothing fits."
     )
-    duration_multiplier: int = Field(
-        ge=1, le=4,
-        description="Cost-scaling factor for recurring/multi-year effort: "
-                    "1 = one-off (single quarter), 2 = spans ~2 years/recurs, "
-                    "3-4 = sustained across most of the horizon.",
+    relative_cost_weight: float = Field(
+        ge=1.0, le=10.0,
+        description="Relative resource intensity of THIS activity compared to other activities in the "
+                    "SAME NAQAAE pillar (across ALL objectives in the pillar, not just this objective). "
+                    "Scale: 1-2=trivial (committee meeting, zero-cost governance); "
+                    "3-4=moderate (single workshop, one survey); "
+                    "5-6=substantial (training series, curriculum revision); "
+                    "7-8=major (multi-year program, large-scale recruitment); "
+                    "9-10=exceptional (institution-scale initiative spanning the full horizon). "
+                    "This is a RELATIVE weight, NOT an EGP value. Python distributes the pillar's "
+                    "pre-allocated budget proportionally to these weights."
     )
 
 
@@ -455,13 +503,11 @@ class ObjectiveActions(BaseModel):
 #  Prompting
 # ══════════════════════════════════════════════════════════════════════════════
 
-def _build_system_prompt(revenue: dict, catalog: dict[str, dict]) -> str:
+def _build_system_prompt(catalog: dict[str, dict]) -> str:
     role_list = "\n".join(f"  - {r}" for r in ROLE_VOCAB)
     archetype_list = "\n".join(
         f"  - {k}: {catalog[k]['description']}" for k in ARCHETYPE_KEYS
     )
-    ceiling_m = revenue["base_ceiling_egp"] / 1_000_000.0
-    revenue_m = revenue["total_revenue_egp"] / 1_000_000.0
 
     return f"""\
 You are a strategic-planning expert building the EXECUTIVE ACTION PLAN (الخطة التنفيذية) \
@@ -473,16 +519,21 @@ TASK
 For the given strategic objective, produce between 2 and 4 concrete, active-verb-led \
 EXECUTIVE ACTIVITIES that make the objective operational. Everything in ENGLISH.
 
-GROUNDING & SCALE (context only — you do NOT output any budget number)
-The faculty serves ~{revenue['total_students']} students and generates roughly \
-{revenue_m:.0f}M EGP/year; about {ceiling_m:.1f}M EGP/year is available for strategic \
-initiatives. Keep activities realistic in ambition for an institution of this size.
-
 ROLES — choose responsible_exec and responsible_monitor STRICTLY from this list:
 {role_list}
 
-COST ARCHETYPES — classify each activity into exactly ONE key (Python prices it later):
+COST ARCHETYPES — classify each activity into exactly ONE key (for reporting/tagging only):
 {archetype_list}
+
+RELATIVE COST WEIGHT — estimate how resource-intensive each activity is relative to \
+other activities in the same NAQAAE pillar (1.0–10.0, NOT an EGP value):
+  1–2   trivial      (one committee meeting, zero-cost governance task)
+  3–4   moderate     (single workshop, one assessment study, one report)
+  5–6   substantial  (recurring training series, curriculum revision, sustained campaign)
+  7–8   major        (multi-year program, large-scale recruitment, lab upgrade)
+  9–10  exceptional  (institution-scale initiative spanning the full horizon)
+Python will distribute this pillar's pre-allocated EGP envelope proportionally to these
+weights across ALL items in the pillar. You NEVER output an EGP value.
 
 TIMELINE — horizon is Q1 2026 .. Q4 2029 (16 quarters).
   - Write `timeline_reasoning` FIRST, then choose start_quarter and end_quarter.
@@ -490,25 +541,24 @@ TIMELINE — horizon is Q1 2026 .. Q4 2029 (16 quarters).
   - Respect the objective's urgency hint (threat-facing objectives schedule earlier).
   - end_quarter must not precede start_quarter.
 
-KPI CONVENTIONS — kpi_name starts with 'Number of', 'Percentage of', 'Existence of', or 'Extent of'.
-
-DURATION — set duration_multiplier: 1 = one-off; 2 = recurs / ~2 years; 3-4 = sustained across the horizon.
+KPI CONVENTIONS — kpi_name starts with 'Number of', 'Percentage of', 'Existence of', \
+or 'Extent of'.
 
 REASONING (write each rationale BEFORE the field it justifies — think, then commit):
-  - activity_rationale: why this activity + KPI follow from the objective and its SWOT grounding.
-  - timeline_reasoning: priority (tie to TOWS urgency) + why this exact quarter + any concurrency, causally.
-  - classification_reasoning: the activity's economic nature (one-off vs recurring; what drives scale) →
-    which justifies the archetype + duration. NEVER state or invent an EGP amount — Python prices it.
+  - activity_rationale:      why this activity + KPI follow from the objective and its SWOT grounding.
+  - timeline_reasoning:      priority (tie to TOWS urgency) + why this exact quarter + concurrency.
+  - classification_reasoning: economic nature of the activity + relative size vs other pillar items
+                              → which justifies the archetype + weight. NEVER state an EGP amount.
 
 Return between 2 and 4 action items now.""" + JSON_GUARDRAIL
 
 
 def _build_human_prompt(objective: dict) -> str:
-    tows = (objective.get("tows_type") or "").upper()
-    urgency = TOWS_URGENCY.get(tows, "Schedule using normal PDCA sequencing.")
+    tows      = (objective.get("tows_type") or "").upper()
+    urgency   = TOWS_URGENCY.get(tows, "Schedule using normal PDCA sequencing.")
     pillar_id = objective.get("pillar_id")
-    pillar = f"{pillar_id} — {PILLAR_NAMES.get(pillar_id, 'Unknown')}" if pillar_id else "Unspecified"
-    swot_ids = objective.get("source_swot_ids") or []
+    pillar    = f"{pillar_id} — {PILLAR_NAMES.get(pillar_id, 'Unknown')}" if pillar_id else "Unspecified"
+    swot_ids  = objective.get("source_swot_ids") or []
 
     return f"""\
 STRATEGIC GOAL: {objective.get('goal_title', '(untitled)')}
@@ -530,17 +580,18 @@ Generate 2-4 executive activities for THIS objective only."""
 # ══════════════════════════════════════════════════════════════════════════════
 
 def _has_schedule_anomaly(drafts: list[ActionItemDraft]) -> bool:
-    """Flag the one case deterministic repair cannot fix: no sequencing at all."""
     if len(drafts) < 3:
         return False
     slots = set()
     for d in drafts:
         q, y = parse_quarter(d.start_quarter)
         slots.add((_clamp_year(y) - PLAN_BASE_YEAR) * 4 + (q - 1))
-    return len(slots) == 1  # 3+ activities all crammed into a single quarter
+    return len(slots) == 1
 
 
-def _self_critique_schedule(objective: dict, drafts: list[ActionItemDraft]) -> list[ActionItemDraft]:
+def _self_critique_schedule(
+    objective: dict, drafts: list[ActionItemDraft]
+) -> list[ActionItemDraft]:
     """Ask the model ONCE to re-sequence quarters when activities aren't spread out."""
     summary = "\n".join(
         f"  {i+1}. {d.activity_text}  [{d.start_quarter} → {d.end_quarter}]"
@@ -556,12 +607,15 @@ def _self_critique_schedule(objective: dict, drafts: list[ActionItemDraft]) -> l
     try:
         structured = _get_llm().with_structured_output(ObjectiveActions)
         revised = structured.invoke(
-            [SystemMessage(content="You fix scheduling only. Return the same activities with corrected quarters." + JSON_GUARDRAIL),
+            [SystemMessage(
+                content="You fix scheduling only. Return the same activities with corrected quarters."
+                        + JSON_GUARDRAIL
+             ),
              HumanMessage(content=msg)]
         )
         if revised and len(revised.actions) == len(drafts):
             return revised.actions
-    except Exception as exc:  # best-effort — never block the run on the critique
+    except Exception as exc:
         print(f"[action_planner] self-critique skipped: {exc}")
     return drafts
 
@@ -572,7 +626,9 @@ def _self_critique_schedule(objective: dict, drafts: list[ActionItemDraft]) -> l
 
 def _get_conn():
     if not DB_CONNECTION_STRING:
-        raise EnvironmentError("DB_CONNECTION_STRING is not set — the Action Plan agent needs the database.")
+        raise EnvironmentError(
+            "DB_CONNECTION_STRING is not set — the Action Plan agent needs the database."
+        )
     return psycopg2.connect(DB_CONNECTION_STRING)
 
 
@@ -600,18 +656,16 @@ def _fetch_objectives(cur, run_id: str) -> list[dict]:
     )
     objectives = []
     for r in cur.fetchall():
-        objectives.append(
-            {
-                "objective_id": str(r[0]),
-                "text": r[1],
-                "tows_type": r[2],
-                "pillar_id": r[3],
-                "source_swot_ids": r[4] or [],
-                "goal_id": str(r[6]),
-                "goal_title": r[7],
-                "goal_description": r[8],
-            }
-        )
+        objectives.append({
+            "objective_id":   str(r[0]),
+            "text":           r[1],
+            "tows_type":      r[2],
+            "pillar_id":      r[3],
+            "source_swot_ids": r[4] or [],
+            "goal_id":        str(r[6]),
+            "goal_title":     r[7],
+            "goal_description": r[8],
+        })
     return objectives
 
 
@@ -626,12 +680,16 @@ def _insert_action(cur, row: dict) -> None:
         INSERT INTO strategic_actions (
             action_id, objective_id, run_id,
             activity_rationale,
-            activity_text, original_activity_text, kpi_name, original_kpi_name, timeline_reasoning,
-            start_quarter, end_quarter, original_start_quarter, original_end_quarter, start_year_index,
-            responsible_exec, original_responsible_exec, responsible_monitor, original_responsible_monitor,
+            activity_text, original_activity_text, kpi_name, original_kpi_name,
+            timeline_reasoning,
+            start_quarter, end_quarter, original_start_quarter, original_end_quarter,
+            start_year_index,
+            responsible_exec, original_responsible_exec,
+            responsible_monitor, original_responsible_monitor,
             classification_reasoning, assigned_archetype, original_assigned_archetype,
-            duration_multiplier, original_duration_multiplier,
-            base_cost_egp, inflated_cost_egp, cost_driver, funding_source, cost_explanation, pricing_provenance,
+            relative_cost_weight, original_relative_cost_weight,
+            inflated_cost_egp, original_inflated_cost_egp,
+            cost_explanation, pricing_provenance,
             position, edited_by_user
         ) VALUES (
             %s, %s, %s,
@@ -641,19 +699,26 @@ def _insert_action(cur, row: dict) -> None:
             %s, %s, %s, %s,
             %s, %s, %s,
             %s, %s,
-            %s, %s, %s, %s, %s, %s,
+            %s, %s,
+            %s, %s,
             %s, %s
         )
         """,
         (
             row["action_id"], row["objective_id"], row["run_id"],
             row["activity_rationale"],
-            row["activity_text"], row["activity_text"], row["kpi_name"], row["kpi_name"], row["timeline_reasoning"],
-            row["start_quarter"], row["end_quarter"], row["start_quarter"], row["end_quarter"], row["start_year_index"],
-            row["responsible_exec"], row["responsible_exec"], row["responsible_monitor"], row["responsible_monitor"],
-            row["classification_reasoning"], row["assigned_archetype"], row["assigned_archetype"],
-            row["duration_multiplier"], row["duration_multiplier"],
-            row["base_cost_egp"], row["inflated_cost_egp"], row["cost_driver"], row["funding_source"],
+            row["activity_text"], row["activity_text"],
+            row["kpi_name"], row["kpi_name"],
+            row["timeline_reasoning"],
+            row["start_quarter"], row["end_quarter"],
+            row["start_quarter"], row["end_quarter"],
+            row["start_year_index"],
+            row["responsible_exec"], row["responsible_exec"],
+            row["responsible_monitor"], row["responsible_monitor"],
+            row["classification_reasoning"],
+            row["assigned_archetype"], row["assigned_archetype"],
+            row["relative_cost_weight"], row["relative_cost_weight"],
+            row["inflated_cost_egp"], row["inflated_cost_egp"],
             row["cost_explanation"], Json(row["pricing_provenance"]),
             row["position"], False,
         ),
@@ -661,7 +726,7 @@ def _insert_action(cur, row: dict) -> None:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  Per-objective generation + pricing
+#  Pass 1 — Per-objective generation (LLM prose + relative weights, no EGP)
 # ══════════════════════════════════════════════════════════════════════════════
 
 def _validate_role(value: str) -> str:
@@ -675,10 +740,13 @@ def _validate_archetype(value: str) -> str:
 def generate_actions_for_objective(
     objective: dict,
     system_prompt: str,
-    catalog: dict[str, dict],
     enable_self_critique: bool,
 ) -> list[dict]:
-    """LLM drafts → deterministic schedule repair → (optional critique) → Python pricing."""
+    """LLM generates prose + relative_cost_weight. Returns items WITHOUT inflated_cost_egp.
+
+    Pass 2 (distribute_pillar_budget) assigns EGP after all objectives are processed,
+    so that items from different objectives in the same pillar are pooled correctly.
+    """
     structured = _get_llm().with_structured_output(ObjectiveActions)
     result: ObjectiveActions = structured.invoke(
         [SystemMessage(content=system_prompt),
@@ -689,34 +757,79 @@ def generate_actions_for_objective(
     if enable_self_critique and _has_schedule_anomaly(drafts):
         drafts = _self_critique_schedule(objective, drafts)
 
-    priced: list[dict] = []
+    items: list[dict] = []
     for position, d in enumerate(drafts):
-        sched = normalize_schedule(d.start_quarter, d.end_quarter)
+        sched    = normalize_schedule(d.start_quarter, d.end_quarter)
         archetype = _validate_archetype(d.assigned_archetype)
-        pricing = price_activity(archetype, d.duration_multiplier, sched["start_year_index"], catalog)
-        cost_explanation = render_cost_explanation(pricing["pricing_provenance"], pricing["inflated_cost_egp"])
-        priced.append(
-            {
-                "action_id": str(uuid.uuid4()),
-                "objective_id": objective["objective_id"],
-                "run_id": objective["run_id"],
-                "activity_rationale": d.activity_rationale,
-                "activity_text": d.activity_text,
-                "kpi_name": d.kpi_name,
-                "timeline_reasoning": d.timeline_reasoning,
-                "start_quarter": sched["start_quarter"],
-                "end_quarter": sched["end_quarter"],
-                "start_year_index": sched["start_year_index"],
-                "responsible_exec": _validate_role(d.responsible_exec),
-                "responsible_monitor": _validate_role(d.responsible_monitor),
-                "classification_reasoning": d.classification_reasoning,
-                "assigned_archetype": archetype,
-                "cost_explanation": cost_explanation,
-                "position": position,
-                **pricing,
+        items.append({
+            "action_id":               str(uuid.uuid4()),
+            "objective_id":            objective["objective_id"],
+            "run_id":                  objective["run_id"],
+            "pillar_id":               objective.get("pillar_id"),
+            "activity_rationale":      d.activity_rationale,
+            "activity_text":           d.activity_text,
+            "kpi_name":                d.kpi_name,
+            "timeline_reasoning":      d.timeline_reasoning,
+            "start_quarter":           sched["start_quarter"],
+            "end_quarter":             sched["end_quarter"],
+            "start_year_index":        sched["start_year_index"],
+            "responsible_exec":        _validate_role(d.responsible_exec),
+            "responsible_monitor":     _validate_role(d.responsible_monitor),
+            "classification_reasoning": d.classification_reasoning,
+            "assigned_archetype":      archetype,
+            "relative_cost_weight":    float(d.relative_cost_weight),
+            "position":                position,
+            # inflated_cost_egp, cost_explanation, pricing_provenance filled in Pass 2
+        })
+    return items
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  Pass 2 — Pillar-scoped budget distribution
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _apply_pillar_pricing(
+    all_items: list[dict],
+    workspace_budget: dict,
+) -> list[dict]:
+    """Group all items by pillar_id, distribute each pillar's budget, fill EGP fields."""
+    pillar_allocations = workspace_budget.get("pillar_allocations", {})
+
+    # Group items by pillar_id (None → 0 for unspecified).
+    groups: dict[int, list[dict]] = {}
+    for item in all_items:
+        pid = int(item.get("pillar_id") or 0)
+        groups.setdefault(pid, []).append(item)
+
+    # Per-pillar distribution.
+    for pid, items in groups.items():
+        pillar_budget = float(pillar_allocations.get(pid, 0))
+        total_weight  = sum(float(item.get("relative_cost_weight") or 0) for item in items)
+        distribute_pillar_budget(items, pillar_budget)
+
+        # Fill provenance + explanation now that EGP is assigned.
+        for item in items:
+            allocated   = int(item["inflated_cost_egp"])
+            item_weight = float(item.get("relative_cost_weight") or 0)
+            item["cost_explanation"] = render_cost_explanation(
+                item_weight, total_weight, pillar_budget, allocated, pid
+            )
+            item["pricing_provenance"] = {
+                "model":               "top_down_weight_distribution",
+                "pillar_id":           pid,
+                "pillar_budget_egp":   pillar_budget,
+                "item_weight":         item_weight,
+                "pillar_total_weight": total_weight,
+                "allocation_formula":  "pillar_budget × (item_weight / pillar_total_weight)",
             }
-        )
-    return priced
+
+        if pid == 0:
+            print(
+                f"[action_planner] Warning: {len(items)} item(s) have no pillar_id — "
+                f"cost assigned as 0 (no pillar budget to draw from)."
+            )
+
+    return all_items
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -729,16 +842,14 @@ def compile_and_run(
     require_final: bool = True,
     progress_cb=None,
 ) -> dict:
-    """
-    Generate the executive action plan for an approved strategy run.
+    """Generate the executive action plan for an approved strategy run.
 
     Args:
         run_id:               the strategy run (must already have goals/objectives).
         enable_self_critique: run a single LLM re-sequencing pass when 3+ activities
                               of an objective collapse into one quarter.
         require_final:        abort unless agent_runs.plan_status == 'final'.
-        progress_cb:          optional callable(processed:int, total:int) invoked as
-                              each objective is processed (for live UI progress).
+        progress_cb:          optional callable(processed:int, total:int).
 
     Returns a summary dict (or {"error": ...} on failure). Persists to
     strategic_actions transactionally and idempotently.
@@ -748,31 +859,36 @@ def compile_and_run(
             try:
                 progress_cb(done, total)
             except Exception:
-                pass  # progress is best-effort; never let it break generation
+                pass
+
     if not run_id:
         return {"error": "run_id is required."}
 
     try:
-        revenue = load_revenue()
         catalog = load_catalog()
     except Exception as exc:
-        return {"error": f"Failed to load financial registries: {exc}"}
+        return {"error": f"Failed to load archetype catalog: {exc}"}
 
-    system_prompt = _build_system_prompt(revenue, catalog)
+    system_prompt = _build_system_prompt(catalog)
 
     conn = None
     try:
         conn = _get_conn()
 
-        # 1) Lifecycle gate + 2) fetch objectives (read-only).
+        # 1) Read workspace budget (tolerates missing tables — returns 0 gracefully).
+        workspace_budget = _fetch_workspace_budget(conn)
+
+        # 2) Lifecycle gate + fetch objectives (read-only).
         with conn.cursor() as cur:
             status = _plan_status(cur, run_id)
             if status is None:
                 return {"error": f"No agent_runs row found for run_id {run_id}."}
             if require_final and status != "final":
                 return {
-                    "error": f"Plan is not final (plan_status='{status}'). "
-                             f"Approve the plan before generating its action plan."
+                    "error": (
+                        f"Plan is not final (plan_status='{status}'). "
+                        f"Approve the plan before generating its action plan."
+                    )
                 }
             objectives = _fetch_objectives(cur, run_id)
 
@@ -782,53 +898,61 @@ def compile_and_run(
         for o in objectives:
             o["run_id"] = run_id
 
-        # 3) Generate + price per objective (LLM calls are outside the write txn).
+        # 3) Pass 1 — Generate prose + relative weights per objective (LLM calls).
         total = len(objectives)
         _report(0, total)
-        all_actions: list[dict] = []
+        all_items: list[dict] = []
         for i, o in enumerate(objectives):
             try:
-                all_actions.extend(
-                    generate_actions_for_objective(o, system_prompt, catalog, enable_self_critique)
+                all_items.extend(
+                    generate_actions_for_objective(o, system_prompt, enable_self_critique)
                 )
             except Exception as exc:
                 print(f"[action_planner] objective {o['objective_id']} failed: {exc}")
             _report(i + 1, total)
 
-        if not all_actions:
+        if not all_items:
             return {"error": "The agent produced no action items."}
 
-        # 4) Per-year affordability reconciliation (faculty OpEx vs inflated ceiling).
-        budget = reconcile_budget(all_actions, revenue)
+        # 4) Pass 2 — Distribute pillar budgets, fill EGP + provenance.
+        all_items = _apply_pillar_pricing(all_items, workspace_budget)
 
-        # 5) Idempotent transactional write.
+        # 5) Reconcile + cash-flow (non-blocking reporting).
+        reconciliation = reconcile_pillars(all_items, workspace_budget)
+        cashflow       = build_cashflow_by_year(all_items)
+
+        # 6) Idempotent transactional write.
         with conn:
             with conn.cursor() as cur:
                 deleted = _delete_prior_actions(cur, run_id)
-                for row in all_actions:
+                for row in all_items:
                     _insert_action(cur, row)
 
         print(
-            f"[action_planner] run {run_id}: wrote {len(all_actions)} actions "
+            f"[action_planner] run {run_id}: wrote {len(all_items)} actions "
             f"for {len(objectives)} objectives (replaced {deleted}). "
-            f"Faculty OpEx total {budget['faculty_opex_total_egp']:,.0f} EGP; "
-            f"central CapEx {budget['central_capex_total_egp']:,.0f} EGP."
+            f"Total assigned {reconciliation['total_assigned_egp']:,.0f} EGP / "
+            f"allocated {reconciliation['total_allocated_egp']:,.0f} EGP."
         )
-        for w in budget["warnings"]:
-            print(f"[action_planner] CEILING WARNING {w}")
+        for w in reconciliation["warnings"]:
+            print(f"[action_planner] WARNING {w}")
 
         return {
-            "run_id": run_id,
+            "run_id":               run_id,
             "objectives_processed": len(objectives),
-            "actions_created": len(all_actions),
-            "actions_replaced": deleted,
-            "budget": budget,
-            "horizon": f"Q1 {PLAN_BASE_YEAR} – Q4 {PLAN_END_YEAR}",
-            "assumptions": {
-                "local_cpi_rate": LOCAL_CPI_RATE,
-                "usd_fx_rate": USD_FX_RATE,
-                "strategic_ceiling_pct": STRATEGIC_CEILING_PCT,
-                "total_revenue_egp": revenue["total_revenue_egp"],
+            "actions_created":      len(all_items),
+            "actions_replaced":     deleted,
+            "reconciliation":       reconciliation,
+            "cashflow_by_year":     cashflow,
+            "horizon":              f"Q1 {PLAN_BASE_YEAR} – Q4 {PLAN_END_YEAR}",
+            "budget": {
+                "total_budget_egp":   workspace_budget["total_budget_egp"],
+                "pillar_allocations": workspace_budget["pillar_allocations"],
+                "unallocated_egp":    max(
+                    0.0,
+                    workspace_budget["total_budget_egp"]
+                    - sum(workspace_budget["pillar_allocations"].values()),
+                ),
             },
         }
 
@@ -875,10 +999,11 @@ def get_graph():
     return _GRAPH
 
 
-# ── Manual run: python -m Agents.action_planner.action_planner <run_id> ────────
+# ── Manual run: python -m Agents.action_planner.action_planner <run_id> ─────
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
+    import sys as _sys
+    if len(_sys.argv) < 2:
         print("Usage: python -m Agents.action_planner.action_planner <run_id>")
         raise SystemExit(1)
-    out = compile_and_run(sys.argv[1])
+    out = compile_and_run(_sys.argv[1])
     print(json.dumps(out, indent=2, ensure_ascii=False, default=str))

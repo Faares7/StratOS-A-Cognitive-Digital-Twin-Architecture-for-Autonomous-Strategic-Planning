@@ -24,6 +24,7 @@ import {
   connectGoogleCalendar,
   fetchLiveMeetings,
   fetchWebhookLog,
+  handoffGoogleToken,
   scheduleMeeting,
   type ScheduleMeetingInput,
   type WebhookLog,
@@ -178,6 +179,7 @@ function ScheduleDialog({ open, onClose, onScheduled }: ScheduleDialogProps) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [fathomWarning, setFathomWarning] = useState<string | null>(null);
+  const [calendarError, setCalendarError] = useState<string | null>(null);
   const [tipsOpen, setTipsOpen] = useState(false);
 
   const minutesUntil = startDatetime
@@ -208,6 +210,7 @@ function ScheduleDialog({ open, onClose, onScheduled }: ScheduleDialogProps) {
     setError(null);
     setSuccess(null);
     setFathomWarning(null);
+    setCalendarError(null);
     setTipsOpen(false);
   }
 
@@ -242,6 +245,7 @@ function ScheduleDialog({ open, onClose, onScheduled }: ScheduleDialogProps) {
       const result = await scheduleMeeting(input);
       setSuccess(result.meet_link || "no-link");
       setFathomWarning(result.fathom_warning ?? null);
+      setCalendarError(result.calendar_error ?? null);
       onScheduled(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to schedule meeting");
@@ -280,6 +284,14 @@ function ScheduleDialog({ open, onClose, onScheduled }: ScheduleDialogProps) {
                 </a>
               )}
             </div>
+            {calendarError && (
+              <div className="w-full rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2.5 text-left">
+                <p className="text-xs font-medium text-red-400">Google Calendar sync failed</p>
+                <p className="mt-0.5 text-xs text-red-300/80">
+                  The meeting was saved, but no Calendar event was created: {calendarError}
+                </p>
+              </div>
+            )}
             {fathomWarning && (
               <div className="w-full rounded-lg border border-yellow-500/20 bg-yellow-500/5 px-3 py-2.5 text-left">
                 <p className="text-xs font-medium text-yellow-400">⚠ Fathom auto-join notice</p>
@@ -403,6 +415,7 @@ function ScheduleDialog({ open, onClose, onScheduled }: ScheduleDialogProps) {
 
 export default function MeetingsPage() {
   const { canMutate } = useRole();
+  const { data: session } = useSession();
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "past" | "upcoming">("all");
@@ -436,6 +449,17 @@ export default function MeetingsPage() {
       setGoogleEmail(email ?? null);
     });
   }, [loadMeetings]);
+
+  // Keep the FastAPI backend's refreshable token in sync whenever the
+  // NextAuth session loads (or the access token silently rotates).
+  useEffect(() => {
+    if (!session?.accessToken) return;
+    handoffGoogleToken(
+      session.accessToken,
+      (session as typeof session & { refreshToken?: string }).refreshToken,
+      session.user?.email,
+    );
+  }, [session?.accessToken]);
 
   async function handleOpenLog() {
     setLogOpen(true);

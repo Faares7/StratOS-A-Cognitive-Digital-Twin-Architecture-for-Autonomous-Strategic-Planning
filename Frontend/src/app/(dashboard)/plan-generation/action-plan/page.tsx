@@ -194,6 +194,22 @@ export default function ActionPlanPage() {
     return () => clearTimeout(t)
   }, [doc])
 
+  // ── Sync logo back to strategic plan drafts so the plan PDF export picks it up
+  useEffect(() => {
+    const logo = doc.meta.orgLogoUrl
+    if (!logo) return
+    for (const l of ['en', 'ar'] as const) {
+      try {
+        const raw = localStorage.getItem(STRAT_KEY(l))
+        if (!raw) continue
+        const parsed = JSON.parse(raw) as PlanDocument
+        if (parsed?.meta && parsed.meta.orgLogoUrl !== logo) {
+          localStorage.setItem(STRAT_KEY(l), JSON.stringify({ ...parsed, meta: { ...parsed.meta, orgLogoUrl: logo }, updatedAt: new Date().toISOString() }))
+        }
+      } catch { /* ignore */ }
+    }
+  }, [doc.meta.orgLogoUrl])
+
   useEffect(() => {
     document.body.classList.add('plan-editor-open')
     return () => document.body.classList.remove('plan-editor-open')

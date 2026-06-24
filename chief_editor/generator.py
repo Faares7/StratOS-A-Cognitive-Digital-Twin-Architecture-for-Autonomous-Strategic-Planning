@@ -40,17 +40,13 @@ logger = logging.getLogger(__name__)
 
 _DEFAULT_ORG_ID = "06427de6-c8ac-46fc-bb0f-6d1714cc3cf9"
 
-# Per-section (max_tokens_writer, max_tokens_critic) — sized for full table output.
-_SECTION_BUDGETS: dict[str, tuple[int, int]] = {
-    "swot_analysis":       (4096, 1500),
-    "gap_analysis":        (4096, 1500),
-    "strategic_goals":     (3000, 1000),
-    "implementation_plan": (6000, 1500),
-}
+# Sections whose content is verbatim (timeline, costs, KPIs) — LLM must never rewrite them.
+# The deterministic builder already produces the correct hierarchical structure.
+_SKIP_LLM_SECTIONS = {"implementation_plan"}
 
 
 def _uid() -> str:
-    return str(uuid.uuid4())[:12]
+    return uuid.uuid4().hex
 
 
 def _now() -> str:
@@ -112,9 +108,11 @@ def generate_plan(
         # ── 2. Load all source data upfront ───────────────────────────────────
         carryover    = _safe(adapters.load_carryover, {})
 
-        gap_run   = _safe(lambda: adapters.fetch_gap_run_id(conn))
-        goals_run = _safe(lambda: adapters.fetch_goals_run_id(conn))
-        exec_run  = _safe(lambda: adapters.fetch_exec_run_id(conn))
+        gap_run  = _safe(lambda: adapters.fetch_gap_run_id(conn))
+        exec_run = _safe(lambda: adapters.fetch_exec_run_id(conn))
+        # actions.run_id IS the goals run (action_planner is called with the goals run_id).
+        # Fall back to an independent lookup only when no actions exist yet.
+        goals_run = exec_run or _safe(lambda: adapters.fetch_goals_run_id(conn))
 
         swot_items    = _safe(lambda: adapters.fetch_swot_items_all_types(conn),   [])
         gap_items     = _safe(lambda: adapters.fetch_gap_items(conn, gap_run),     []) if gap_run   else []
@@ -133,22 +131,18 @@ def generate_plan(
             len(swot_items), len(gap_items), len(goals), len(actions),
         )
 
+        # Pre-flight: refuse to generate a hollow plan when all agent data is absent.
+        if not swot_items and not gap_items and not goals and not actions:
+            raise RuntimeError(
+                "No strategic data found (SWOT, gaps, goals, and actions are all empty). "
+                "Run the analysis agents before generating a plan."
+            )
+
         # ── 2a. Build Brief (deterministic, zero LLM calls) ───────────────────
         brief_obj = _safe(
             lambda: build_brief(org, carryover, swot_items, gap_items, goals, objectives, actions),
             None,
         )
-
-        # ── 2b. Pre-condense SWOT SW/OT once — shared by SWOT and Gap builders
-        sw_condensed: dict = {}
-        ot_condensed      = None
-        if use_llm and brief_obj:
-            try:
-                sw_condensed, ot_condensed = _prepare_swot_condensed(
-                    brief_obj, swot_items, job_id
-                )
-            except Exception as exc:
-                logger.warning("[generator] SWOT condensing step failed: %s", exc)
 
         # ── 3a. Build preface sections ─────────────────────────────────────────
         dean_name   = _extract_dean_name(carryover)
@@ -191,13 +185,10 @@ def generate_plan(
                     effective_input_pillars, goals, objectives, actions,
                     use_llm=use_llm, job_id=job_id,
                     brief_obj=brief_obj,
-                    sw_condensed=sw_condensed,
-                    ot_condensed=ot_condensed,
                 )
 
-                # Writer→critic→revise for agent sections; carryover is always deterministic.
-                if use_llm and sec_def.mode == "agent" and brief_obj:
-                    wt, ct = _SECTION_BUDGETS.get(sec_def.section_key, (2048, 1024))
+                # Writer→critic→revise for agent sections; carryover and verbatim sections are deterministic.
+                if use_llm and sec_def.mode == "agent" and brief_obj and sec_def.section_key not in _SKIP_LLM_SECTIONS:
                     blocks = refine_section(
                         section_key=sec_def.section_key,
                         section_title=sec_def.heading,
@@ -205,14 +196,10 @@ def generate_plan(
                             sec_def.section_key,
                             swot_items, gap_items, effective_input_pillars,
                             goals, objectives, actions,
-                            sw_condensed or None,
-                            ot_condensed,
                         ),
                         deterministic_blocks=blocks,
                         brief=brief_obj,
                         job_id=job_id,
-                        max_tokens_writer=wt,
-                        max_tokens_critic=ct,
                     )
 
                 needs_review = (
@@ -284,8 +271,6 @@ def _dispatch_builder(
     use_llm:       bool = False,
     job_id:        str  = "",
     brief_obj      = None,
-    sw_condensed:  dict | None = None,
-    ot_condensed   = None,
 ) -> list[BlockModel]:
     try:
         if sec.mode == "carryover":
@@ -293,16 +278,11 @@ def _dispatch_builder(
             return builders.build_carryover_blocks(data) if data else []
 
         if sec.agent == "swot":
-            return builders.build_swot_blocks(
-                swot_items,
-                sw_condensed=sw_condensed if use_llm else None,
-                ot_condensed=ot_condensed if use_llm else None,
-            )
+            return builders.build_swot_blocks(swot_items)
 
         if sec.agent == "gap":
             return builders.build_gap_blocks_llm(
-                gap_items, input_pillars,
-                sw_condensed=sw_condensed if use_llm else None,
+                gap_items, input_pillars, swot_items=swot_items,
             )
 
         if sec.agent == "goals":
@@ -336,29 +316,21 @@ def _build_source_data(
     goals:         list,
     objectives:    list,
     actions:       list,
-    sw_condensed:  dict | None = None,
-    ot_condensed              = None,
 ) -> dict:
     """Slim source_data dict for refine_section — writer-relevant fields only.
     Strips DB noise (created_at, run_id, pricing_provenance, etc.) to reduce prompt size."""
 
     if section_key == "swot_analysis":
-        d: dict = {
+        return {
             "swot_items": [
                 {k: v for k, v in item.items()
                  if k in ("type", "title", "description", "pillar_id", "pillar_name", "impact_level")}
                 for item in swot_items
             ]
         }
-        if sw_condensed:
-            # tuple(list,list) → list[list] for JSON
-            d["sw_condensed"] = {k: [list(v[0]), list(v[1])] for k, v in sw_condensed.items()}
-        if ot_condensed is not None:
-            d["ot_condensed"] = [list(ot_condensed[0]), list(ot_condensed[1])]
-        return d
 
     if section_key == "gap_analysis":
-        d = {
+        return {
             "gap_items": [
                 {k: v for k, v in item.items()
                  if k in ("pillar_id", "pillar_name", "gap_identified", "suggestion")}
@@ -370,9 +342,6 @@ def _build_source_data(
                 for name, data in input_pillars.items()
             },
         }
-        if sw_condensed:
-            d["sw_condensed"] = {k: [list(v[0]), list(v[1])] for k, v in sw_condensed.items()}
-        return d
 
     if section_key == "strategic_goals":
         return {
@@ -410,57 +379,6 @@ def _build_source_data(
         }
 
     return {}
-
-
-# ── SWOT pre-condensing ───────────────────────────────────────────────────────
-
-def _prepare_swot_condensed(
-    brief_obj:  object,
-    swot_items: list[dict],
-    job_id:     str,
-) -> tuple[dict, object]:
-    """Group SWOT items then condense SW per pillar + OT once.
-    Returns (sw_condensed, ot_condensed) — internal failures are logged, not raised."""
-    strengths_by:  dict[str, list[str]] = {}
-    weaknesses_by: dict[str, list[str]] = {}
-    o_texts: list[str] = []
-    t_texts: list[str] = []
-
-    for item in swot_items:
-        t     = (item.get("type") or "").lower()
-        pname = (item.get("pillar_name") or "").strip() or "General"
-        title = (item.get("title") or "").strip()
-        desc  = (item.get("description") or "").strip()
-        text  = f"{title}: {desc}" if title and desc else (title or desc)
-        if not text:
-            continue
-        if t == "strength":
-            strengths_by.setdefault(pname, []).append(text)
-        elif t == "weakness":
-            weaknesses_by.setdefault(pname, []).append(text)
-        elif t == "opportunity":
-            o_texts.append(text)
-        elif t == "threat":
-            t_texts.append(text)
-
-    sw_condensed: dict[str, tuple[list[str], list[str]]] = {}
-    for pname in {*strengths_by, *weaknesses_by}:
-        s_raw = strengths_by.get(pname, [])
-        w_raw = weaknesses_by.get(pname, [])
-        try:
-            s_b, w_b = _llm.condense_swot_sw_pillar(brief_obj, pname, s_raw, w_raw, job_id=job_id)  # type: ignore[arg-type]
-            sw_condensed[pname] = (s_b, w_b)
-        except Exception as exc:
-            logger.warning("[generator] SW condense failed for '%s': %s", pname, exc)
-
-    ot_condensed = None
-    if o_texts or t_texts:
-        try:
-            ot_condensed = _llm.condense_swot_ot(brief_obj, o_texts, t_texts, job_id=job_id)  # type: ignore[arg-type]
-        except Exception as exc:
-            logger.warning("[generator] OT condense failed: %s", exc)
-
-    return sw_condensed, ot_condensed
 
 
 # ── Fallback block ────────────────────────────────────────────────────────────

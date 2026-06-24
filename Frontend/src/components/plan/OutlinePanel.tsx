@@ -253,7 +253,7 @@ interface OutlinePanelProps {
 
 export function OutlinePanel({ doc, editorApi }: OutlinePanelProps) {
   return (
-    <aside className="flex w-56 shrink-0 flex-col border-e border-white/5 bg-[#0b0e1a] overflow-hidden">
+    <aside className="flex h-full w-56 flex-col border-e border-white/5 bg-[#0b0e1a] overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-white/5 px-3 py-3">
         <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
@@ -270,7 +270,7 @@ export function OutlinePanel({ doc, editorApi }: OutlinePanelProps) {
       </div>
 
       {/* Chapter list */}
-      <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
+      <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-0.5">
         {doc.chapters.map((ch, i) => (
           <ChapterRow
             key={ch.id}

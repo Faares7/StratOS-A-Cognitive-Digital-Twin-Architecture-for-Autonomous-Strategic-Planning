@@ -12,7 +12,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { formatRelativeTime } from "@/lib/utils";
-import type { Meeting, InsightCard, SimulationResult } from "@/types";
+import type { Meeting, InsightCard } from "@/types";
 
 type EventType = "meeting" | "threat" | "opportunity" | "weakness" | "simulation" | "compliance";
 
@@ -39,7 +39,6 @@ function buildFeed(
   threats:            InsightCard[],
   weaknesses:         InsightCard[],
   opportunities:      InsightCard[],
-  simulation:         SimulationResult | null,
   complianceUpdated:  string,
 ): FeedEvent[] {
   const events: FeedEvent[] = [];
@@ -88,21 +87,11 @@ function buildFeed(
     });
   });
 
-  if (simulation) {
-    events.push({
-      id:        "sim-1",
-      type:      "simulation",
-      title:     `Scenario: "${simulation.query}"`,
-      subtitle:  `${simulation.iterations.toLocaleString()} iterations · ${simulation.confidence}% confidence`,
-      timestamp: simulation.simulated_at,
-    });
-  }
-
   events.push({
     id:        "compliance-refresh",
     type:      "compliance",
     title:     "Compliance data refreshed",
-    subtitle:  "12 pillars scored via NAQAAE framework",
+    subtitle:  "7 pillars scored via NAQAAE framework",
     timestamp: complianceUpdated,
     href:      "/gap-analysis",
   });
@@ -117,17 +106,15 @@ export function IntelligenceFeed({
   threats,
   weaknesses,
   opportunities,
-  simulation,
   complianceUpdated,
 }: {
   meetings:          Meeting[];
   threats:           InsightCard[];
   weaknesses:        InsightCard[];
   opportunities:     InsightCard[];
-  simulation:        SimulationResult | null;
   complianceUpdated: string;
 }) {
-  const events = buildFeed(meetings, threats, weaknesses, opportunities, simulation, complianceUpdated);
+  const events = buildFeed(meetings, threats, weaknesses, opportunities, complianceUpdated);
 
   return (
     <div className="flex flex-col rounded-xl border border-white/[0.07] bg-[#0f1422]">

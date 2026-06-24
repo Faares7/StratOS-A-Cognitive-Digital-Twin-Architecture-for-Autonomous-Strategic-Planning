@@ -353,7 +353,7 @@ function Blocks({ blocks, mode, onSelectBlock }: {
   if (mode === 'edit' && editorApi) {
     return (
       <div className="space-y-1">
-        <AddBlockAffordance editorApi={editorApi} chapterId={chapterId} subId={subId} />
+        <AddBlockAffordance editorApi={editorApi} chapterId={chapterId} subId={subId} atStart />
         {blocks.map((b) => (
           <React.Fragment key={b.id}>
             <div className="py-1">{renderBlock(b)}</div>

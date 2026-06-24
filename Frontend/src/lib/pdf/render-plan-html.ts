@@ -4,9 +4,9 @@
  *
  * Layout contract (must match the values used in the API route):
  *   A4 height   = 297 mm  = 1122.52 px @ 96 dpi
- *   top margin  = 1.35 in =  129.60 px  ← reserved for running header
- *   bot margin  = 0.45 in =   43.20 px  ← reserved for page numbers
- *   content H   =  949.72 px            ← A4_CONTENT_H
+ *   top margin  = 1.0 in  =   96.00 px  ← 0.70in header band + 0.30in gap
+ *   bot margin  = 0.6 in  =   57.60 px  ← page numbers + safety buffer
+ *   content H   =  968.92 px            ← A4_CONTENT_H
  *
  * Two-pass strategy for accurate TOC numbers
  * ------------------------------------------
@@ -27,8 +27,8 @@ import type {
 // ── Layout constants ──────────────────────────────────────────────────────────
 
 /** A4 printable content height in CSS px (96 px/in, margins subtracted). */
-export const A4_CONTENT_H = (297 / 25.4) * 96 - 1.35 * 96 - 0.45 * 96
-// = 1122.52 − 129.6 − 43.2 = 949.72 px
+export const A4_CONTENT_H = (297 / 25.4) * 96 - 1.0 * 96 - 0.6 * 96
+// = 1122.52 − 96.0 − 57.6 = 968.92 px
 
 // ── Tiny HTML helpers ─────────────────────────────────────────────────────────
 
@@ -50,7 +50,15 @@ function richToHtml(node: RichText | null | undefined): string {
     return (node.content ?? []).map(richToHtml).join('')
   if (node.type === 'paragraph') {
     const inner = (node.content ?? []).map(richToHtml).join('')
-    return `<p style="margin:0 0 0.75rem">${inner || '&nbsp;'}</p>`
+    return `<p style="margin:0 0 0.5rem">${inner || '&nbsp;'}</p>`
+  }
+  if (node.type === 'bulletList') {
+    const items = (node.content ?? []).map(richToHtml).join('')
+    return `<ul style="list-style-type:disc;padding-left:1.25rem;margin:0.25rem 0 0.25rem">${items}</ul>`
+  }
+  if (node.type === 'listItem') {
+    const inner = (node.content ?? []).map(richToHtml).join('')
+    return `<li style="margin-bottom:0.3rem;line-height:1.5">${inner}</li>`
   }
   if (node.type === 'text') {
     let t = esc(node.text ?? '')
@@ -69,7 +77,7 @@ function renderBlock(b: Block): string {
   switch (b.type) {
 
     case 'paragraph':
-      return `<div style="margin-bottom:1rem;font-family:Georgia,'Times New Roman',serif;font-size:1rem;line-height:1.75;color:#334155">
+      return `<div style="margin-bottom:1rem;font-family:Georgia,'Times New Roman',serif;font-size:1rem;line-height:1.75;color:#334155;break-inside:avoid;page-break-inside:avoid;">
         ${richToHtml((b as ParagraphBlock).content)}
       </div>`
 
@@ -87,19 +95,36 @@ function renderBlock(b: Block): string {
 
     case 'table': {
       const tb = b as TableBlock
+      const colCount = tb.header?.length ?? tb.rows[0]?.length ?? 1
+
+      // First column is always a short label (pillar name, category). Give it
+      // the minimum it needs; spread the rest equally across the other columns.
+      const firstColPct  = colCount >= 5 ? 14 : colCount >= 3 ? 18 : 50
+      const otherColPct  = ((100 - firstColPct) / Math.max(colCount - 1, 1)).toFixed(1)
+      const colgroup = `<colgroup>
+        ${Array.from({ length: colCount }, (_, i) =>
+          i === 0
+            ? `<col style="width:${firstColPct}%">`
+            : `<col style="width:${otherColPct}%">`
+        ).join('')}
+      </colgroup>`
+
       const thead = tb.header
         ? `<thead style="background:#1e293b">
             <tr>${tb.header.map(h =>
-              `<th style="padding:.75rem 1rem;text-align:start;font-weight:600;color:#fff;
-                          font-family:Georgia,serif;font-size:.875rem">${esc(h)}</th>`
+              `<th style="padding:.6rem .9rem;text-align:start;font-weight:600;color:#fff;
+                          border:1px solid rgba(184,146,47,.3);
+                          font-family:Georgia,serif;font-size:.875rem;
+                          word-break:break-word;overflow-wrap:anywhere">${esc(h)}</th>`
             ).join('')}</tr>
            </thead>`
         : ''
       const tbody = tb.rows.map((row, ri) => {
         const rowBg = ri % 2 === 1 ? 'background:rgba(184,146,47,.04)' : ''
         const cells = row.map(cell =>
-          `<td style="padding:.75rem 1rem;border-bottom:1px solid rgba(184,146,47,.15);${rowBg};
-                      font-family:Georgia,serif;font-size:.875rem;color:#334155">
+          `<td style="padding:.6rem .9rem;border:1px solid rgba(184,146,47,.15);${rowBg};
+                      font-family:Georgia,serif;font-size:.875rem;color:#334155;
+                      vertical-align:top;word-break:break-word;overflow-wrap:anywhere">
             ${richToHtml(cell)}
            </td>`
         ).join('')
@@ -108,8 +133,9 @@ function renderBlock(b: Block): string {
       const caption = tb.caption
         ? `<p style="margin:.5rem 0 0;text-align:center;font-size:.75rem;font-style:italic;color:#78716c">${esc(tb.caption)}</p>`
         : ''
-      return `<div style="margin:1.5rem 0;overflow:hidden;border-radius:.5rem;border:1px solid rgba(184,146,47,.3)">
-        <table style="width:100%;border-collapse:collapse">${thead}<tbody>${tbody}</tbody></table>
+      return `<div style="margin:1.5rem 0;break-inside:avoid;page-break-inside:avoid;">
+        <table style="width:100%;border-collapse:collapse;table-layout:fixed;
+                      border:1px solid rgba(184,146,47,.3)">${colgroup}${thead}<tbody>${tbody}</tbody></table>
       </div>${caption}`
     }
 
@@ -272,9 +298,11 @@ function chapterCover(ch: Chapter): string {
 }
 
 function subchapterSection(sub: Subchapter, chNum: number, idx: number): string {
-  return `
-<div id="${esc(sub.id)}" data-section-id="${esc(sub.id)}"
-     style="margin-bottom:2.5rem">
+  // Keep the heading + divider glued to the first block so a page break can
+  // never leave a heading stranded at the bottom of a page. The remaining
+  // blocks flow normally.
+  const [firstBlock, ...restBlocks] = sub.blocks
+  const heading = `
   <div style="margin-bottom:1.5rem;display:flex;align-items:baseline;gap:1rem">
     <div style="height:6px;width:2rem;flex-shrink:0;margin-top:.5rem;
                 background:linear-gradient(to right,#1e293b,#b8922f)"></div>
@@ -284,8 +312,16 @@ function subchapterSection(sub: Subchapter, chNum: number, idx: number): string 
     </h3>
   </div>
   <div style="height:1px;background:linear-gradient(to right,#b8922f,transparent);
-              margin-bottom:1.5rem"></div>
-  ${renderBlocks(sub.blocks)}
+              margin-bottom:1.5rem"></div>`
+
+  return `
+<div id="${esc(sub.id)}" data-section-id="${esc(sub.id)}"
+     style="margin-bottom:2.5rem">
+  <div class="keep-together">
+    ${heading}
+    ${firstBlock ? renderBlock(firstBlock) : ''}
+  </div>
+  ${restBlocks.length ? renderBlocks(restBlocks) : ''}
 </div>`
 }
 
@@ -337,6 +373,19 @@ em     { font-style:italic }
 img    { max-width:100% }
 table  { border-collapse:collapse }
 
+/* ── Page-break behaviour for flowing content ──
+   Every content unit gets break-inside:avoid so Chromium moves the whole
+   element to the next page rather than shearing it mid-content.
+   - p: covers standalone paragraphs AND richText <p> tags inside table cells
+   - tr: row cannot be split (large tables fall back to breaking between rows)
+   - li: list items stay whole
+   - figure: images + captions stay together
+   - div block wrappers get it inline (see renderBlock)
+   thead repeats the header row on every page a table spans. */
+tr, li, figure, p { break-inside:avoid; page-break-inside:avoid; }
+thead              { display:table-header-group; }
+.keep-together     { break-inside:avoid; page-break-inside:avoid; }
+
 /* ── Fixed-page blocks (cover, TOC, chapter covers) ── */
 .pdf-block {
   width:100%;
@@ -348,7 +397,7 @@ table  { border-collapse:collapse }
 }
 /* ── Flowing content blocks (chapter bodies) ── */
 .pdf-content-block {
-  padding:2rem 0.85in 0.8in;
+  padding:1.25rem 0.45in 0.8in;
   max-width:8.5in;
   margin:0 auto;
 }

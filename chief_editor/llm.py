@@ -31,10 +31,11 @@ _job_tokens: dict[str, float] = {}
 
 # ── Factory ────────────────────────────────────────────────────────────────────
 
-def get_chat_model(model: str = "gemini-2.5-flash", max_output_tokens: int = 512):
+def get_chat_model(model: str = "gemini-2.5-flash"):
     """Return a configured ChatVertexAI instance.
     Auth: GOOGLE_APPLICATION_CREDENTIALS (ADC service-account JSON).
-    Thinking is explicitly disabled to control token cost."""
+    No max_output_tokens cap — let the model output fully to avoid truncation.
+    Thinking is explicitly disabled."""
     from langchain_google_vertexai import ChatVertexAI  # noqa: PLC0415
 
     project  = os.getenv("GOOGLE_CLOUD_PROJECT", "caregiver-tutoring-assistant")
@@ -45,7 +46,6 @@ def get_chat_model(model: str = "gemini-2.5-flash", max_output_tokens: int = 512
             "model_name": model,
             "project":    project,
             "location":   location,
-            "max_output_tokens": max_output_tokens,
             "model_kwargs": {
                 "generation_config": {"thinking_config": {"thinking_budget": 0}}
             },
@@ -54,7 +54,6 @@ def get_chat_model(model: str = "gemini-2.5-flash", max_output_tokens: int = 512
             "model_name": model,
             "project":    project,
             "location":   location,
-            "max_output_tokens": max_output_tokens,
         },
     ]:
         try:
@@ -158,10 +157,9 @@ def _parse_two_sections(
 
 
 def _llm_call(
-    prompt:            str,
-    job_id:            str,
-    model:             str,
-    max_output_tokens: int,
+    prompt: str,
+    job_id: str,
+    model:  str,
 ) -> Optional[str]:
     """Single LLM invoke with ceiling check and 1 retry. Returns stripped text or None."""
     from langchain_core.messages import HumanMessage  # noqa: PLC0415
@@ -174,7 +172,7 @@ def _llm_call(
 
     for attempt in range(2):
         try:
-            llm  = get_chat_model(model=model, max_output_tokens=max_output_tokens)
+            llm  = get_chat_model(model=model)
             resp = llm.invoke([HumanMessage(content=prompt)])
             text = (getattr(resp, "content", None) or "").strip()
             if not text:
@@ -216,71 +214,13 @@ def condense_gap_pillar(
         f"TARGET:\n- <bullet>\n\n"
         f"SUGGESTIONS:\n- <bullet>"
     )
-    text = _llm_call(_build_prompt(brief, task), job_id, model, max_output_tokens=400)
+    text = _llm_call(_build_prompt(brief, task), job_id, model)
     if text:
         t_b, s_b = _parse_two_sections(text, "TARGET", "SUGGESTIONS")
         if t_b or s_b:
             return t_b, s_b
     return _fallback_bullets(target_state), _fallback_bullets("; ".join(suggestions))
 
-
-def condense_swot_sw_pillar(
-    brief:      "Brief",
-    pillar:     str,
-    strengths:  list[str],
-    weaknesses: list[str],
-    job_id:     str = "",
-    model:      str = "gemini-2.5-flash",
-) -> tuple[list[str], list[str]]:
-    """Condense raw S/W items for one NAQAAE pillar into clean bullet cells.
-    Output is reused in BOTH the SWOT-SW table and the Gap table S/W columns.
-    Returns (strength_bullets, weakness_bullets)."""
-    s_block = "\n".join(f"- {s}" for s in strengths if s) or "None."
-    w_block = "\n".join(f"- {w}" for w in weaknesses if w) or "None."
-    task = (
-        f"TASK: Condense the SWOT strengths and weaknesses for NAQAAE pillar '{pillar}' "
-        f"into two clean bullet lists. Use concise, impersonal formal language. "
-        f"These bullets appear in both the SWOT matrix and the Gap Analysis table.\n\n"
-        f"INPUT — STRENGTHS:\n{s_block}\n\n"
-        f"INPUT — WEAKNESSES:\n{w_block}\n\n"
-        f"OUTPUT FORMAT (output ONLY the following lines — no other text):\n"
-        f"STRENGTHS:\n- <bullet>\n\n"
-        f"WEAKNESSES:\n- <bullet>"
-    )
-    text = _llm_call(_build_prompt(brief, task), job_id, model, max_output_tokens=400)
-    if text:
-        s_b, w_b = _parse_two_sections(text, "STRENGTHS", "WEAKNESSES")
-        if s_b or w_b:
-            return s_b, w_b
-    return _fallback_bullets("\n".join(strengths)), _fallback_bullets("\n".join(weaknesses))
-
-
-def condense_swot_ot(
-    brief:         "Brief",
-    opportunities: list[str],
-    threats:       list[str],
-    job_id:        str = "",
-    model:         str = "gemini-2.5-flash",
-) -> tuple[list[str], list[str]]:
-    """Condense all opportunity and threat items into two bullet cells.
-    Returns (opportunity_bullets, threat_bullets)."""
-    o_block = "\n".join(f"- {o}" for o in opportunities if o) or "None."
-    t_block = "\n".join(f"- {t}" for t in threats if t) or "None."
-    task = (
-        f"TASK: Condense the SWOT Opportunities and Threats into two concise bullet lists. "
-        f"Group related items where appropriate.\n\n"
-        f"INPUT — OPPORTUNITIES:\n{o_block}\n\n"
-        f"INPUT — THREATS:\n{t_block}\n\n"
-        f"OUTPUT FORMAT (output ONLY the following lines — no other text):\n"
-        f"OPPORTUNITIES:\n- <bullet>\n\n"
-        f"THREATS:\n- <bullet>"
-    )
-    text = _llm_call(_build_prompt(brief, task), job_id, model, max_output_tokens=400)
-    if text:
-        o_b, t_b = _parse_two_sections(text, "OPPORTUNITIES", "THREATS")
-        if o_b or t_b:
-            return o_b, t_b
-    return _fallback_bullets("\n".join(opportunities)), _fallback_bullets("\n".join(threats))
 
 
 def condense_exec_activities(
@@ -311,8 +251,7 @@ def condense_exec_activities(
         f"<number>.\nACTIVITY: <condensed description>\nKPI: <condensed KPI name>"
     )
     # Scale token budget with activity count
-    max_tokens = max(512, len(activities) * 80)
-    text = _llm_call(_build_prompt(brief, task), job_id, model, max_output_tokens=max_tokens)
+    text = _llm_call(_build_prompt(brief, task), job_id, model)
     if text:
         condensed = _parse_exec_output(text, len(activities))
         if len(condensed) == len(activities) and any(c.get("activity_text") for c in condensed):
@@ -375,4 +314,4 @@ def generate_section_intro(
         f"INSTITUTIONAL CONTEXT above. "
         f"Output ONLY the paragraph — no heading, no preamble, no trailing notes."
     )
-    return _llm_call(_build_prompt(brief, task), job_id, model, max_output_tokens=200)
+    return _llm_call(_build_prompt(brief, task), job_id, model)

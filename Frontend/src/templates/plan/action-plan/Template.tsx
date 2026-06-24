@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useRef, useEffect, useState } from 'react'
-import { Plus, Trash2, ArrowUp, ArrowDown, Pencil, Check } from 'lucide-react'
+import { Plus, Trash2, ArrowUp, ArrowDown, Pencil, Check, Upload } from 'lucide-react'
 import type {
   ActionPlanDocument, ActionPlanMeta, ActivityRow,
 } from '@/types/action-plan-document'
@@ -269,6 +269,16 @@ function CoverPage({ meta, mode, api, lang }: {
   const isPrint = mode === 'print'
   const canEdit = mode === 'edit' && !!api
   const docFont = lang === 'ar' ? "'Cairo','Amiri',Georgia,sans-serif" : "Georgia,'Times New Roman',serif"
+  const logoFileRef = useRef<HTMLInputElement>(null)
+
+  const handleLogoFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => api?.updateMeta({ orgLogoUrl: reader.result as string })
+    reader.readAsDataURL(file)
+    e.target.value = ''
+  }
 
   return (
     <div
@@ -289,15 +299,34 @@ function CoverPage({ meta, mode, api, lang }: {
       <div style={{ position: 'absolute', bottom: 64, insetInlineEnd: 48, fontSize: '5rem', color: 'var(--plan-accent)', opacity: 0.05, fontFamily: 'Georgia,serif' }}>◆</div>
 
       <div style={{ maxWidth: '36rem', textAlign: 'center', position: 'relative', zIndex: 10, display: 'flex', flexDirection: 'column', gap: '3rem', alignItems: 'center' }}>
-        {/* Logo */}
-        {meta.orgLogoUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={meta.orgLogoUrl} alt={meta.orgName} style={{ width: '26rem', maxWidth: '88%', height: 'auto', objectFit: 'contain' }} />
-        ) : (
-          <div style={{ width: '6rem', height: '6rem', background: 'linear-gradient(135deg,#1e293b,#0f172a)', borderRadius: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '2rem', fontWeight: 700, border: '2px solid var(--plan-accent)', boxShadow: '0 4px 20px rgba(0,0,0,0.15)' }}>
-            {meta.orgName ? meta.orgName.charAt(0).toUpperCase() : '◆'}
-          </div>
-        )}
+        {/* Logo — click to upload in edit mode */}
+        <div style={{ position: 'relative', display: 'inline-block' }}>
+          {meta.orgLogoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={meta.orgLogoUrl} alt={meta.orgName} style={{ width: '26rem', maxWidth: '88%', height: 'auto', objectFit: 'contain' }} />
+          ) : (
+            <div style={{ width: '6rem', height: '6rem', background: 'linear-gradient(135deg,#1e293b,#0f172a)', borderRadius: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '2rem', fontWeight: 700, border: '2px solid var(--plan-accent)', boxShadow: '0 4px 20px rgba(0,0,0,0.15)' }}>
+              {meta.orgName ? meta.orgName.charAt(0).toUpperCase() : '◆'}
+            </div>
+          )}
+          {canEdit && (
+            <>
+              <input ref={logoFileRef} type="file" accept="image/*" className="hidden" onChange={handleLogoFile} />
+              <button
+                onClick={() => logoFileRef.current?.click()}
+                title="Upload logo"
+                style={{
+                  position: 'absolute', bottom: -8, insetInlineEnd: -8,
+                  background: 'var(--plan-accent)', border: 'none', borderRadius: '50%',
+                  width: '1.75rem', height: '1.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
+                }}
+              >
+                <Upload style={{ width: '0.75rem', height: '0.75rem', color: '#0b0e1a' }} />
+              </button>
+            </>
+          )}
+        </div>
 
         {/* Title */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', direction: lang === 'ar' ? 'rtl' : 'ltr' }}>

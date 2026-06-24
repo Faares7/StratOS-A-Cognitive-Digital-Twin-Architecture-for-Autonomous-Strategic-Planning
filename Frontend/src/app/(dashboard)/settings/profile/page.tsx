@@ -12,7 +12,9 @@ import {
   Pencil,
   Plus,
   RefreshCw,
+  Save,
   Upload,
+  Wallet,
   X,
 } from "lucide-react";
 import { Header } from "@/components/layout/Header";
@@ -21,6 +23,11 @@ import { cn } from "@/lib/utils";
 import { useRole } from "@/hooks/useRole";
 import type { OrgProfile } from "@/app/api/org/profile/route";
 import type { ReferencePlan } from "@/app/api/knowledge-base/plans/route";
+
+// ── Constants ─────────────────────────────────────────────────────────────────
+
+const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
+
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -452,6 +459,217 @@ function UploadDialog({
   );
 }
 
+// ── Budget section ────────────────────────────────────────────────────────────
+
+interface WorkspaceBudget {
+  total_budget_egp: number;
+  pillar_allocations: { pillar_id: number; allocated_egp: number; pillar_name: string }[];
+}
+
+function fmt(n: number) {
+  return n.toLocaleString("en-EG", { style: "currency", currency: "EGP", maximumFractionDigits: 0 });
+}
+
+function BudgetSection({ isAdmin }: { isAdmin: boolean }) {
+  const [budget,  setBudget]  = useState<WorkspaceBudget | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [err,     setErr]     = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [saving,  setSaving]  = useState(false);
+  const [saveErr, setSaveErr] = useState<string | null>(null);
+
+  // Edit-form state: flat map pillarId → string value for controlled inputs
+  const [totalDraft,   setTotalDraft]   = useState("");
+  const [pillarDrafts, setPillarDrafts] = useState<Record<number, string>>({});
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const res = await fetch(`${BACKEND}/api/workspace/budget`, { cache: "no-store" });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        setBudget(await res.json() as WorkspaceBudget);
+      } catch (e) {
+        setErr(e instanceof Error ? e.message : "Could not load budget");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  function startEdit() {
+    if (!budget) return;
+    setTotalDraft(String(Math.round(budget.total_budget_egp)));
+    const drafts: Record<number, string> = {};
+    for (const p of budget.pillar_allocations) drafts[p.pillar_id] = String(Math.round(p.allocated_egp));
+    setPillarDrafts(drafts);
+    setSaveErr(null);
+    setEditing(true);
+  }
+
+  async function saveBudget() {
+    setSaving(true);
+    setSaveErr(null);
+    try {
+      const body = {
+        total_budget_egp: Number(totalDraft) || 0,
+        pillar_allocations: Object.entries(pillarDrafts).map(([id, v]) => ({
+          pillar_id: Number(id),
+          allocated_egp: Number(v) || 0,
+        })),
+      };
+      const res = await fetch(`${BACKEND}/api/workspace/budget`, {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const updated = await res.json() as WorkspaceBudget;
+      setBudget(updated);
+      setEditing(false);
+    } catch (e) {
+      setSaveErr(e instanceof Error ? e.message : "Save failed");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const totalAllocated = budget?.pillar_allocations?.reduce((s, p) => s + p.allocated_egp, 0) ?? 0;
+  const draftAllocated = Object.values(pillarDrafts).reduce((s, v) => s + (Number(v) || 0), 0);
+  const draftTotal     = Number(totalDraft) || 0;
+  const over           = editing ? draftAllocated > draftTotal : totalAllocated > (budget?.total_budget_egp ?? 0);
+
+  return (
+    <div className="rounded-xl border border-white/5 bg-[#0d1117]">
+      <div className="flex items-center justify-between border-b border-white/5 px-5 py-4">
+        <div className="flex items-center gap-2.5">
+          <Wallet className="h-4 w-4 text-cyan-400" />
+          <div>
+            <h3 className="text-sm font-semibold text-slate-100">Strategic Budget</h3>
+            <p className="text-xs text-slate-500">Workspace budget allocated across NAQAAE pillars</p>
+          </div>
+        </div>
+        {isAdmin && !editing && !loading && !err && (
+          <Button variant="ghost" size="sm" className="gap-1.5 text-xs" onClick={startEdit}>
+            <Pencil className="h-3 w-3" /> Edit
+          </Button>
+        )}
+        {editing && (
+          <div className="flex items-center gap-2">
+            <button onClick={() => setEditing(false)} className="text-xs text-slate-500 hover:text-slate-300">
+              Cancel
+            </button>
+            <Button size="sm" className="gap-1.5 text-xs" onClick={() => void saveBudget()} disabled={saving || over}>
+              {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+              {saving ? "Saving…" : "Save"}
+            </Button>
+          </div>
+        )}
+      </div>
+
+      <div className="p-5 space-y-4">
+        {loading && (
+          <div className="flex items-center gap-2 text-slate-600">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            <span className="text-xs">Loading budget…</span>
+          </div>
+        )}
+
+        {err && !loading && (
+          <div className="flex items-start gap-2 rounded-lg border border-rose-500/20 bg-rose-500/5 px-3 py-2 text-xs text-rose-400">
+            <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            {err}
+          </div>
+        )}
+
+        {budget && !loading && (
+          <>
+            {/* Total budget row */}
+            <div className="flex items-center justify-between gap-4 rounded-lg border border-cyan-500/15 bg-cyan-500/[0.05] px-4 py-3">
+              <span className="text-xs font-semibold text-slate-300">Total Workspace Budget</span>
+              {editing ? (
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={totalDraft}
+                  onChange={(e) => setTotalDraft(e.target.value.replace(/[^0-9]/g, ""))}
+                  className="w-36 rounded-md border border-white/10 bg-[#080a14] px-2 py-1 text-right text-sm text-slate-200 outline-none focus:border-cyan-500/40"
+                />
+              ) : (
+                <span className="text-sm font-bold text-cyan-300">{fmt(budget.total_budget_egp)}</span>
+              )}
+            </div>
+
+            {/* Per-pillar rows */}
+            <div className="space-y-1.5">
+              {[1, 2, 3, 4, 5, 6, 7].map((pid) => {
+                const row = budget.pillar_allocations.find((p) => p.pillar_id === pid);
+                const name = row?.pillar_name ?? `Pillar ${pid}`;
+                const allocated = row?.allocated_egp ?? 0;
+                const pct = budget.total_budget_egp > 0
+                  ? Math.min(100, (allocated / budget.total_budget_egp) * 100) : 0;
+                const draftPct = draftTotal > 0
+                  ? Math.min(100, ((Number(pillarDrafts[pid]) || 0) / draftTotal) * 100) : 0;
+
+                return (
+                  <div key={pid} className="flex items-center gap-3 rounded-lg border border-white/5 px-3 py-2">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-[#b8922f]/30 text-[10px] font-bold text-[#b8922f]">
+                      {pid}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate text-xs text-slate-300">{name}</span>
+                    {editing ? (
+                      <>
+                        <div className="h-1.5 w-20 shrink-0 overflow-hidden rounded-full bg-white/5">
+                          <div className="h-full rounded-full bg-cyan-500/50" style={{ width: `${draftPct}%` }} />
+                        </div>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={pillarDrafts[pid] ?? "0"}
+                          onChange={(e) => setPillarDrafts((d) => ({ ...d, [pid]: e.target.value.replace(/[^0-9]/g, "") }))}
+                          className="w-32 rounded-md border border-white/10 bg-[#080a14] px-2 py-1 text-right text-xs text-slate-200 outline-none focus:border-cyan-500/40"
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <div className="h-1.5 w-20 shrink-0 overflow-hidden rounded-full bg-white/5">
+                          <div className="h-full rounded-full bg-cyan-500" style={{ width: `${pct}%` }} />
+                        </div>
+                        <span className="w-32 text-right text-xs text-slate-300">{fmt(allocated)}</span>
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Allocation summary */}
+            <div className={cn(
+              "flex items-center justify-between rounded-lg px-3 py-2 text-xs",
+              over
+                ? "border border-rose-500/20 bg-rose-500/5 text-rose-400"
+                : "border border-white/5 bg-white/[0.02] text-slate-500",
+            )}>
+              <span>Total allocated across pillars</span>
+              <span className="font-semibold">
+                {fmt(editing ? draftAllocated : totalAllocated)}
+                {" / "}
+                {fmt(editing ? draftTotal : (budget.total_budget_egp))}
+                {over && " — exceeds total"}
+              </span>
+            </div>
+
+            {saveErr && (
+              <div className="flex items-start gap-2 rounded-lg border border-rose-500/20 bg-rose-500/5 px-3 py-2 text-xs text-rose-400">
+                <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                {saveErr}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 interface EditState {
@@ -718,6 +936,9 @@ export default function ProfilePage() {
                 </div>
               </div>
             </div>
+
+            {/* Budget */}
+            <BudgetSection isAdmin={isAdmin} />
 
             {/* Knowledge Base — document blocks */}
             <div className="rounded-xl border border-white/5 bg-[#0d1117]">

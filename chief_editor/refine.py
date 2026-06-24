@@ -133,9 +133,9 @@ class _WriterOutput(BaseModel):
 
 # ── Client factories ───────────────────────────────────────────────────────────
 
-def _get_writer_client(max_output_tokens: int) -> tuple[Any, str]:
-    """Return (client, label).  Gemini 2.5 Flash on Vertex AI.
-    To upgrade to Claude Opus, set CE_WRITER_MODEL=claude-opus-4-8and CE_WRITER_REGION=us-east5."""
+def _get_writer_client() -> tuple[Any, str]:
+    """Return (client, label).  Gemini 2.5 Pro on Vertex AI.
+    No max_output_tokens cap — let the model output fully to avoid JSON truncation."""
     from langchain_google_vertexai import ChatVertexAI  # noqa: PLC0415
 
     model   = os.getenv("CE_WRITER_MODEL",  "gemini-2.5-pro")
@@ -145,14 +145,12 @@ def _get_writer_client(max_output_tokens: int) -> tuple[Any, str]:
     for kwargs in [
         {
             "model_name": model, "project": project, "location": region,
-            "max_output_tokens": max_output_tokens,
             "model_kwargs": {
                 "generation_config": {"thinking_config": {"thinking_budget": 1024}}
             },
         },
         {
             "model_name": model, "project": project, "location": region,
-            "max_output_tokens": max_output_tokens,
         },
     ]:
         try:
@@ -165,8 +163,8 @@ def _get_writer_client(max_output_tokens: int) -> tuple[Any, str]:
     raise RuntimeError("[refine] Cannot initialise writer (ChatVertexAI)")
 
 
-def _get_critic_client(max_output_tokens: int) -> Any:
-    """Gemini 2.5 Pro on Vertex.  Thinking enabled (no budget=0)."""
+def _get_critic_client() -> Any:
+    """Gemini 2.5 Pro on Vertex.  Thinking enabled, no output cap."""
     from langchain_google_vertexai import ChatVertexAI  # noqa: PLC0415
 
     model   = os.getenv("CE_CRITIC_MODEL",  "gemini-2.5-pro")
@@ -174,18 +172,14 @@ def _get_critic_client(max_output_tokens: int) -> Any:
     project = os.getenv("GOOGLE_CLOUD_PROJECT", "caregiver-tutoring-assistant")
 
     for kwargs in [
-        # Explicit thinking budget (2.5 models accept it)
         {
             "model_name": model, "project": project, "location": region,
-            "max_output_tokens": max_output_tokens,
             "model_kwargs": {
                 "generation_config": {"thinking_config": {"thinking_budget": 1024}}
             },
         },
-        # Bare — thinking on by 2.5 default
         {
             "model_name": model, "project": project, "location": region,
-            "max_output_tokens": max_output_tokens,
         },
     ]:
         try:
@@ -199,11 +193,10 @@ def _get_critic_client(max_output_tokens: int) -> Any:
 # ── Single model call ──────────────────────────────────────────────────────────
 
 def _call(
-    client:     Any,
-    system:     str,
-    human:      str,
-    job_id:     str,
-    max_tokens: int,
+    client: Any,
+    system: str,
+    human:  str,
+    job_id: str,
 ) -> Optional[str]:
     """System + human → text.  Ceiling check, max 1 retry on empty response."""
     from langchain_core.messages import HumanMessage, SystemMessage  # noqa: PLC0415
@@ -301,7 +294,7 @@ def _parse_critic_verdict(text: str) -> Optional[CriticVerdict]:
 # ── Block conversion ───────────────────────────────────────────────────────────
 
 def _uid() -> str:
-    return str(uuid.uuid4())[:12]
+    return uuid.uuid4().hex
 
 
 def _blocks_from_writer(
@@ -432,8 +425,6 @@ def refine_section(
     brief:                Optional["Brief"] = None,
     job_id:               str              = "",
     max_revise_rounds:    int              = MAX_REVISE_ROUNDS,
-    max_tokens_writer:    int              = 2048,
-    max_tokens_critic:    int              = 1024,
 ) -> list[BlockModel]:
     """
     Run the writer→critic→revise loop for one agent-sourced section.
@@ -459,13 +450,13 @@ def refine_section(
     """
     # ── Initialise clients ─────────────────────────────────────────────────────
     try:
-        writer_client, writer_label = _get_writer_client(max_tokens_writer)
+        writer_client, writer_label = _get_writer_client()
     except Exception as exc:
         logger.warning("[refine] writer client init failed for %s: %s", section_key, exc)
         return deterministic_blocks
 
     try:
-        critic_client = _get_critic_client(max_tokens_critic)
+        critic_client = _get_critic_client()
     except Exception as exc:
         logger.warning("[refine] critic client init failed for %s: %s", section_key, exc)
         return deterministic_blocks
@@ -475,7 +466,7 @@ def refine_section(
 
     # ── 1. Writer drafts ───────────────────────────────────────────────────────
     writer_h = _writer_human(section_key, section_title, source_data, brief)
-    draft_text = _call(writer_client, WRITER_SYSTEM, writer_h, job_id, max_tokens_writer)
+    draft_text = _call(writer_client, WRITER_SYSTEM, writer_h, job_id)
 
     if not draft_text:
         logger.warning("[refine] writer no output for %s; using deterministic", section_key)
@@ -496,7 +487,7 @@ def refine_section(
     # ── 2 + 3. Critic → optional revise rounds ─────────────────────────────────
     for round_n in range(max_revise_rounds + 1):
         critic_h = _critic_human(section_key, section_title, source_data, best_text)
-        critic_text = _call(critic_client, CRITIC_SYSTEM, critic_h, job_id, max_tokens_critic)
+        critic_text = _call(critic_client, CRITIC_SYSTEM, critic_h, job_id)
 
         if not critic_text:
             logger.warning(
@@ -519,6 +510,10 @@ def refine_section(
         # pass: True or no blocking issues — accept current draft
         blocking = [i for i in verdict.issues if i.type != "clarity"]
         if verdict.pass_ or not blocking:
+            logger.info(
+                "[refine] %s critic round %d PASSED (pass_=%s blocking=%d); accepting draft",
+                section_key, round_n, verdict.pass_, len(blocking),
+            )
             break
 
         if round_n >= max_revise_rounds:
@@ -527,13 +522,18 @@ def refine_section(
 
         # ── Reviser ────────────────────────────────────────────────────────────
         # Reviser reuses the writer client (same model, same guardrails).
-        verdict_json = verdict.model_dump_json(by_alias=True)
+        try:
+            verdict_json = verdict.model_dump_json(by_alias=True)
+        except Exception as exc:
+            logger.warning(
+                "[refine] verdict serialisation failed round %d for %s: %s; accepting draft",
+                round_n, section_key, exc,
+            )
+            break
         reviser_h    = _reviser_human(
             section_key, section_title, source_data, best_text, verdict_json
         )
-        revised_text = _call(
-            writer_client, REVISER_SYSTEM, reviser_h, job_id, max_tokens_writer
-        )
+        revised_text = _call(writer_client, REVISER_SYSTEM, reviser_h, job_id)
 
         if not revised_text:
             logger.warning(

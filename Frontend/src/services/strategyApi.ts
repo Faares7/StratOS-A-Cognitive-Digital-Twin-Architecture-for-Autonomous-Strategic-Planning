@@ -20,7 +20,7 @@ const BASE = (
 ).replace(/\/$/, "");
 
 const POLL_INTERVAL_MS = 2_500;
-const POLL_TIMEOUT_MS  = 1_200_000;  // 20 min — LLM on CPU can be slow
+const POLL_TIMEOUT_MS  = 5_400_000;  // 90 min — grounding on CPU can be slow with large datasets
 
 // ── Run + poll ────────────────────────────────────────────────────────────────
 
@@ -64,6 +64,17 @@ export async function pollStrategy(
 }
 
 // ── Read ──────────────────────────────────────────────────────────────────────
+
+export async function fetchLatestRunId(): Promise<string | null> {
+  try {
+    const res = await fetch(`${BASE}/api/strategy/latest-run-id`);
+    if (!res.ok) return null;
+    const { run_id } = (await res.json()) as { run_id: string };
+    return run_id ?? null;
+  } catch {
+    return null;
+  }
+}
 
 export async function fetchPlan(runId: string): Promise<StrategyPlan> {
   const res = await fetch(`${BASE}/api/strategy/goals/${runId}`);

@@ -13,15 +13,29 @@ import {
   Chrome,
   ExternalLink,
   Loader2,
+  Minus,
   Plus,
   Sparkles,
   Upload,
+  Wallet,
   X,
 } from "lucide-react";
 
 // Constants
 
-const STEP_LABELS = ["Context", "Integrations", "Profiling", "Upload"] as const;
+const STEP_LABELS = ["Context", "Integrations", "Profiling", "Budget", "Upload"] as const;
+
+const PILLARS = [
+  { id: 1, name: "Program Mission & Management" },
+  { id: 2, name: "Program Design" },
+  { id: 3, name: "Teaching, Learning & Assessment" },
+  { id: 4, name: "Students & Graduates" },
+  { id: 5, name: "Faculty & Teaching Assistants" },
+  { id: 6, name: "Resources & Learning Facilities" },
+  { id: 7, name: "Quality Assurance & Evaluation" },
+] as const;
+
+const BUDGET_STEP = 1_000;
 
 const DEFAULT_PRIORITIES = [
   "Updating curriculum for market alignment",
@@ -235,7 +249,7 @@ function Step2Integrations({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         access_token:  session.accessToken,
-        refresh_token: (session as Record<string, unknown>).refreshToken ?? null,
+        refresh_token: session.refreshToken ?? null,
         email:         session.user?.email ?? null,
       }),
     })
@@ -520,9 +534,198 @@ function Step3Profiling({
   );
 }
 
-// Step 4
+// Step 4 — Budget
 
-function Step4Upload({ file, setFile }: { file: File | null; setFile: (f: File | null) => void }) {
+function formatCurrency(n: number) {
+  return n.toLocaleString("en-EG");
+}
+
+function Step4Budget({
+  totalBudget,
+  setTotalBudget,
+  pillarBudgets,
+  setPillarBudgets,
+}: {
+  totalBudget: number;
+  setTotalBudget: (v: number) => void;
+  pillarBudgets: number[];
+  setPillarBudgets: (v: number[]) => void;
+}) {
+  const allocated = pillarBudgets.reduce((a, b) => a + b, 0);
+  const remaining = totalBudget - allocated;
+
+  function handleTotalChange(raw: string) {
+    const n = parseInt(raw.replace(/[^0-9]/g, ""), 10);
+    setTotalBudget(isNaN(n) ? 0 : n);
+  }
+
+  function adjust(index: number, delta: number) {
+    const next = [...pillarBudgets];
+    next[index] = Math.max(0, next[index] + delta);
+    setPillarBudgets(next);
+  }
+
+  function handlePillarInput(index: number, raw: string) {
+    const n = parseInt(raw.replace(/[^0-9]/g, ""), 10);
+    const next = [...pillarBudgets];
+    next[index] = isNaN(n) ? 0 : n;
+    setPillarBudgets(next);
+  }
+
+  function handleSliderChange(index: number, pctStr: string) {
+    const pct = parseFloat(pctStr);
+    const newBudget = Math.round((pct / 100) * totalBudget);
+    const next = [...pillarBudgets];
+    // clamp so we never exceed what's available for this pillar
+    next[index] = Math.min(newBudget, pillarBudgets[index] + Math.max(0, remaining));
+    setPillarBudgets(next);
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-lg font-semibold text-slate-100">Budget Allocation</h2>
+        <p className="mt-1 text-sm text-slate-500">
+          Set your overall strategic budget, then distribute it across the 7 NAQAAE pillars. Use the slider or +/− to
+          allocate, or type an amount directly.
+        </p>
+      </div>
+
+      {/* Total budget */}
+      <div className="rounded-xl border border-[#b8922f]/20 bg-[#b8922f]/[0.04] p-4">
+        <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wider text-[#b8922f]/70">
+          Overall Strategic Budget (EGP)
+        </label>
+        <div className="flex items-center gap-3">
+          <Wallet className="h-5 w-5 shrink-0 text-[#b8922f]/60" />
+          <input
+            type="text"
+            inputMode="numeric"
+            value={totalBudget === 0 ? "" : formatCurrency(totalBudget)}
+            onChange={(e) => handleTotalChange(e.target.value)}
+            placeholder="e.g. 5,000,000"
+            className={cn(
+              "flex-1 rounded-lg border border-[#b8922f]/25 bg-[#070911]",
+              "px-3.5 py-2.5 text-lg font-semibold text-[#e0e4ef] placeholder-[#2b2f45]",
+              "outline-none transition-colors duration-150",
+              "focus:border-[#b8922f]/50 focus:ring-1 focus:ring-[#b8922f]/15"
+            )}
+          />
+        </div>
+      </div>
+
+      {/* Remaining tracker */}
+      {totalBudget > 0 && (
+        <div
+          className={cn(
+            "flex items-center justify-between rounded-lg px-4 py-2.5 text-sm font-medium transition-colors",
+            remaining < 0
+              ? "border border-rose-500/25 bg-rose-500/[0.06] text-rose-400"
+              : remaining === 0
+              ? "border border-emerald-500/25 bg-emerald-500/[0.06] text-emerald-400"
+              : "border border-white/[0.07] bg-white/[0.02] text-[#8d97b8]"
+          )}
+        >
+          <span>
+            {remaining < 0 ? "Over budget by" : remaining === 0 ? "Fully allocated" : "Remaining to allocate"}
+          </span>
+          <span className="font-mono text-base">
+            {remaining < 0 ? `−${formatCurrency(Math.abs(remaining))}` : `${formatCurrency(remaining)}`} EGP
+          </span>
+        </div>
+      )}
+
+      {/* Pillar rows */}
+      <div className="space-y-2">
+        {PILLARS.map((pillar, i) => {
+          const value = pillarBudgets[i];
+          const canIncrease = remaining >= BUDGET_STEP;
+          const canDecrease = value >= BUDGET_STEP;
+          const pct = totalBudget > 0 ? Math.min(100, (value / totalBudget) * 100) : 0;
+
+          return (
+            <div
+              key={pillar.id}
+              className="rounded-xl border border-white/[0.07] bg-[#070911] px-4 py-3"
+            >
+              {/* Header: pillar name + percentage badge */}
+              <div className="mb-2.5 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-[#b8922f]/30 text-[10px] font-bold text-[#b8922f]">
+                    {pillar.id}
+                  </span>
+                  <span className="truncate text-[13px] font-medium text-slate-200">{pillar.name}</span>
+                </div>
+                <span
+                  className={cn(
+                    "shrink-0 rounded-md px-2 py-0.5 text-[11px] font-mono font-semibold tabular-nums",
+                    pct > 0
+                      ? "bg-[#b8922f]/10 text-[#b8922f]"
+                      : "bg-white/[0.03] text-[#2b2f45]"
+                  )}
+                >
+                  {pct.toFixed(1)}%
+                </span>
+              </div>
+
+              {/* Slider */}
+              <div className="mb-2.5 px-0.5">
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  step={0.01}
+                  value={pct}
+                  disabled={totalBudget === 0}
+                  onChange={(e) => handleSliderChange(i, e.target.value)}
+                  className="budget-slider w-full disabled:cursor-not-allowed disabled:opacity-30"
+                  style={{
+                    "--pct": `${pct}%`,
+                  } as React.CSSProperties}
+                />
+              </div>
+
+              {/* +/- and number input */}
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => adjust(i, -BUDGET_STEP)}
+                  disabled={!canDecrease}
+                  className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/[0.09] text-[#505672] transition-colors hover:border-white/[0.16] hover:text-slate-300 disabled:pointer-events-none disabled:opacity-25"
+                >
+                  <Minus className="h-3 w-3" />
+                </button>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={value === 0 ? "" : formatCurrency(value)}
+                  onChange={(e) => handlePillarInput(i, e.target.value)}
+                  placeholder="0"
+                  className="flex-1 rounded-lg border border-white/[0.09] bg-[#0f1422] px-2 py-1 text-center text-[12px] font-mono text-[#e0e4ef] placeholder-[#2b2f45] outline-none focus:border-[#b8922f]/35 focus:ring-1 focus:ring-[#b8922f]/12"
+                />
+                <span className="text-[11px] text-[#2b2f45]">EGP</span>
+                <button
+                  onClick={() => adjust(i, BUDGET_STEP)}
+                  disabled={!canIncrease}
+                  className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/[0.09] text-[#505672] transition-colors hover:border-[#b8922f]/30 hover:text-[#b8922f] disabled:pointer-events-none disabled:opacity-25"
+                >
+                  <Plus className="h-3 w-3" />
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <p className="text-center text-xs text-slate-600">
+        You can adjust budget allocations later from Settings. This step is optional — click Next to skip.
+      </p>
+    </div>
+  );
+}
+
+// Step 5
+
+function Step5Upload({ file, setFile }: { file: File | null; setFile: (f: File | null) => void }) {
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -635,12 +838,15 @@ export default function OnboardingPage() {
   const [programState, setProgramState] = useState<ChecklistState>(() => initChecklist(DEFAULT_PROGRAMS));
   const [researchState, setResearchState] = useState<ChecklistState>(() => initChecklist(DEFAULT_RESEARCH));
 
+  const [totalBudget, setTotalBudget] = useState(0);
+  const [pillarBudgets, setPillarBudgets] = useState<number[]>(Array(7).fill(0));
+
   const [file, setFile] = useState<File | null>(null);
 
   const canProceed = step !== 0 || (faculty.trim() !== "" && period.trim() !== "");
 
   function handleNext() {
-    if (step < 3) setStep((s) => s + 1);
+    if (step < 4) setStep((s) => s + 1);
   }
 
   async function handleComplete() {
@@ -656,6 +862,12 @@ export default function OnboardingPage() {
           selectedPriorities: Array.from(priorityState.selected),
           selectedPrograms:   Array.from(programState.selected),
           selectedResearch:   Array.from(researchState.selected),
+          totalBudget,
+          pillarBudgets: PILLARS.map((p, i) => ({
+            pillarId: p.id,
+            name: p.name,
+            budget: pillarBudgets[i],
+          })),
         }),
       });
       if (!res.ok) {
@@ -708,7 +920,15 @@ export default function OnboardingPage() {
               setResearchState={setResearchState}
             />
           )}
-          {step === 3 && <Step4Upload file={file} setFile={setFile} />}
+          {step === 3 && (
+            <Step4Budget
+              totalBudget={totalBudget}
+              setTotalBudget={setTotalBudget}
+              pillarBudgets={pillarBudgets}
+              setPillarBudgets={setPillarBudgets}
+            />
+          )}
+          {step === 4 && <Step5Upload file={file} setFile={setFile} />}
         </div>
 
         {submitError && (
@@ -728,7 +948,7 @@ export default function OnboardingPage() {
           </button>
 
           <div className="flex items-center gap-3">
-            {step === 3 && !submitting && (
+            {step === 4 && !submitting && (
               <button
                 onClick={handleComplete}
                 className="text-sm text-slate-600 transition-colors hover:text-slate-400"
@@ -736,7 +956,7 @@ export default function OnboardingPage() {
                 Skip upload
               </button>
             )}
-            {step < 3 ? (
+            {step < 4 ? (
               <button
                 onClick={handleNext}
                 disabled={!canProceed}

@@ -26,9 +26,12 @@ declare module 'next-auth/jwt' {
   interface JWT extends DefaultJWT {
     accessToken?: string;
     refreshToken?: string;
+    expiresAt?: number;
     accountStatus?: AccountStatus;
     role?: UserRole;
     profilingDone?: boolean;
     organizationId?: string;
+    /** Unix ms timestamp of the last DB re-check for profilingDone */
+    profilingRefreshedAt?: number;
   }
 }

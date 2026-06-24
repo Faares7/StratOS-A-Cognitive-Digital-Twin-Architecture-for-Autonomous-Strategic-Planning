@@ -56,29 +56,31 @@ def load_carryover() -> dict[str, dict]:
 def fetch_org(conn, org_id: str) -> dict[str, Any]:
     rows = _q(conn, "SELECT * FROM organizations WHERE id = %s LIMIT 1", (org_id,))
     if not rows:
-        rows = _q(conn, "SELECT * FROM organizations LIMIT 1")
-    return rows[0] if rows else {}
+        raise ValueError(f"Organization '{org_id}' not found")
+    return rows[0]
 
 
 # ── SWOT ─────────────────────────────────────────────────────────────────────
 
 def fetch_swot_items_all_types(conn) -> list[dict]:
-    """Fetch items using the latest run_id independently per SWOT type.
-    S/W and O/T are produced by different agent runs — a single latest run_id
-    would miss the other pair.  This union query selects the most recent run
-    per type and then returns all items of that type from that run."""
-    return _q(conn, """
-        WITH latest_run_per_type AS (
-            SELECT DISTINCT ON (type) type, run_id
-            FROM   swot_items
-            ORDER  BY type, created_at DESC
-        )
-        SELECT si.*
-        FROM   swot_items si
-        JOIN   latest_run_per_type lr
-               ON si.type = lr.type AND si.run_id = lr.run_id
-        ORDER  BY si.type, si.created_at
+    """Fetch approved SWOT consolidation candidates — same query as /api/gap-analysis/draft.
+    Returns [] (with a warning) if no approved consolidation run exists."""
+    rows = _q(conn, """
+        SELECT candidate_id::text AS item_id,
+               type, title, description,
+               pillar_id, pillar_name,
+               salience_score,
+               approved_at AS created_at
+        FROM   swot_consolidation_candidates
+        WHERE  approved = true
+          AND  description  IS NOT NULL
+          AND  description  != ''
+        ORDER  BY pillar_id NULLS LAST, type, salience_score DESC
     """)
+    if not rows:
+        print("[chief_editor] WARNING: no approved SWOT consolidation run found — "
+              "approve a consolidation run before generating a plan.")
+    return rows
 
 
 # ── Gap analysis ─────────────────────────────────────────────────────────────

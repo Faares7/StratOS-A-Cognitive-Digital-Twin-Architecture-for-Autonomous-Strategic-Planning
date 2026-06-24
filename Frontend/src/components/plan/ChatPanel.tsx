@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, useCallback, useImperativeHandle, forwardRef } from "react";
 import {
-  Send, Plus, Copy, Check, MessageSquare,
+  Send, Plus, Copy, Check, MessageSquare, ImagePlus, X,
 } from "lucide-react";
 import type { PlanDocument, Provenance, Block } from "@/types/plan-document";
 
@@ -28,6 +28,7 @@ interface ChatMessage {
   id:              string;
   role:            ChatRole;
   text:            string;
+  image?:          string;   // base64 data URL of an attached image (user messages)
   isDraft?:        boolean;
   // set when this message is a draft tied to a specific block
   targetBlockId?:  string;
@@ -57,6 +58,58 @@ function uid() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 }
 
+// ── Per-document chat persistence (localStorage) ────────────────────────────────
+
+const DEFAULT_WELCOME: ChatMessage = {
+  id: "welcome",
+  role: "assistant",
+  text: "Hi! I'm your plan editing assistant.\n\nSelect any section in the document to see its sources, then ask me to explain, rewrite, or expand it. Use **+** to reference specific sections.",
+};
+
+const CHAT_STORAGE_KEY = (docId: string) => `stratos-plan-chat-${docId}`;
+
+/**
+ * Read an image file and downscale it to a bounded JPEG data URL.
+ * Keeps base64 small enough for localStorage (~5 MB origin cap) and trims the
+ * token cost of sending it to Gemini. Max edge 1024px, JPEG quality 0.8.
+ */
+function readAndDownscaleImage(file: File, maxEdge = 1024, quality = 0.8): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("read failed"));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("decode failed"));
+      img.onload = () => {
+        const scale = Math.min(1, maxEdge / Math.max(img.width, img.height));
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) { reject(new Error("no canvas ctx")); return; }
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.src = reader.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function loadChat(docId: string): ChatMessage[] {
+  if (!docId || typeof window === "undefined") return [DEFAULT_WELCOME];
+  try {
+    const raw = window.localStorage.getItem(CHAT_STORAGE_KEY(docId));
+    if (raw) {
+      const parsed = JSON.parse(raw) as ChatMessage[];
+      if (Array.isArray(parsed) && parsed.length) return parsed;
+    }
+  } catch { /* ignore */ }
+  return [DEFAULT_WELCOME];
+}
+
 function describeProvenance(prov: Provenance): string {
   if (prov.kind === "human") {
     return `Human edit on ${new Date(prov.editedAt).toLocaleDateString()}`;
@@ -81,11 +134,13 @@ async function callChatApi(
   provenanceDesc: string | null,
   docTitle:      string,
   orgName:       string,
+  history:       { role: ChatRole; content: string }[],
+  image:         string | null,   // base64 data URL of an attached image
 ): Promise<string> {
   const res = await fetch("/api/plan-generation/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message, blockHeading, blockContent, provenanceDesc, docTitle, orgName }),
+    body: JSON.stringify({ message, blockHeading, blockContent, provenanceDesc, docTitle, orgName, history, image }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error ?? "Chat error");
@@ -95,21 +150,18 @@ async function callChatApi(
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function ChatPanel({ selectedBlock, doc, onApplyDraft }, ref) {
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: "welcome",
-      role: "assistant",
-      text: "Hi! I'm your plan editing assistant.\n\nSelect any section in the document to see its sources, then ask me to explain, rewrite, or expand it. Use **+** to reference specific sections.",
-    },
-  ]);
+  const [messages, setMessages] = useState<ChatMessage[]>([DEFAULT_WELCOME]);
+  const loadedDocIdRef = useRef<string | null>(null);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [mentionOpen, setMentionOpen] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [width, setWidth] = useState(340);
+  const [pendingImage, setPendingImage] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const mentionRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ startX: number; startWidth: number } | null>(null);
   const prevBlockIdRef = useRef<string | null>(null);
@@ -126,17 +178,30 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     },
   }), []);
 
-  // Auto-resize textarea: reset to auto so scrollHeight recalculates, then apply it
-  useEffect(() => {
-    const ta = inputRef.current;
-    if (!ta) return;
-    ta.style.height = "auto";
-    ta.style.height = `${ta.scrollHeight}px`;
-  }, [input]);
+  // No auto-resize — textarea stays fixed height to avoid layout reflow.
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  // Load this document's persisted chat when the document changes
+  useEffect(() => {
+    const docId = doc.id;
+    if (!docId || loadedDocIdRef.current === docId) return;
+    loadedDocIdRef.current = docId;
+    setMessages(loadChat(docId));
+  }, [doc.id]);
+
+  // Persist chat to localStorage whenever it changes, keyed by document id.
+  // Skip the bare default so a not-yet-loaded panel can't clobber saved history.
+  useEffect(() => {
+    const docId = loadedDocIdRef.current;
+    if (!docId) return;
+    if (messages.length === 1 && messages[0].id === "welcome") return;
+    try {
+      window.localStorage.setItem(CHAT_STORAGE_KEY(docId), JSON.stringify(messages));
+    } catch { /* ignore */ }
   }, [messages]);
 
   // Track block changes (used for mockResponse context only)
@@ -179,13 +244,28 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     document.addEventListener("mouseup", onUp);
   }, [width]);
 
+  const handlePickImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";   // allow re-picking the same file
+    if (!file) return;
+    if (!file.type.startsWith("image/")) return;
+    try {
+      const dataUrl = await readAndDownscaleImage(file);
+      setPendingImage(dataUrl);
+    } catch {
+      /* ignore unreadable image */
+    }
+  };
+
   const handleSend = async () => {
     const text = input.trim();
-    if (!text || loading) return;
+    const image = pendingImage;
+    if ((!text && !image) || loading) return;
 
-    const uMsg: ChatMessage = { id: uid(), role: "user", text };
+    const uMsg: ChatMessage = { id: uid(), role: "user", text, image: image ?? undefined };
     setMessages(prev => [...prev, uMsg]);
     setInput("");
+    setPendingImage(null);
     setLoading(true);
 
     try {
@@ -193,13 +273,22 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
         ? describeProvenance(selectedBlock.provenance)
         : null;
 
+      // Prior turns (excluding the welcome banner), capped to the last 20 to
+      // bound token cost. `messages` here is the state before the new user turn.
+      const history = messages
+        .filter(m => m.id !== "welcome")
+        .slice(-20)
+        .map(m => ({ role: m.role, content: m.text }));
+
       const reply = await callChatApi(
-        text,
+        text || "(see attached image)",
         selectedBlock?.heading ?? null,
         selectedBlock?.rawContent ?? null,   // actual block text — the LLM reads this
         provenanceDesc,
         doc.meta.title,
         doc.meta.orgName,
+        history,
+        image,
       );
 
       const lower = text.toLowerCase();
@@ -285,12 +374,20 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3">
+      <div className="flex-1 min-h-0 overflow-y-auto px-3 py-3 space-y-3">
         {messages.map((msg) => {
           if (msg.role === "user") {
             return (
               <div key={msg.id} className="flex justify-end">
                 <div className="max-w-[85%] rounded-lg rounded-tr-sm bg-[#1e2535] px-3 py-2 text-xs text-slate-200 leading-relaxed">
+                  {msg.image && (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      src={msg.image}
+                      alt="attachment"
+                      className="mb-1.5 max-h-48 w-full rounded-md object-contain"
+                    />
+                  )}
                   {msg.text}
                 </div>
               </div>
@@ -360,8 +457,40 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       </div>
 
       {/* Input area */}
-      <div className="border-t border-white/5 p-3">
+      <div className="shrink-0 border-t border-white/5 p-3">
+        {/* Pending image preview */}
+        {pendingImage && (
+          <div className="mb-2 inline-flex items-start gap-1 rounded-lg border border-white/10 bg-[#131825] p-1">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={pendingImage} alt="attachment preview" className="max-h-20 rounded object-contain" />
+            <button
+              onClick={() => setPendingImage(null)}
+              className="flex h-4 w-4 items-center justify-center rounded-full bg-black/50 text-slate-300 hover:bg-black/70 hover:text-white transition-colors"
+              title="Remove image"
+            >
+              <X className="h-2.5 w-2.5" />
+            </button>
+          </div>
+        )}
         <div className="flex items-end gap-2 rounded-lg border border-white/10 bg-[#131825] p-2 focus-within:border-cyan-500/30 transition-colors">
+          {/* Hidden file input for image attachment */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handlePickImage}
+          />
+
+          {/* Attach image */}
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="flex h-6 w-6 items-center justify-center rounded text-slate-500 hover:bg-white/5 hover:text-slate-300 transition-colors"
+            title="Attach an image"
+          >
+            <ImagePlus className="h-3.5 w-3.5" />
+          </button>
+
           {/* @ mention trigger */}
           <div className="relative" ref={mentionRef}>
             <button
@@ -413,14 +542,13 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
               }
             }}
             placeholder="Ask me to explain, rewrite, or expand…"
-            rows={1}
-            className="flex-1 resize-none bg-transparent text-xs text-slate-200 placeholder-slate-600 outline-none leading-relaxed"
-            style={{ maxHeight: "14rem", overflowY: "auto" }}
+            rows={3}
+            className="flex-1 resize-none bg-transparent text-xs text-slate-200 placeholder-slate-600 outline-none leading-relaxed overflow-y-auto"
           />
 
           <button
             onClick={handleSend}
-            disabled={!input.trim() || loading}
+            disabled={(!input.trim() && !pendingImage) || loading}
             className="flex h-6 w-6 items-center justify-center rounded bg-cyan-500/15 text-cyan-400 hover:bg-cyan-500/25 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
           >
             <Send className="h-3 w-3" />
